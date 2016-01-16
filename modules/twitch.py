@@ -4,7 +4,7 @@ class IRC(irc.client.SimpleIRCClient):
 	def __init__(self, queue, channel):
 		irc.client.SimpleIRCClient.__init__(self)
 		# Basic variables, twitch channel are IRC so #channel
-		self.channel = "#" + channel
+		self.channel = "#" + channel.lower()
 		self.source = "tw"
 		self.queue = queue
 		
@@ -40,7 +40,7 @@ class IRC(irc.client.SimpleIRCClient):
 		
 		# Then we comp the message and send it to queue for message handling.
 		text = event.arguments[0]
-		print event.source
+		# print event.source
 		comp = {'source': self.source, 'user': user, 'text': text}
 			
 		self.queue.put(comp)
@@ -102,9 +102,8 @@ def __init__(queue, pythonFolder):
 			if request.status_code == 200:
 				# print type(request.json())
 				host = random.choice(request.json()['servers']).split(':')[0]
-				# print random.choice(request.json()['servers']).split(':')[0]
+				# print request.json()['servers'][0].split(':')[0]
 			
-	
 	# If any of the value are non-existent then exit the programm with error.
 	if (host is None) or (port is None) or (channel is None):
 		print "Config for twitch is not correct!"
