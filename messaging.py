@@ -23,7 +23,7 @@ class Message(threading.Thread):
 				#  same name as module name
 				tmp = importlib.import_module(moduleTag + '.' + module[0])
 				init =  getattr(tmp, module[0])
-				self.modules[module[0]] = init()
+				self.modules[module[0]] = init(confFolder)
 		self.daemon = "True"
 		self.queue = queue
 		self.start()
@@ -38,7 +38,11 @@ class Message(threading.Thread):
 		source = message['source']
 		username = message['user']
 		text = message['text']
-	
+		
+		if 'flags' in message:
+			if message['flags'] == 'hidden':
+				return
+		
 		print "[%s] %s: %s" %(source, username, text)
 	
 	def run(self):

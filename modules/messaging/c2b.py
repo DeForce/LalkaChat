@@ -3,7 +3,7 @@
 import re, random
 
 class c2b():
-	def __init__(self):
+	def __init__(self, confFolder):
 		# Creating filter and replace strings.
 		self.filter=[u'жопа']
 		self.replace=[u'погода']
