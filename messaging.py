@@ -8,7 +8,7 @@ class Message(threading.Thread):
     def __init__(self, queue):
         super(self.__class__, self).__init__()
         # Creating dict for dynamic modules
-        self.modules={}
+        self.modules = {}
 
         print "Loading configuration file for messaging"
         python_folder = os.path.dirname(os.path.abspath(__file__))
