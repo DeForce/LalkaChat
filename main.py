@@ -58,7 +58,7 @@ def init():
             # configuration correctly
             loaded_modules[module[0]].__init__(queue, python_folder)
         else: 
-            # If module find/load fails exit all programm
+            # If module find/load fails exit all program
             print "[Error] %s module not found" % module[0]
             exit()
     
