@@ -11,10 +11,10 @@ class Message(threading.Thread):
         self.modules={}
 
         print "Loading configuration file for messaging"
-        pythonFolder=os.path.dirname(os.path.abspath(__file__))
-        confFolder=os.path.join(pythonFolder, "conf")
+        python_folder=os.path.dirname(os.path.abspath(__file__))
+        confFolder=os.path.join(python_folder, "conf")
         confFile=os.path.join(confFolder, "messaging.cfg")
-        moduleFolder=os.path.join(pythonFolder, "modules", "messaging")
+        moduleFolder=os.path.join(python_folder, "modules", "messaging")
         moduleTag="modules.messaging"
         config = ConfigParser.RawConfigParser(allow_no_value=True)
         config.read(confFile)
