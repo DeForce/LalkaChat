@@ -37,7 +37,7 @@ class Message(threading.Thread):
         # All modules should return the message with modified/not modified
         #  content so it can be passed to new module, or to pass to CLI
         for module in self.modules:
-            message = self.modules[module].getMessage(message)
+            message = self.modules[module].get_message(message)
 
         source = message['source']
         username = message['user']
