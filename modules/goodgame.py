@@ -88,29 +88,29 @@ class ggThread(threading.Thread):
         ws.run_forever()
 
 
-def __init__(queue, pythonFolder):
+def __init__(queue, python_folder):
     print "Initializing goodgame chat"
     
     # Reading config from main directory.
-    confFolder=os.path.join(pythonFolder, "conf")
-    confFile=os.path.join(confFolder, "chats.cfg")
+    conf_folder = os.path.join(python_folder, "conf")
+    conf_file = os.path.join(conf_folder, "chats.cfg")
     config = ConfigParser.RawConfigParser(allow_no_value=True)
-    config.read(confFile)
+    config.read(conf_file)
     
     # Checking config file for needed variables
     address = None
-    id = None
+    ch_id = None
     for item in config.items("goodgame"):
         if item[0] == 'socket':
             address = item[1]
         elif item[0] == 'channelid':
-            id = item[1]
+            ch_id = item[1]
     
     # If any of the value are non-existent then exit the programm with error.
-    if (address is None) or (id is None):
+    if (address is None) or (ch_id is None):
         print "Config for goodgame is not correct!"
         exit()
     
     # Creating new thread with queue in place for messaging tranfers
-    gg = ggThread(queue, address, id)
+    gg = ggThread(queue, address, ch_id)
     gg.start()

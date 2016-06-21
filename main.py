@@ -1,4 +1,9 @@
-import os, ConfigParser, importlib, threading, Queue, messaging
+import os
+import ConfigParser
+import importlib
+import threading
+import Queue
+import messaging
 
 
 def init():
@@ -25,7 +30,7 @@ def init():
     print "Loading Messaging Handler"
     print "Loading Queue for message handling"
     
-    # Creating queues for messaging tranfer between chat threads
+    # Creating queues for messaging transfer between chat threads
     queue = Queue.Queue()
     # Loading module for message processing...
     msg_module = messaging.Message(queue)

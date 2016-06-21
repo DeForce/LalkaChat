@@ -1,5 +1,6 @@
 import irc.client, threading, os, sys, ConfigParser, random, requests
 
+
 class IRC(irc.client.SimpleIRCClient):
     def __init__(self, queue, channel):
         irc.client.SimpleIRCClient.__init__(self)
@@ -45,6 +46,7 @@ class IRC(irc.client.SimpleIRCClient):
 
         self.queue.put(comp)
 
+
 class twThread(threading.Thread):
     def __init__(self, queue, host, port, channel):
         threading.Thread.__init__(self)
@@ -76,6 +78,7 @@ class twThread(threading.Thread):
         ircClient.start()
         # print dir(IRCCat)
         # irc.connect()
+
 
 def __init__(queue, pythonFolder):
     print "Initializing twitch chat"

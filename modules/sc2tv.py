@@ -1,5 +1,12 @@
-import json, threading, time, re, requests, os, ConfigParser
+import json
+import threading
+import time
+import re
+import requests
+import os
+import ConfigParser
 from ws4py.client.threadedclient import WebSocketClient
+
 
 class fsChat(WebSocketClient):
     def __init__(self, ws, queue, nick, protocols=None,):
@@ -46,29 +53,29 @@ class fsChat(WebSocketClient):
             # 	       43Iter{json}
             # ex:      430{'somedata': 'somedata'}
             # We need to just get the json, so we "regexp" it.
-            if(re.findall('{.*}', message)[0]):
+            if re.findall('{.*}', message)[0]:
                 # If message does have JSON (some of them dont, dont know why)
                 #  we analyze the real "json" message.
                 message = json.loads(re.findall('{.*}',message)[0])
-                for dict in message:
+                for dict_item in message:
                     # SID type is "start" packet, after that we can join channels,
                     #  at least I think so.
-                    if dict == 'sid':
+                    if dict_item == 'sid':
                         # "Funstream" has some interesting infrastructure, so
                         #  we first need to find the channel ID from
                         #  nickname of streamer we need to connect to.
                         self.fsGetId()
                         self.fsJoin()
                         self.fsPing()
-                    elif dict == 'id':
+                    elif dict_item == 'id':
                         try:
-                            self.duplicates.index(message[dict])
+                            self.duplicates.index(message[dict_item])
                         except:
                             user = message['from']['name']
                             text = message['text']
                             comp = {'source': self.source, 'user': user, 'text': text}
                             self.queue.put(comp)
-                            self.duplicates.append(message[dict])
+                            self.duplicates.append(message[dict_item])
                             if len(self.duplicates) > self.bufferForDup:
                                 self.duplicates.pop(0)
 
@@ -78,7 +85,7 @@ class fsChat(WebSocketClient):
         payload = "{'id': null, 'name': \""+ self.nick + "\"}"
         request = requests.post("http://funstream.tv/api/user", data=payload)
         if request.status_code == 200:
-            self.channelID = json.loads(re.findall('{.*}',request.text)[0])['id']
+            self.channelID = json.loads(re.findall('{.*}', request.text)[0])['id']
 
     def fsJoin(self):
         # Because we need to iterate each message we iterate it!
@@ -102,6 +109,7 @@ class fsChat(WebSocketClient):
         pingThr = pingThread(self)
         pingThr.start()
 
+
 class pingThread(threading.Thread):
     def __init__(self, ws):
         threading.Thread.__init__(self)
@@ -124,6 +132,7 @@ class pingThread(threading.Thread):
             self.ws.send("2")
             time.sleep(30)
 
+
 class fsThread(threading.Thread):
     def __init__(self, queue, socket, nick):
         threading.Thread.__init__(self)
@@ -141,14 +150,15 @@ class fsThread(threading.Thread):
         ws.connect()
         ws.run_forever()
 
-def __init__(queue, pythonFolder):
+
+def __init__(queue, python_folder):
     print "Initializing funstream chat"
 
     # Reading config from main directory.
-    confFolder=os.path.join(pythonFolder, "conf")
-    confFile=os.path.join(confFolder, "chats.cfg")
+    conf_folder=os.path.join(python_folder, "conf")
+    conf_file=os.path.join(conf_folder, "chats.cfg")
     config = ConfigParser.RawConfigParser(allow_no_value=True)
-    config.read(confFile)
+    config.read(conf_file)
 
     # Checking config file for needed variables
     socket = None
