@@ -15,7 +15,10 @@ class df():
 			if grep[0] == 'symbol':
 				self.symbol = grep[1]
 			elif grep[0] == 'file':
-				self.file = os.path.join(confFolder, grep[1])
+				self.file = grep[1]
+				if not os.path.isfile(grep[1]):
+					with open(grep[1], 'w') as f:
+						pass
 				
 		self.prof=[]
 		for prof in config.items(profTag):
@@ -23,14 +26,18 @@ class df():
 			self.prof.append(comp)
 			
 	def writeToFile(self, message):
+		with open(self.file, 'r') as f:
+			for line in f.readlines():
+				if message['user'] == line.split(',')[0]:
+					return 
+			text = "%s,%s\n" %(message['user'], message['text'])
 		with open(self.file, 'a') as f:
-			text = "%s: %s \n" %(message['user'], message['text'])
 			f.write(text)
 	
 	def getMessage(self, message):
 		for regexp in self.prof:
 			if re.search(regexp[1], message['text']):
-				print "Got Hit %s" % regexp[0]
+				# print "Got Hit %s" % regexp[0]
 				comp = {'user': message['user'], 'text': regexp[0]}
 				self.writeToFile(comp)
 				break
