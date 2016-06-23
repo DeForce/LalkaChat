@@ -37,6 +37,7 @@ def init():
     
     print "Loading Configuration File"
     module_tag = "modules"
+    module_import_folder = "modules"
     
     loaded_modules = {}
     
@@ -48,12 +49,12 @@ def init():
         if module[1] is not None:
             print "[Error] unable to load module %s: has parameters" % module[0]
             exit()
-        if os.path.isfile(os.path.join(module_folder, module[0]+ ".py")):
+        if os.path.isfile(os.path.join(module_folder, module[0] + ".py")):
             print "found %s" % module[0]
             # After module is find, we are initializing it.
             # Module should have __init__ function not in class.
             # Class should be threaded if it needs to run "infinitely"
-            loaded_modules[module[0]] = importlib.import_module(module_tag + '.' + module[0])
+            loaded_modules[module[0]] = importlib.import_module(module_import_folder + '.' + module[0])
             # Also passing core folder to module so it can load it's own
             # configuration correctly
             loaded_modules[module[0]].__init__(queue, python_folder)
@@ -74,3 +75,6 @@ def init():
         except KeyboardInterrupt:
             print "Exiting now!"
             exit()
+
+if __name__ == '__main__':
+    init()
