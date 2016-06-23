@@ -1,7 +1,6 @@
 import os
 import ConfigParser
 import importlib
-import threading
 import Queue
 import messaging
 
@@ -33,7 +32,7 @@ def init():
     # Creating queues for messaging transfer between chat threads
     queue = Queue.Queue()
     # Loading module for message processing...
-    msg_module = messaging.Message(queue)
+    messaging.Message(queue)
     
     print "Loading Configuration File"
     module_tag = "modules"
