@@ -1,3 +1,5 @@
+# This Python file uses the following encoding: utf-8
+# -*- coding: utf-8 -*-
 import os
 import ConfigParser
 import threading
@@ -33,22 +35,21 @@ class Message(threading.Thread):
         self.start()
 
     def msg_process(self, message):
+        if ('to' in message) and (message['to'] is not None):
+            message['text'] = ', '.join([message['to'], text])
+
         # When we receive message we pass it via all loaded modules
         # All modules should return the message with modified/not modified
         #  content so it can be passed to new module, or to pass to CLI
+
         for module in self.modules:
-            message = self.modules[module].get_message(message)
+            try:
+                message = self.modules[module].get_message(message)
+            except:
+                pass
 
-        source = message['source']
-        username = message['user']
-        text = message['text']
-
-        if 'flags' in message:
-            if message['flags'] == 'hidden':
-                return
-        if ('to' in message) and (message['to'] is not None):
-            text = ', '.join([message['to'], text])
-        print "[%s] %s: %s" % (source, username, text)
+        if message is not None:
+            print "[%s] %s: %s" % (message['source'], message['user'], message['text'])
 
     def run(self):
         while True:

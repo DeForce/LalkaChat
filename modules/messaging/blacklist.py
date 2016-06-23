@@ -13,28 +13,59 @@ class blacklist():
         config = ConfigParser.RawConfigParser(allow_no_value=True)
         config.read(conf_file)
 
-        users_tag = 'users'
-        words_tag = 'words'
+        tag_config = 'main'
+        tag_users = 'users'
+        tag_users_hide = 'users_hide'
+        tag_words = 'words'
+        tag_words_hide = 'words_hide'
+
+        for item in config.items(tag_config):
+            if item[0] == 'message':
+                self.blacklist_message = item[1].decode('utf-8')
 
         self.users = []
-        for user in config.items(users_tag):
-            comp = [user[0], user[1]]
+        for user in config.items(tag_users):
+            comp = {'type': user[0], 'filter': user[1].split(',')}
+            comp['filter'] = map(lambda x: x.strip().decode('utf-8'), comp['filter'])
+            self.users.append(comp)
+        for user in config.items(tag_users_hide):
+            comp = {'type': 'hide', 'filter': user[1].split(',')}
+            comp['filter'] = map(lambda x: x.strip().decode('utf-8'), comp['filter'])
             self.users.append(comp)
 
         self.words = []
-        for word in config.items(words_tag):
-            comp = [word[0], word[1]]
+        for word in config.items(tag_words):
+            comp = {'type': word[0], 'filter': word[1]}
+            self.words.append(comp)
+        for word in config.items(tag_words_hide):
+            comp = {'type': 'hide', 'filter': word[1]}
             self.words.append(comp)
 
     def get_message(self, message):
-        for regexp in self.users:
-            if re.search(regexp[1], message['user']):
-                message['flags'] = 'hidden'
-                break
+        if message is None:
+            # print "Blackist recieved no message"
+            return
+        else:
+            for regexp in self.users:
+                for re_item in regexp['filter']:
+                    if message['user'] == re_item:
+                        if regexp['type'] == 'hide':
+                            message['flags'] = 'hide'
+                        else:
+                            message['flags'] = 'blacklist'
+                        break
 
-        for regexp in self.words:
-            if re.search(regexp[1], message['text']):
-                message['flags'] = 'hidden'
-                break
+            for regexp in self.words:
+                if re.search(regexp['filter'], message['text']):
+                    if regexp['type'] == 'hide':
+                        message['flags'] = 'hide'
+                    else:
+                        message['flags'] = 'blacklist'
+                    break
 
-        return message
+            if message['flags'] == 'blacklist':
+                message['text'] = self.blacklist_message
+
+            if message['flags'] == 'hide':
+                return
+            return message

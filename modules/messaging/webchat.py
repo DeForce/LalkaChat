@@ -2,20 +2,29 @@ import ConfigParser
 import os
 import threading
 import requests
+import Queue
+
 from flask import Flask, request
 from flask_sockets import Sockets
+
+from gevent import pywsgi
+from geventwebsocket.handler import WebSocketHandler
 
 
 # Flask Side
 app = Flask(__name__)
 sockets = Sockets(app)
+s_queue = Queue.Queue()
 
 
-@sockets.route('/echo')
+@sockets.route('/message/ws')
 def echo_socket(ws):
-    while not ws.closed:
-        message = ws.receive()
-        ws.send(message)
+    while True:
+        message = s_queue.get()
+        try:
+            ws.send(message)
+        except:
+            pass
 
 
 @app.route('/')
@@ -25,7 +34,7 @@ def hello_world():
 
 @app.route('/message/get', methods=['POST'])
 def process_message():
-    print "Recieved Message"
+    print "Received Message"
     return request.form['user']
 
 
@@ -37,6 +46,17 @@ class FlaskThread(threading.Thread):
 
     def run(self):
         app.run(host=self.host, port=self.port)
+
+
+class SocketThread(threading.Thread):
+    def __init__(self, host, port):
+        super(self.__class__, self).__init__()
+        self.host = host
+        self.port = port
+
+    def run(self):
+        server = pywsgi.WSGIServer((self.host, self.port), app, handler_class=WebSocketHandler)
+        server.serve_forever()
 
 
 class webchat():
@@ -57,9 +77,17 @@ class webchat():
         f_thread = FlaskThread(self.host, self.port)
         f_thread.start()
 
+        s_port = int(self.port) + 1
+        s_thread = SocketThread(self.host, s_port)
+        s_thread.start()
 
     def get_message(self, message):
-        # url = 'http://{0}:{1}{2}'.format(self.host, self.port, '/message/get')
-        # req = requests.post(url, data=message)
-        # print req.text
-        return message
+        if message is None:
+            # print "webchat received empty message"
+            return
+        else:
+            if 'flags' in message:
+                if message['flags'] == 'hidden':
+                    return message
+            s_queue.put(message)
+            return message

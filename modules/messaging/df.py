@@ -7,7 +7,7 @@ import ConfigParser
 
 class df():
     def __init__(self, conf_folder):
-        # Dwarf proffesions.
+        # Dwarf professions.
         conf_file = os.path.join(conf_folder, "df.cfg")
         grep_tag = 'grep'
         prof_tag = 'prof'
@@ -20,7 +20,7 @@ class df():
             elif grep[0] == 'file':
                 self.file = grep[1]
                 if not os.path.isfile(grep[1]):
-                    with open(grep[1], 'w') as f:
+                    with open(grep[1], 'w'):
                         pass
 
         self.prof = []
@@ -38,11 +38,14 @@ class df():
             f.write(text)
 
     def get_message(self, message):
-        for regexp in self.prof:
-            if re.search(regexp[1], message['text']):
-                # print "Got Hit %s" % regexp[0]
-                comp = {'user': message['user'], 'text': regexp[0]}
-                self.write_to_tile(comp)
-                break
-
-        return message
+        if message is None:
+            # print "df received empty message"
+            return
+        else:
+            for regexp in self.prof:
+                if re.search(regexp[1], message['text']):
+                    # print "Got Hit %s" % regexp[0]
+                    comp = {'user': message['user'], 'text': regexp[0]}
+                    self.write_to_tile(comp)
+                    break
+            return message
