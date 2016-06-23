@@ -3,10 +3,19 @@ import os
 import threading
 import requests
 from flask import Flask, request
+from flask_sockets import Sockets
 
 
 # Flask Side
 app = Flask(__name__)
+sockets = Sockets(app)
+
+
+@sockets.route('/echo')
+def echo_socket(ws):
+    while not ws.closed:
+        message = ws.receive()
+        ws.send(message)
 
 
 @app.route('/')
@@ -47,8 +56,6 @@ class webchat():
         # Run Flask Thread
         f_thread = FlaskThread(self.host, self.port)
         f_thread.start()
-
-        # Run WebSocket Thread
 
 
     def get_message(self, message):
