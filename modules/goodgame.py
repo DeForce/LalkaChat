@@ -1,4 +1,9 @@
-import json, threading, os, ConfigParser, time, Queue
+import json
+import threading
+import os
+import ConfigParser
+import time
+import Queue
 from ws4py.client.threadedclient import WebSocketClient
 
 
