@@ -9,8 +9,8 @@ class df():
     def __init__(self, conf_folder):
         # Dwarf proffesions.
         conf_file = os.path.join(conf_folder, "df.cfg")
-        grep_tag =  'grep'
-        prof_tag =  'prof'
+        grep_tag = 'grep'
+        prof_tag = 'prof'
         config = ConfigParser.RawConfigParser(allow_no_value=True)
         config.read(conf_file)
 
@@ -23,7 +23,7 @@ class df():
                     with open(grep[1], 'w') as f:
                         pass
 
-        self.prof=[]
+        self.prof = []
         for prof in config.items(prof_tag):
             comp = [prof[0].capitalize(), self.symbol + prof[1].decode('utf-8')]
             self.prof.append(comp)

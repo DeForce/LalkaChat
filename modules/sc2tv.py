@@ -56,7 +56,7 @@ class fsChat(WebSocketClient):
             if re.findall('{.*}', message)[0]:
                 # If message does have JSON (some of them dont, dont know why)
                 #  we analyze the real "json" message.
-                message = json.loads(re.findall('{.*}',message)[0])
+                message = json.loads(re.findall('{.*}', message)[0])
                 for dict_item in message:
                     # SID type is "start" packet, after that we can join channels,
                     #  at least I think so.
@@ -72,8 +72,12 @@ class fsChat(WebSocketClient):
                             self.duplicates.index(message[dict_item])
                         except:
                             user = message['from']['name']
+                            if message['to'] is not None:
+                                to = message['to']['name']
+                            else:
+                                to = None
                             text = message['text']
-                            comp = {'source': self.source, 'user': user, 'text': text}
+                            comp = {'source': self.source, 'user': user, 'text': text, 'to': to}
                             self.queue.put(comp)
                             self.duplicates.append(message[dict_item])
                             if len(self.duplicates) > self.bufferForDup:
@@ -94,7 +98,7 @@ class fsChat(WebSocketClient):
 
         # Then we send the message acording to needed format and
         #  hope it joins us
-        join = str(iter)+ "[\"/chat/join\", " + json.dumps({'channel':"stream/" + str(self.channelID)}, sort_keys=False) + "]"
+        join = str(iter) + "[\"/chat/join\", " + json.dumps({'channel':"stream/" + str(self.channelID)}, sort_keys=False) + "]"
         self.send(join)
         print "[%s] Joined channel %s" % (self.source, self.channelID)
 
@@ -155,8 +159,8 @@ def __init__(queue, python_folder):
     print "Initializing funstream chat"
 
     # Reading config from main directory.
-    conf_folder=os.path.join(python_folder, "conf")
-    conf_file=os.path.join(conf_folder, "chats.cfg")
+    conf_folder = os.path.join(python_folder, "conf")
+    conf_file = os.path.join(conf_folder, "chats.cfg")
     config = ConfigParser.RawConfigParser(allow_no_value=True)
     config.read(conf_file)
 

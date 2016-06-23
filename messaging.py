@@ -46,8 +46,9 @@ class Message(threading.Thread):
         if 'flags' in message:
             if message['flags'] == 'hidden':
                 return
-
-        print "[%s] %s: %s" %(source, username, text)
+        if ('to' in message) and (message['to'] is not None):
+            text = ', '.join([message['to'], text])
+        print "[%s] %s: %s" % (source, username, text)
 
     def run(self):
         while True:
