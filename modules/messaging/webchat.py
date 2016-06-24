@@ -1,51 +1,75 @@
 import ConfigParser
 import os
 import threading
-import requests
+import json
 import Queue
+import cherrypy
+from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
+from ws4py.websocket import WebSocket
 
-from flask import Flask, request
-from flask_sockets import Sockets
-
-from gevent import pywsgi
-from geventwebsocket.handler import WebSocketHandler
-
-
-# Flask Side
-app = Flask(__name__)
-sockets = Sockets(app)
 s_queue = Queue.Queue()
 
 
-@sockets.route('/message/ws')
-def echo_socket(ws):
-    while True:
-        message = s_queue.get()
-        try:
-            ws.send(message)
-        except:
-            pass
-
-
-@app.route('/')
-def hello_world():
-    return 'Hello, World!'
-
-
-@app.route('/message/get', methods=['POST'])
-def process_message():
-    print "Received Message"
-    return request.form['user']
-
-
-class FlaskThread(threading.Thread):
-    def __init__(self, host, port):
+class MessagingThread(threading.Thread):
+    def __init__(self, ws):
         super(self.__class__, self).__init__()
-        self.host = host
-        self.port = port
+        self.ws = ws
 
     def run(self):
-        app.run(host=self.host, port=self.port)
+        while True:
+            message = s_queue.get()
+            cherrypy.engine.publish('websocket-broadcast', json.dumps(message))
+
+
+class WebChatSocketServer(WebSocket):
+    def __init__(self, sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None):
+        super(self.__class__, self).__init__(sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None)
+        thread = MessagingThread(self)
+        thread.start()
+        self.clients = []
+
+    def opened(self):
+        cherrypy.engine.publish('add-client', self.peer_address, self)
+
+    def closed(self, code, reason=None):
+        cherrypy.engine.publish('del-client', self.peer_address, self)
+
+    def received_message(self, message):
+        print message
+
+
+class WebChatPlugin(WebSocketPlugin):
+    def __init__(self, bus):
+        WebSocketPlugin.__init__(self, bus)
+        self.clients = []
+
+    def start(self):
+        WebSocketPlugin.start(self)
+        self.bus.subscribe('add-client', self.add_client)
+        self.bus.subscribe('del-client', self.del_client)
+
+    def stop(self):
+        WebSocketPlugin.stop(self)
+        self.bus.unsubscribe('add-client', self.add_client)
+        self.bus.unsubscribe('del-client', self.del_client)
+
+    def add_client(self, addr, websocket):
+        self.clients.append({'ip': addr[0], 'port': addr[1], 'websocket': websocket})
+
+    def del_client(self, addr):
+        self.clients.remove({'ip': addr[0], 'port': addr[1]})
+
+
+class HttpRoot(object):
+    @cherrypy.expose
+    def index(self):
+        print 'HelloWorld'
+        return 'some HTML with a websocket javascript connection'
+
+    @cherrypy.expose
+    def ws(self):
+        # you can access the class instance through
+        handler = cherrypy.request.ws_handler
 
 
 class SocketThread(threading.Thread):
@@ -54,9 +78,13 @@ class SocketThread(threading.Thread):
         self.host = host
         self.port = port
 
+        cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host})
+        WebChatPlugin(cherrypy.engine).subscribe()
+        cherrypy.tools.websocket = WebSocketTool()
+
     def run(self):
-        server = pywsgi.WSGIServer((self.host, self.port), app, handler_class=WebSocketHandler)
-        server.serve_forever()
+        cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
+                                                             'tools.websocket.handler_cls': WebChatSocketServer}})
 
 
 class webchat():
@@ -73,12 +101,7 @@ class webchat():
             if item[0] == 'port':
                 self.port = item[1]
 
-        # Run Flask Thread
-        f_thread = FlaskThread(self.host, self.port)
-        f_thread.start()
-
-        s_port = int(self.port) + 1
-        s_thread = SocketThread(self.host, s_port)
+        s_thread = SocketThread(self.host, self.port)
         s_thread.start()
 
     def get_message(self, message):
