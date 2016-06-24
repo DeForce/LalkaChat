@@ -33,7 +33,7 @@ class WebChatSocketServer(WebSocket):
         cherrypy.engine.publish('add-client', self.peer_address, self)
 
     def closed(self, code, reason=None):
-        cherrypy.engine.publish('del-client', self.peer_address, self)
+        cherrypy.engine.publish('del-client', self.peer_address)
 
     def received_message(self, message):
         print message

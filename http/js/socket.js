@@ -51,7 +51,19 @@ twitch_processEmoticons = function(message, emotes) {
 	return message;
 };
 
-htmlifyEmoticons = function(message) {
+htmlifyGGEmoticons = function(message, emotes) {
+	return message.replace(/:(\w+|\d+):/g, function (code, emote_key) {
+		for(var emote in emotes) {
+			if(emote_key == emotes[emote]['emote_id']) {
+				return "<img class='imgSmile' src=" + emotes[emote]['emote_url'] + ">";
+			}
+		}
+		return code;
+    });
+};
+
+
+htmlifyTwitchEmoticons = function(message) {
     return message.replace(/\$emoticon#(\d+)\$/g, function (code, emoteId) {
 		return "<img class='imgSmile' src='http://static-cdn.jtvnw.net/emoticons/v1/" + emoteId + "/1.0'>";
     });
@@ -139,7 +151,10 @@ function showMessage(message) {
 		elements.message.text.setAttribute('class', 'msgText');
 		
 		if(messageJSON.source == 'tw') {
-			messageJSON.text = htmlifyEmoticons(escapeHtml(twitch_processEmoticons(messageJSON.text, messageJSON.emotes)));
+			messageJSON.text = htmlifyTwitchEmoticons(escapeHtml(twitch_processEmoticons(messageJSON.text, messageJSON.emotes)));
+		}
+		else if(messageJSON.source == 'gg') {
+			messageJSON.text = htmlifyGGEmoticons(messageJSON.text, messageJSON.emotes)
 		}
 		
 		// elements.message.text.appendChild(document.createTextNode(messageJSON.text));
