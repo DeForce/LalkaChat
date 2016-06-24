@@ -36,7 +36,7 @@ class Message(threading.Thread):
 
     def msg_process(self, message):
         if ('to' in message) and (message['to'] is not None):
-            message['text'] = ', '.join([message['to'], text])
+            message['text'] = ', '.join([message['to'], message['text']])
 
         # When we receive message we pass it via all loaded modules
         # All modules should return the message with modified/not modified
