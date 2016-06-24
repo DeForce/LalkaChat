@@ -43,14 +43,34 @@ class ggChat(WebSocketClient):
             user = message['data']['user_name']
             text = message['data']['text']
 
+            print message
             emotes = []
             smiles_array = re.findall(self.smile_regex, text)
             for smile in smiles_array:
                 for smile_find in self.smiles:
                     if smile_find['key'] == smile:
                         print smile_find
-                        if smile not in emotes:
-                            emotes.append({'emote_id': smile, 'emote_url': smile_find['urls']['big']})
+                        allow = False
+                        if message['data']['user_rights'] >= 40:
+                            allow = True
+                        elif message['data']['user_rights'] >= 20 \
+                                and (smile_find['channel_id'] == '0' or smile_find['channel_id'] == '10603'):
+                            allow = True
+                        elif smile_find['donate_lvl'] == 0 \
+                                and (smile_find['channel_id'] == '0' or smile_find['channel_id'] == '10603'):
+                            allow = True
+
+                        for premium in message['data']['premiums']:
+                            if smile_find['channel_id'] == str(premium):
+                                if smile_find['is_premium']:
+                                    print smile_find['is_premium']
+                                    allow = True
+
+
+                        print allow
+                        if allow:
+                            if smile not in emotes:
+                                emotes.append({'emote_id': smile, 'emote_url': smile_find['urls']['big']})
 
             comp = {'source': self.source, 'user': user, 'text': text, 'emotes': emotes}
             self.queue.put(comp)

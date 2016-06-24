@@ -58,7 +58,10 @@ class WebChatPlugin(WebSocketPlugin):
         self.clients.append({'ip': addr[0], 'port': addr[1], 'websocket': websocket})
 
     def del_client(self, addr):
-        self.clients.remove({'ip': addr[0], 'port': addr[1]})
+        try:
+            self.clients.remove({'ip': addr[0], 'port': addr[1]})
+        except:
+            pass
 
 
 class HttpRoot(object):
