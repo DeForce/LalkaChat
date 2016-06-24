@@ -79,7 +79,10 @@ class SocketThread(threading.Thread):
         self.host = host
         self.port = port
 
-        cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host})
+        cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host,
+                                'global': {
+                                    'engine.autoreload.on': False
+                                }})
         WebChatPlugin(cherrypy.engine).subscribe()
         cherrypy.tools.websocket = WebSocketTool()
 
