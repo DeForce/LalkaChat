@@ -4,6 +4,7 @@ import threading
 import json
 import Queue
 import cherrypy
+from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
@@ -63,8 +64,8 @@ class WebChatPlugin(WebSocketPlugin):
 class HttpRoot(object):
     @cherrypy.expose
     def index(self):
-        print 'HelloWorld'
-        return 'some HTML with a websocket javascript connection'
+        print os.path.join(os.getcwd(), 'http', 'index.html')
+        return serve_file(os.path.join(os.getcwd(), 'http', 'index.html'), 'text/html')
 
     @cherrypy.expose
     def ws(self):
@@ -83,8 +84,26 @@ class SocketThread(threading.Thread):
         cherrypy.tools.websocket = WebSocketTool()
 
     def run(self):
+        # cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
+        #                                                      'tools.websocket.handler_cls': WebChatSocketServer},
+        #                                              '/': {'tools.staticdir.on': True,
+        #                                                    'tools.staticdir.root': os.path.join(os.getcwd(), 'http'),
+        #                                                    'tools.staticdir.dir': os.path.join(os.getcwd(), 'http'),
+        #                                                    'tools.staticdir.index': "index.html",
+        #                                                    'tools.staticdir.debug': True,
+        #                                                    'log.screen': True}})
+
         cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
-                                                             'tools.websocket.handler_cls': WebChatSocketServer}})
+                                                             'tools.websocket.handler_cls': WebChatSocketServer},
+                                                     '/js': {'tools.staticdir.on': True,
+                                                             'tools.staticdir.dir': os.path.join(os.getcwd(),
+                                                                                                 'http', 'js')},
+                                                     '/css': {'tools.staticdir.on': True,
+                                                              'tools.staticdir.dir': os.path.join(os.getcwd(),
+                                                                                                  'http', 'css')},
+                                                     '/img': {'tools.staticdir.on': True,
+                                                              'tools.staticdir.dir': os.path.join(os.getcwd(),
+                                                                                                  'http', 'img')}})
 
 
 class webchat():

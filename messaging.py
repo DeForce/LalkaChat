@@ -11,6 +11,7 @@ class Message(threading.Thread):
         super(self.__class__, self).__init__()
         # Creating dict for dynamic modules
         self.modules = {}
+        self.msg_counter = 0
 
         print "Loading configuration file for messaging"
         python_folder = os.path.dirname(os.path.abspath(__file__))
@@ -38,6 +39,9 @@ class Message(threading.Thread):
         if ('to' in message) and (message['to'] is not None):
             message['text'] = ', '.join([message['to'], message['text']])
 
+        if 'id' not in message:
+            message['id'] = self.msg_counter
+            self.msg_counter += 1
         # When we receive message we pass it via all loaded modules
         # All modules should return the message with modified/not modified
         #  content so it can be passed to new module, or to pass to CLI

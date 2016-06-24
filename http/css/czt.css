@@ -1,0 +1,48 @@
+::-webkit-scrollbar {
+	visibility: hidden;
+}
+
+body{
+	margin: 0px;
+}
+
+#ChatContainer{
+	position: absolute;
+    bottom: 0;
+	width: 100%;
+}
+
+.msg{
+	border: 1p solid red;
+	background-color: rgba( 35, 35, 37, 0.627451 );
+	font-family: 'Consolas'; font-size: 13pt;
+	text-shadow: 0 1px 1px black;
+	padding-bottom: 3px;
+	color: #FFFFFF;
+
+}
+
+.msgSource {
+	margin-right: 3px;
+	width: 16px;
+	height: 16px;
+	background-color: rgba(0,0,0,0.6);
+	border-radius: 3px;
+	margin: 0px 3px 0px 0px;
+	position: relative;
+	top: 3px;
+	left: 3px;
+	display: inline-block;
+}
+
+.msgUser {
+	display: inline-block;
+	position: relative;
+	padding-left: 5px;
+}
+
+.msgText {
+	display: inline;
+	padding-left: 5px;
+	word-wrap: break-word;
+}

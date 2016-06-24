@@ -98,7 +98,7 @@ class fsChat(WebSocketClient):
 
         # Then we send the message acording to needed format and
         #  hope it joins us
-        join = str(iter) + "[\"/chat/join\", " + json.dumps({'channel':"stream/" + str(self.channelID)}, sort_keys=False) + "]"
+        join = str(iter) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channelID)}, sort_keys=False) + "]"
         self.send(join)
         print "[%s] Joined channel %s" % (self.source, self.channelID)
 
