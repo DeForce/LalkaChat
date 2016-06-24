@@ -15,7 +15,6 @@ class ggChat(WebSocketClient):
         self.source = "gg"
         self.queue = queue
         self.id = id
-        self.id = id
         # Checking the connection state
         self.pqueue = Queue.Queue()
 
@@ -25,7 +24,7 @@ class ggChat(WebSocketClient):
     def opened(self):
         print "[%s] Connection Succesfull" % self.source
         # Sending join channel command to goodgame websocket
-        join = json.dumps({'type': "join", 'data': {'channel_id': "15009", 'hidden': "true"}}, sort_keys=False)
+        join = json.dumps({'type': "join", 'data': {'channel_id': self.id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
         # self.ggPing()
         print "[%s] Sent join message" % self.source
@@ -56,9 +55,11 @@ class ggChat(WebSocketClient):
                         elif message['data']['user_rights'] >= 20 \
                                 and (smile_find['channel_id'] == '0' or smile_find['channel_id'] == '10603'):
                             allow = True
-                        elif smile_find['donate_lvl'] == 0 \
-                                and (smile_find['channel_id'] == '0' or smile_find['channel_id'] == '10603'):
-                            allow = True
+                        elif smile_find['channel_id'] == '0' or smile_find['channel_id'] == '10603':
+                            if smile_find['donate_lvl'] == 0:
+                                allow = True
+                            elif smile_find['donate_lvl'] <= int(message['data']['payments']):
+                                allow = True
 
                         for premium in message['data']['premiums']:
                             if smile_find['channel_id'] == str(premium):
@@ -66,8 +67,6 @@ class ggChat(WebSocketClient):
                                     print smile_find['is_premium']
                                     allow = True
 
-
-                        print allow
                         if allow:
                             if smile not in emotes:
                                 emotes.append({'emote_id': smile, 'emote_url': smile_find['urls']['big']})
@@ -176,7 +175,7 @@ def __init__(queue, python_folder):
                 print "Issue with goodgame"
                 if ch_id is None:
                     exit()
-
+    print ch_id
     # If any of the value are non-existent then exit the programm with error.
     if (address is None) or (ch_id is None):
         print "Config for goodgame is not correct!"
