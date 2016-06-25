@@ -81,3 +81,12 @@ body{
 	word-wrap: break-word;
 	color: #c67117;
 }
+
+.msgTextMention {
+	display: inline;
+	height: auto;
+	padding-left: 5px;
+	word-wrap: break-word;
+	color: #c0ffc0;
+
+}

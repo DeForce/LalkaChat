@@ -151,6 +151,9 @@ function showMessage(message) {
 		if(messageJSON.hasOwnProperty('pm') && messageJSON.pm == true) {
 			elements.message.text.setAttribute('class', 'msgTextPriv');
 		}
+		else if(messageJSON.hasOwnProperty('mention') && messageJSON.mention == true){
+			elements.message.text.setAttribute('class', 'msgTextMention');
+		}
 		else {
 			elements.message.text.setAttribute('class', 'msgText');
 			

@@ -62,10 +62,10 @@ class blacklist():
                     else:
                         message['flags'] = 'blacklist'
                     break
+            if 'flags' in message:
+                if message['flags'] == 'blacklist':
+                    message['text'] = self.blacklist_message
 
-            if message['flags'] == 'blacklist':
-                message['text'] = self.blacklist_message
-
-            if message['flags'] == 'hide':
-                return
+                if message['flags'] == 'hide':
+                    return
             return message

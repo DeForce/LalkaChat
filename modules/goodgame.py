@@ -176,7 +176,7 @@ def __init__(queue, python_folder):
                 if request.status_code == 200:
                     # print type(request.json())
                     channel_name = request.json()['channel']['key']
-                    print request.json()
+                    # print request.json()
             except:
                 print "Issue with goodgame"
                 if ch_id is None:
@@ -188,7 +188,7 @@ def __init__(queue, python_folder):
                 if request.status_code == 200:
                     # print type(request.json())
                     ch_id = request.json()['channel']['id']
-                    print request.json()
+                    # print request.json()
             except:
                 print "Issue with goodgame"
                 if ch_id is None:

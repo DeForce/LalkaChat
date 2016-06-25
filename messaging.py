@@ -47,10 +47,11 @@ class Message(threading.Thread):
         #  content so it can be passed to new module, or to pass to CLI
 
         for module in self.modules:
+            message = self.modules[module].get_message(message)
             try:
-                message = self.modules[module].get_message(message)
-            except:
                 pass
+            except Exception as exc:
+                print exc
 
         if message is not None:
             print "[%s] %s: %s" % (message['source'], message['user'], message['text'])

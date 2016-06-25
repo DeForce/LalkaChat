@@ -79,7 +79,7 @@ class IRC(irc.client.SimpleIRCClient):
 
         # Then we comp the message and send it to queue for message handling.
         comp['text'] = event.arguments[0]
-        if re.match('^@?{0} '.format(self.nick), comp['text'].lower()):
+        if re.match('^@?{0}( |,)'.format(self.nick), comp['text'].lower()):
             comp['pm'] = True
 
         self.queue.put(comp)
