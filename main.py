@@ -19,7 +19,7 @@ def init():
             if not os.path.isdir(module_folder):
                 print "[Error] Could not find %s folder" % module_folder
                 exit()
-        else: 
+        else:
             print "[Error] Could not find %s" % conf_file
             exit()
     else: 

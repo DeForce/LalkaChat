@@ -148,13 +148,22 @@ function showMessage(message) {
 	if(messageJSON.hasOwnProperty('text')) {
 		// console.log("message has text " + messageJSON.text);
 		elements.message['text'] = document.createElement('div');
-		elements.message.text.setAttribute('class', 'msgText');
+		if(messageJSON.hasOwnProperty('pm') && messageJSON.pm == true) {
+			elements.message.text.setAttribute('class', 'msgTextPriv');
+		}
+		else {
+			elements.message.text.setAttribute('class', 'msgText');
+			
+		}
 		
 		if(messageJSON.source == 'tw') {
 			messageJSON.text = htmlifyTwitchEmoticons(escapeHtml(twitch_processEmoticons(messageJSON.text, messageJSON.emotes)));
 		}
 		else if(messageJSON.source == 'gg') {
 			messageJSON.text = htmlifyGGEmoticons(messageJSON.text, messageJSON.emotes)
+		}
+		else if(messageJSON.source == 'fs') {
+			messageJSON.text = htmlifyGGEmoticons(escapeHtml(messageJSON.text), messageJSON.emotes)
 		}
 		
 		// elements.message.text.appendChild(document.createTextNode(messageJSON.text));

@@ -9,12 +9,13 @@ from ws4py.client.threadedclient import WebSocketClient
 
 
 class ggChat(WebSocketClient):
-    def __init__(self, ws, protocols=None, queue=None, id=None, smiles=None):
+    def __init__(self, ws, protocols=None, queue=None, id=None, nick=None, smiles=None):
         super(self.__class__, self).__init__(ws, protocols=None)
         # Received value setting.
         self.source = "gg"
         self.queue = queue
         self.id = id
+        self.nick = nick
         # Checking the connection state
         self.pqueue = Queue.Queue()
 
@@ -39,16 +40,17 @@ class ggChat(WebSocketClient):
         if message['type'] == "message":
             # Getting all needed data from received message
             # and sending it to queue for further message handling
-            user = message['data']['user_name']
-            text = message['data']['text']
+            comp = {'source': self.source,
+                    'user': message['data']['user_name'],
+                    'text': message['data']['text']}
 
-            print message
+            # print message
             emotes = []
-            smiles_array = re.findall(self.smile_regex, text)
+            smiles_array = re.findall(self.smile_regex, comp['text'])
             for smile in smiles_array:
                 for smile_find in self.smiles:
                     if smile_find['key'] == smile:
-                        print smile_find
+                        # print smile_find
                         allow = False
                         if message['data']['user_rights'] >= 40:
                             allow = True
@@ -64,15 +66,18 @@ class ggChat(WebSocketClient):
                         for premium in message['data']['premiums']:
                             if smile_find['channel_id'] == str(premium):
                                 if smile_find['is_premium']:
-                                    print smile_find['is_premium']
+                                    # print smile_find['is_premium']
                                     allow = True
 
                         if allow:
                             if smile not in emotes:
                                 emotes.append({'emote_id': smile, 'emote_url': smile_find['urls']['big']})
+            comp['emotes'] = emotes
 
-            comp = {'source': self.source, 'user': user, 'text': text, 'emotes': emotes}
+            if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):
+                comp['pm'] = True
             self.queue.put(comp)
+
         # elif message['type'] == "channel_counters":
             # self.pqueue.put(True)
             # print "not put"
@@ -109,7 +114,7 @@ class ggChat(WebSocketClient):
             
             
 class ggThread(threading.Thread):
-    def __init__(self, queue, address, id):
+    def __init__(self, queue, address, id, nick):
         threading.Thread.__init__(self)
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -117,6 +122,7 @@ class ggThread(threading.Thread):
         self.daemon = "True"
         self.queue = queue
         self.address = address
+        self.nick = nick
         self.id = id
         self.smiles = []
         
@@ -142,7 +148,8 @@ class ggThread(threading.Thread):
             print "Unable to download smiles, YAY"
 
         # Connecting to goodgame websocket
-        ws = ggChat(self.address, protocols=['websocket'], queue=self.queue, id=self.id, smiles=self.smiles)
+        ws = ggChat(self.address, protocols=['websocket'], queue=self.queue, id=self.id, nick=self.nick,
+                    smiles=self.smiles)
         ws.connect()
         ws.run_forever()
 
@@ -164,6 +171,16 @@ def __init__(queue, python_folder):
             address = item[1]
         if item[0] == 'channelid':
             ch_id = item[1]
+            try:
+                request = requests.get("http://api2.goodgame.ru/streams/"+ch_id)
+                if request.status_code == 200:
+                    # print type(request.json())
+                    channel_name = request.json()['channel']['key']
+                    print request.json()
+            except:
+                print "Issue with goodgame"
+                if ch_id is None:
+                    exit()
         if item[0] == 'channelname':
             channel_name = item[1]
             try:
@@ -171,16 +188,16 @@ def __init__(queue, python_folder):
                 if request.status_code == 200:
                     # print type(request.json())
                     ch_id = request.json()['channel']['id']
+                    print request.json()
             except:
                 print "Issue with goodgame"
                 if ch_id is None:
                     exit()
-    print ch_id
     # If any of the value are non-existent then exit the programm with error.
     if (address is None) or (ch_id is None):
         print "Config for goodgame is not correct!"
         exit()
     
     # Creating new thread with queue in place for messaging tranfers
-    gg = ggThread(queue, address, ch_id)
+    gg = ggThread(queue, address, ch_id, channel_name)
     gg.start()

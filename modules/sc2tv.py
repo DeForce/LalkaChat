@@ -9,12 +9,15 @@ from ws4py.client.threadedclient import WebSocketClient
 
 
 class fsChat(WebSocketClient):
-    def __init__(self, ws, queue, nick, protocols=None,):
+    def __init__(self, ws, queue, nick, protocols=None, smiles=[]):
         super(self.__class__, self).__init__(ws, protocols=None)
         # Received value setting.
         self.source = "fs"
         self.queue = queue
         self.nick = nick
+
+        self.smiles = smiles
+        self.smile_regex = ':(\w+|\d+):'
 
         # Because funstream API is fun, we have to iterate the
         #  requests in "proper" format:
@@ -32,6 +35,7 @@ class fsChat(WebSocketClient):
         self.iter = 0
         self.fsGetId()
         self.duplicates = []
+        self.users = []
         self.bufferForDup = 20
 
     def opened(self):
@@ -39,6 +43,30 @@ class fsChat(WebSocketClient):
 
     def closed(self, code, reason=None):
         print "[%s] Connection Closed Down" % self.source
+
+    def allow_smile(self, smile, user_id):
+        allow = False
+
+        if smile['level'] == 0:
+            allow = True
+        # else:
+        #     user_match = False
+        #     for user_iter in self.users:
+        #         if user_iter['id'] == user_id:
+        #             user_match = True
+        #
+        #     if not user_match:
+        #         try:
+        #             user_id = {'id': user_id}
+        #             req_user = requests.post('http://funstream.tv/api/user/full', json=user_id)
+        #             if req_user.status_code == 200:
+        #                 req_user_answer = req_user.json()
+        #                 print "HelloWorld"
+        #                 print req_user_answer
+        #
+        #         except:
+        #             print "Unable to get smiles"
+        return allow
 
     def received_message(self, mes):
         # Funstream send all kind of different messages
@@ -71,13 +99,25 @@ class fsChat(WebSocketClient):
                         try:
                             self.duplicates.index(message[dict_item])
                         except:
-                            user = message['from']['name']
+                            comp = {'source': self.source,
+                                    'user': message['from']['name'],
+                                    'text': message['text']}
                             if message['to'] is not None:
-                                to = message['to']['name']
+                                comp['to'] = message['to']['name']
+                                if comp['to'] == self.nick:
+                                    comp['pm'] = True
                             else:
-                                to = None
-                            text = message['text']
-                            comp = {'source': self.source, 'user': user, 'text': text, 'to': to}
+                                comp['to'] = None
+
+                            emotes = []
+                            smiles_array = re.findall(self.smile_regex, comp['text'])
+                            for smile in smiles_array:
+                                for smile_find in self.smiles:
+                                    if smile_find['code'] == smile:
+                                        if self.allow_smile(smile_find, message['from']['id']):
+                                            emotes.append({'emote_id': smile, 'emote_url': smile_find['url']})
+                            comp['emotes'] = emotes
+
                             self.queue.put(comp)
                             self.duplicates.append(message[dict_item])
                             if len(self.duplicates) > self.bufferForDup:
@@ -86,7 +126,7 @@ class fsChat(WebSocketClient):
     def fsGetId(self):
         # We get ID from POST request to funstream API, and it hopefuly
         #  answers us the correct ID of the channel we need to connect to
-        payload = "{'id': null, 'name': \""+ self.nick + "\"}"
+        payload = "{'id': null, 'name': \"" + self.nick + "\"}"
         request = requests.post("http://funstream.tv/api/user", data=payload)
         if request.status_code == 200:
             self.channelID = json.loads(re.findall('{.*}', request.text)[0])['id']
@@ -147,10 +187,21 @@ class fsThread(threading.Thread):
         self.queue = queue
         self.socket = socket
         self.nick = nick
+        self.smiles = []
 
     def run(self):
+        # Let us get smiles for sc2tv
+        try:
+            smiles = requests.post('http://funstream.tv/api/smile')
+            if smiles.status_code == 200:
+                smiles_answer = smiles.json()
+                for smile in smiles_answer:
+                    self.smiles.append(smile)
+        except:
+            print "Unable to get smiles"
+
         # Connecting to funstream websocket
-        ws = fsChat(self.socket, self.queue, self.nick, protocols=['websocket'])
+        ws = fsChat(self.socket, self.queue, self.nick, protocols=['websocket'], smiles=self.smiles,)
         ws.connect()
         ws.run_forever()
 

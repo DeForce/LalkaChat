@@ -1,7 +1,7 @@
 import irc.client
 import threading
 import os
-import sys
+import re
 import ConfigParser
 import random
 import requests
@@ -12,6 +12,7 @@ class IRC(irc.client.SimpleIRCClient):
         irc.client.SimpleIRCClient.__init__(self)
         # Basic variables, twitch channel are IRC so #channel
         self.channel = "#" + channel.lower()
+        self.nick = channel.lower()
         self.source = "tw"
         self.queue = queue
         self.badges = badges
@@ -38,6 +39,7 @@ class IRC(irc.client.SimpleIRCClient):
         #  the display-name tag, so we have to check their "real" username
         #  and capitalize it because twitch does so, so we do the same.
         # print event
+        comp = {'source': self.source}
         badges = []
         emotes = []
         for tag in event.tags:
@@ -45,9 +47,9 @@ class IRC(irc.client.SimpleIRCClient):
                 if tag['value'] is None:
                     # If there is not display-name then we strip the user
                     #  from the string and use it as it is.
-                    user = event.source.split('!')[0].capitalize()
+                    comp['user'] = event.source.split('!')[0].capitalize()
                 else:
-                    user = tag['value']
+                    comp['user'] = tag['value']
             if tag['key'] == 'badges':
                 if tag['value'] is None:
                     pass
@@ -62,6 +64,7 @@ class IRC(irc.client.SimpleIRCClient):
                         else:
                             url = self.badges[badge_pre[0]]['image']
                         badges.append({'badge': badge_pre[0], 'size': badge_pre[1], 'url': url})
+
             if tag['key'] == 'emotes':
                 if tag['value'] is None:
                     pass
@@ -71,11 +74,13 @@ class IRC(irc.client.SimpleIRCClient):
                         emote_pre = emote.split(':')
                         emote_pos_pre = emote_pre[1].split(',')
                         emotes.append({'emote_id': emote_pre[0], 'emote_pos': emote_pos_pre})
+        comp['badges'] = badges
+        comp['emotes'] = emotes
 
         # Then we comp the message and send it to queue for message handling.
-        text = event.arguments[0]
-        # print event.source
-        comp = {'source': self.source, 'user': user, 'text': text, 'badges': badges, 'emotes': emotes}
+        comp['text'] = event.arguments[0]
+        if re.match('^@?{0} '.format(self.nick), comp['text'].lower()):
+            comp['pm'] = True
 
         self.queue.put(comp)
 
