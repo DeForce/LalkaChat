@@ -90,3 +90,41 @@ body{
 	color: #c0ffc0;
 
 }
+
+.msgSLevel {
+	margin-right: 3px;
+	width: 16px;
+	height: 16px;
+	background-color: rgba(0,0,0,0.6);
+	border-radius: 3px;
+	margin: 0px 3px 0px 0px;
+	position: relative;
+	top: 3px;
+	left: 3px;
+	display: inline-block;
+}
+
+.imgSLevel {
+	width: 16px;
+	height: 16px;
+	border-radius: 3px;
+}
+
+.msgLevel {
+	margin-right: 3px;
+	width: 16px;
+	height: 16px;
+	background-color: rgba(0,0,0,0.6);
+	border-radius: 3px;
+	margin: 0px 3px 0px 0px;
+	position: relative;
+	top: 3px;
+	left: 3px;
+	display: inline-block;
+}
+
+.imgLevel {
+	width: 16px;
+	height: 16px;
+	border-radius: 3px;
+}

@@ -10,7 +10,9 @@ class Message(threading.Thread):
     def __init__(self, queue):
         super(self.__class__, self).__init__()
         # Creating dict for dynamic modules
-        self.modules = {}
+        self.modules = []
+        self.daemon = True
+        # self.modules = {}
         self.msg_counter = 0
 
         print "Loading configuration file for messaging"
@@ -30,7 +32,9 @@ class Message(threading.Thread):
                 #  same name as module name
                 tmp = importlib.import_module(module_tag + '.' + module[0])
                 init = getattr(tmp, module[0])
-                self.modules[module[0]] = init(conf_folder)
+                # self.modules[module[0]] = init(conf_folder)
+                module = init(conf_folder)
+                self.modules.append(module)
         self.daemon = "True"
         self.queue = queue
         self.start()
@@ -47,7 +51,7 @@ class Message(threading.Thread):
         #  content so it can be passed to new module, or to pass to CLI
 
         for module in self.modules:
-            message = self.modules[module].get_message(message)
+            message = module.get_message(message, self.queue)
             try:
                 pass
             except Exception as exc:

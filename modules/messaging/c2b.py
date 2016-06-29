@@ -19,7 +19,7 @@ class c2b():
             f_item['replace'] = map(lambda x: x.strip().decode('utf-8'), f_item['replace'])
             self.f_items.append(f_item)
 
-    def get_message(self, message):
+    def get_message(self, message, queue):
         # Replacing the message if needed.
         # Please do the needful
         if message is None:

@@ -37,7 +37,7 @@ class df():
         with open(self.file, 'a') as f:
             f.write(text)
 
-    def get_message(self, message):
+    def get_message(self, message, queue):
         if message is None:
             # print "df received empty message"
             return

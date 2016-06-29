@@ -25,7 +25,7 @@ class mentions():
                 address = map(lambda x: x.strip().lower(), address)
                 map(lambda x: self.addresses.append(x), address)
 
-    def get_message(self, message):
+    def get_message(self, message, queue):
         # Replacing the message if needed.
         # Please do the needful
         if message is None:

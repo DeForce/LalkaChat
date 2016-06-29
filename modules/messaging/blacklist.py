@@ -41,7 +41,7 @@ class blacklist():
             comp = {'type': 'hide', 'filter': word[1]}
             self.words.append(comp)
 
-    def get_message(self, message):
+    def get_message(self, message, queue):
         if message is None:
             # print "Blackist recieved no message"
             return

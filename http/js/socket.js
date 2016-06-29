@@ -99,6 +99,33 @@ function showMessage(message) {
 		elements.message.appendChild(elements.message.source);
 	}
 	
+	if(messageJSON.hasOwnProperty('levels')) {
+		elements.message['level'] = document.createElement('div');
+		elements.message.level.setAttribute('class', 'msgLevel')
+
+		elements.message.level['img'] = document.createElement('img');
+		elements.message.level.img.setAttribute('class', 'imgLevel')
+		elements.message.level.img.setAttribute('src', messageJSON.levels.url);
+		
+		elements.message.level.appendChild(elements.message.level.img);
+		elements.message.appendChild(elements.message.level);
+	}
+	
+	if(messageJSON.hasOwnProperty('s_levels')) {
+		
+		for (i = 0; i < messageJSON.s_levels.length; i++) {
+			elements.message['s_level'] = document.createElement('div');
+			elements.message.s_level.setAttribute('class', 'msgSLevel')
+
+			elements.message.s_level['img'] = document.createElement('img');
+			elements.message.s_level.img.setAttribute('class', 'imgSLevel')
+			elements.message.s_level.img.setAttribute('src', messageJSON.s_levels[i].url);
+			
+			elements.message.s_level.appendChild(elements.message.s_level.img);
+			elements.message.appendChild(elements.message.s_level);
+		}
+	}
+	
 	if(messageJSON.hasOwnProperty('badges')) {
 		
 		for (i = 0; i < messageJSON.badges.length; i++) {
@@ -120,19 +147,9 @@ function showMessage(message) {
 					elements.message.badge.img.setAttribute('style', 'background-color: #6441a5');
 				}
 			}
-
 			elements.message.badge.appendChild(elements.message.badge.img);
 			elements.message.appendChild(elements.message.badge);
-			
 		}
-		// elements.message['badge'] = document.createElement('div');
-		// elements.message.badge.setAttribute('class', 'msgSource');
-		
-		// elements.message.badge['img'] = document.createElement('img');
-		// elements.message.badge.img.setAttribute('src', '/img/badges/' + messageJSON.badge + '.png');
-		
-		// elements.message.badge.appendChild(elements.message.badge.img);
-		// elements.message.appendChild(elements.message.badge);
 	}
 	
 	if(messageJSON.hasOwnProperty('user')) {

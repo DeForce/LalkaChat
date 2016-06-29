@@ -15,6 +15,7 @@ class MessagingThread(threading.Thread):
     def __init__(self, ws):
         super(self.__class__, self).__init__()
         self.ws = ws
+        self.daemon = True
 
     def run(self):
         while True:
@@ -28,6 +29,7 @@ class WebChatSocketServer(WebSocket):
         thread = MessagingThread(self)
         thread.start()
         self.clients = []
+        self.daemon = True
 
     def opened(self):
         cherrypy.engine.publish('add-client', self.peer_address, self)
@@ -43,6 +45,7 @@ class WebChatPlugin(WebSocketPlugin):
     def __init__(self, bus):
         WebSocketPlugin.__init__(self, bus)
         self.clients = []
+        self.daemon = True
 
     def start(self):
         WebSocketPlugin.start(self)
@@ -65,10 +68,10 @@ class WebChatPlugin(WebSocketPlugin):
 
 
 class HttpRoot(object):
-    @cherrypy.expose
-    def index(self):
-        print os.path.join(os.getcwd(), 'http', 'index.html')
-        return serve_file(os.path.join(os.getcwd(), 'http', 'index.html'), 'text/html')
+    # @cherrypy.expose
+    # def index(self):
+    #     print os.path.join(os.getcwd(), 'http', 'index.html')
+    #     return serve_file(os.path.join(os.getcwd(), 'http', 'index.html'), 'text/html')
 
     @cherrypy.expose
     def ws(self):
@@ -77,10 +80,12 @@ class HttpRoot(object):
 
 
 class SocketThread(threading.Thread):
-    def __init__(self, host, port):
+    def __init__(self, host, port, root_folder):
         super(self.__class__, self).__init__()
+        self.daemon = True
         self.host = host
         self.port = port
+        self.root_folder = root_folder
 
         cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host,
                                 'global': {
@@ -90,6 +95,7 @@ class SocketThread(threading.Thread):
         cherrypy.tools.websocket = WebSocketTool()
 
     def run(self):
+        http_folder = os.path.join(self.root_folder, '..', 'http')
         # cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
         #                                                      'tools.websocket.handler_cls': WebChatSocketServer},
         #                                              '/': {'tools.staticdir.on': True,
@@ -102,14 +108,14 @@ class SocketThread(threading.Thread):
         cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
                                                              'tools.websocket.handler_cls': WebChatSocketServer},
                                                      '/js': {'tools.staticdir.on': True,
-                                                             'tools.staticdir.dir': os.path.join(os.getcwd(),
-                                                                                                 'http', 'js')},
+                                                             'tools.staticdir.dir': os.path.join(http_folder, 'js')},
                                                      '/css': {'tools.staticdir.on': True,
-                                                              'tools.staticdir.dir': os.path.join(os.getcwd(),
-                                                                                                  'http', 'css')},
+                                                              'tools.staticdir.dir': os.path.join(http_folder, 'css')},
                                                      '/img': {'tools.staticdir.on': True,
-                                                              'tools.staticdir.dir': os.path.join(os.getcwd(),
-                                                                                                  'http', 'img')}})
+                                                              'tools.staticdir.dir': os.path.join(http_folder, 'img')},
+                                                     '/': {'tools.staticdir.on': True,
+                                                           'tools.staticdir.dir': http_folder,
+                                                           'tools.staticdir.index': "index.html"}})
 
 
 class webchat():
@@ -126,10 +132,10 @@ class webchat():
             if item[0] == 'port':
                 self.port = item[1]
 
-        s_thread = SocketThread(self.host, self.port)
+        s_thread = SocketThread(self.host, self.port, conf_folder)
         s_thread.start()
 
-    def get_message(self, message):
+    def get_message(self, message, queue):
         if message is None:
             # print "webchat received empty message"
             return
