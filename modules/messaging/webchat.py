@@ -4,7 +4,7 @@ import threading
 import json
 import Queue
 import cherrypy
-from cherrypy.lib.static import serve_file
+from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
@@ -12,50 +12,64 @@ s_queue = Queue.Queue()
 
 
 class MessagingThread(threading.Thread):
-    def __init__(self, ws):
+    def __init__(self):
         super(self.__class__, self).__init__()
-        self.ws = ws
         self.daemon = True
 
     def run(self):
         while True:
             message = s_queue.get()
+            cherrypy.engine.publish('add-history', message)
             cherrypy.engine.publish('websocket-broadcast', json.dumps(message))
+
+
+class FireFirstMessages(threading.Thread):
+    def __init__(self, ws, history):
+        super(self.__class__, self).__init__()
+        self.daemon = True
+        self.ws = ws
+        self.history = history
+
+    def run(self):
+        sleep(0.1)
+        for item in self.history:
+            self.ws.send(json.dumps(item))
 
 
 class WebChatSocketServer(WebSocket):
     def __init__(self, sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None):
-        super(self.__class__, self).__init__(sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None)
-        thread = MessagingThread(self)
-        thread.start()
+        super(self.__class__, self).__init__(sock)
         self.clients = []
-        self.daemon = True
 
     def opened(self):
         cherrypy.engine.publish('add-client', self.peer_address, self)
+        send_history = FireFirstMessages(self, cherrypy.engine.publish('get-history')[0])
+        send_history.start()
 
     def closed(self, code, reason=None):
         cherrypy.engine.publish('del-client', self.peer_address)
-
-    def received_message(self, message):
-        print message
 
 
 class WebChatPlugin(WebSocketPlugin):
     def __init__(self, bus):
         WebSocketPlugin.__init__(self, bus)
         self.clients = []
-        self.daemon = True
+        self.history = []
+        self.history_size = 10
 
     def start(self):
         WebSocketPlugin.start(self)
         self.bus.subscribe('add-client', self.add_client)
         self.bus.subscribe('del-client', self.del_client)
+        self.bus.subscribe('add-history', self.add_history)
+        self.bus.subscribe('get-history', self.get_history)
 
     def stop(self):
         WebSocketPlugin.stop(self)
         self.bus.unsubscribe('add-client', self.add_client)
         self.bus.unsubscribe('del-client', self.del_client)
+        self.bus.unsubscribe('add-history', self.add_history)
+        self.bus.unsubscribe('get-history', self.get_history)
 
     def add_client(self, addr, websocket):
         self.clients.append({'ip': addr[0], 'port': addr[1], 'websocket': websocket})
@@ -65,6 +79,14 @@ class WebChatPlugin(WebSocketPlugin):
             self.clients.remove({'ip': addr[0], 'port': addr[1]})
         except:
             pass
+
+    def add_history(self, message):
+        self.history.append(message)
+        if len(self.history) > self.history_size:
+            self.history.pop(0)
+
+    def get_history(self):
+        return self.history
 
 
 class HttpRoot(object):
@@ -96,15 +118,6 @@ class SocketThread(threading.Thread):
 
     def run(self):
         http_folder = os.path.join(self.root_folder, '..', 'http')
-        # cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
-        #                                                      'tools.websocket.handler_cls': WebChatSocketServer},
-        #                                              '/': {'tools.staticdir.on': True,
-        #                                                    'tools.staticdir.root': os.path.join(os.getcwd(), 'http'),
-        #                                                    'tools.staticdir.dir': os.path.join(os.getcwd(), 'http'),
-        #                                                    'tools.staticdir.index': "index.html",
-        #                                                    'tools.staticdir.debug': True,
-        #                                                    'log.screen': True}})
-
         cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
                                                              'tools.websocket.handler_cls': WebChatSocketServer},
                                                      '/js': {'tools.staticdir.on': True,
@@ -134,6 +147,9 @@ class webchat():
 
         s_thread = SocketThread(self.host, self.port, conf_folder)
         s_thread.start()
+
+        m_thread = MessagingThread()
+        m_thread.start()
 
     def get_message(self, message, queue):
         if message is None:
