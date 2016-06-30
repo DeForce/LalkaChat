@@ -62,6 +62,16 @@ htmlifyGGEmoticons = function(message, emotes) {
     });
 };
 
+htmlifyBTTVEmoticons = function(message, emotes) {
+	return message.replace(/(^| )?(\S+)?( |$)/g, function (code, b1, emote_key, b2) {
+		for(var emote in emotes) {
+			if(emote_key == emotes[emote]['emote_id']) {
+				return "<img class='imgSmile' src=" + emotes[emote]['emote_url'] + ">";
+			}
+		}
+		return code;
+    });
+};
 
 htmlifyTwitchEmoticons = function(message) {
     return message.replace(/\$emoticon#(\d+)\$/g, function (code, emoteId) {
@@ -173,11 +183,13 @@ function showMessage(message) {
 		}
 		else {
 			elements.message.text.setAttribute('class', 'msgText');
-			
 		}
 		
 		if(messageJSON.source == 'tw') {
 			messageJSON.text = htmlifyTwitchEmoticons(escapeHtml(twitch_processEmoticons(messageJSON.text, messageJSON.emotes)));
+			if(messageJSON.hasOwnProperty('bttv_emotes')) {
+				messageJSON.text = htmlifyBTTVEmoticons(messageJSON.text, messageJSON.bttv_emotes);
+			}
 		}
 		else if(messageJSON.source == 'gg') {
 			messageJSON.text = htmlifyGGEmoticons(messageJSON.text, messageJSON.emotes)

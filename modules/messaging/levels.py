@@ -108,11 +108,13 @@ class levels():
         for level in self.levels:
             if level['exp'] < experience:
                 max_level += 1
+        if max_level >= len(self.levels):
+            max_level -= 1
 
         if experience >= self.levels[max_level]['exp']:
             if self.experience == 'random':
-                max_level = random.randint(0, len(self.levels))
-                experience = self.levels[max_level-1]['exp']
+                max_level = random.randint(0, len(self.levels) - 1)
+                experience = self.levels[max_level]['exp'] - self.exp_for_level
                 cursor.execute('UPDATE UserLevels SET Experience = ? WHERE User = ? ', [experience, user])
                 self.db.commit()
             else:

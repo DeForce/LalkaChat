@@ -8,7 +8,7 @@ import requests
 
 
 class IRC(irc.client.SimpleIRCClient):
-    def __init__(self, queue, channel, badges):
+    def __init__(self, queue, channel, badges, bttv):
         irc.client.SimpleIRCClient.__init__(self)
         # Basic variables, twitch channel are IRC so #channel
         self.channel = "#" + channel.lower()
@@ -16,6 +16,7 @@ class IRC(irc.client.SimpleIRCClient):
         self.source = "tw"
         self.queue = queue
         self.badges = badges
+        self.bttv = bttv
 
     def on_connect(self, connection, event):
         print "[%s] Connected" % self.source
@@ -79,6 +80,13 @@ class IRC(irc.client.SimpleIRCClient):
 
         # Then we comp the message and send it to queue for message handling.
         comp['text'] = event.arguments[0]
+
+        bt_emotes = []
+        for bt_emote in self.bttv:
+            if re.search('(^| )({0})( |$)'.format(re.escape(bt_emote['regex'])), comp['text']):
+                bt_emotes.append({'emote_id': bt_emote['regex'], 'emote_url': 'http:{0}'.format(bt_emote['url'])})
+        comp['bttv_emotes'] = bt_emotes
+
         if re.match('^@?{0}( |,)'.format(self.nick), comp['text'].lower()):
             comp['pm'] = True
 
@@ -86,7 +94,7 @@ class IRC(irc.client.SimpleIRCClient):
 
 
 class twThread(threading.Thread):
-    def __init__(self, queue, host, port, channel, badges):
+    def __init__(self, queue, host, port, channel, badges, bttv_smiles):
         threading.Thread.__init__(self)
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -98,6 +106,7 @@ class twThread(threading.Thread):
         self.host = host
         self.port = port
         self.channel = channel
+        self.bttv_smiles = bttv_smiles
 
         # For anonymous log in Twitch wants username in special format:
         #
@@ -111,8 +120,14 @@ class twThread(threading.Thread):
             self.nickname += str(random.randint(0, 9))
 
     def run(self):
+        bttv_smiles = []
+        if self.bttv_smiles:
+            request = requests.get("https://api.betterttv.net/emotes")
+            if request.status_code == 200:
+                bttv_smiles = request.json()['emotes']
+
         # We are connecting via IRC handler.
-        ircClient = IRC(self.queue, self.channel, self.badges)
+        ircClient = IRC(self.queue, self.channel, self.badges, bttv_smiles)
         ircClient.connect(self.host, self.port, self.nickname)
         ircClient.start()
         # print dir(IRCCat)
@@ -133,6 +148,7 @@ def __init__(queue, pythonFolder):
     host = None
     port = None
     channel = None
+    bttv_smiles = False
 
     # If any of the value are non-existent then exit the programm with error.
     for item in config.items("twitch"):
@@ -157,6 +173,10 @@ def __init__(queue, pythonFolder):
             except:
                 print "Issue with twitch"
                 exit()
+        elif item[0] == 'bttv':
+            if item[1] == 'true':
+                # Load bttv smiles in thread
+                bttv_smiles = True
 
     # If any of the value are non-existent then exit the programm with error.
     if (host is None) or (port is None) or (channel is None):
@@ -164,5 +184,5 @@ def __init__(queue, pythonFolder):
         exit()
 
     # Creating new thread with queue in place for messaging tranfers
-    tw = twThread(queue, host, port, channel, badges)
+    tw = twThread(queue, host, port, channel, badges, bttv_smiles)
     tw.start()
