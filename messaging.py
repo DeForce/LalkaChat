@@ -4,7 +4,8 @@ import os
 import ConfigParser
 import threading
 import importlib
-
+import codecs
+import sys
 
 class Message(threading.Thread):
     def __init__(self, queue):
@@ -57,10 +58,14 @@ class Message(threading.Thread):
             except Exception as exc:
                 print exc
 
-        if message is not None:
-            print "[%s] %s: %s" % (message['source'], message['user'], message['text'])
+        # if message is not None:
+            # print type(message['text'])
+            # print type(message['text'].encode('utf-8').decode('utf-8'))
+            # print "[%s] %s: %s" % (message['source'], message['user'], message['text'])
 
     def run(self):
         while True:
+            UTF8Writer = codecs.getwriter('utf8')
+            sys.stdout = UTF8Writer(sys.stdout)
             message = self.queue.get()
             self.msg_process(message)

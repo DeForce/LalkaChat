@@ -52,6 +52,7 @@ class ggChat(WebSocketClient):
                     if smile_find['key'] == smile:
                         # print smile_find
                         allow = False
+                        gif = False
                         if message['data']['user_rights'] >= 40:
                             allow = True
                         elif message['data']['user_rights'] >= 20 \
@@ -68,10 +69,14 @@ class ggChat(WebSocketClient):
                                 if smile_find['is_premium']:
                                     # print smile_find['is_premium']
                                     allow = True
+                                    gif = True
 
                         if allow:
                             if smile not in emotes:
-                                emotes.append({'emote_id': smile, 'emote_url': smile_find['urls']['big']})
+                                if gif:
+                                    emotes.append({'emote_id': smile, 'emote_url': smile_find['urls']['gif']})
+                                else:
+                                    emotes.append({'emote_id': smile, 'emote_url': smile_find['urls']['big']})
             comp['emotes'] = emotes
 
             if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):

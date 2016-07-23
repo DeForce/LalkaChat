@@ -99,7 +99,7 @@ class twThread(threading.Thread):
         # Basic value setting.
         # Daemon is needed so when main programm exits
         # all threads will exit too.
-        self.daemon = "True"
+        self.daemon = True
         self.queue = queue
         self.badges = badges
 
