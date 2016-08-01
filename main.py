@@ -45,6 +45,8 @@ def init():
             gui_settings['gui'] = True
         elif param == 'on_top' and value == 'true':
             gui_settings['on_top'] = True
+        elif param == 'language' and value == 'true':
+            gui_settings['language'] = True
 
     print "Loading Messaging Handler"
     print "Loading Queue for message handling"

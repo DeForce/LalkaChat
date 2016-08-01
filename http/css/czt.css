@@ -79,7 +79,8 @@ body{
 	height: auto;
 	padding-left: 5px;
 	word-wrap: break-word;
-	color: #c67117;
+	color: #e57017;
+	/*color: #103b61;*/
 }
 
 .msgTextMention {

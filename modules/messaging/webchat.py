@@ -4,6 +4,7 @@ import threading
 import json
 import Queue
 import cherrypy
+from cherrypy.lib.static import serve_file
 from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
@@ -90,10 +91,15 @@ class WebChatPlugin(WebSocketPlugin):
 
 
 class HttpRoot(object):
-    # @cherrypy.expose
-    # def index(self):
-    #     print os.path.join(os.getcwd(), 'http', 'index.html')
-    #     return serve_file(os.path.join(os.getcwd(), 'http', 'index.html'), 'text/html')
+    @cherrypy.expose
+    # @cherrypy.tools.response_headers([("Expires", '-1')])
+    # @cherrypy.tools.response_headers([("Pragma", "no-cache")])
+    # @cherrypy.tools.response_headers([("Cache-Control", "private, max-age=0, no-cache, no-store, must-revalidate")])
+    def index(self):
+        cherrypy.response.headers["Expires"] = -1
+        cherrypy.response.headers["Pragma"] = "no-cache"
+        cherrypy.response.headers["Cache-Control"] = "private, max-age=0, no-cache, no-store, must-revalidate"
+        return serve_file(os.path.join(os.getcwd(), 'http', 'index.html'), 'text/html')
 
     @cherrypy.expose
     def ws(self):
@@ -125,10 +131,10 @@ class SocketThread(threading.Thread):
                                                      '/css': {'tools.staticdir.on': True,
                                                               'tools.staticdir.dir': os.path.join(http_folder, 'css')},
                                                      '/img': {'tools.staticdir.on': True,
-                                                              'tools.staticdir.dir': os.path.join(http_folder, 'img')},
-                                                     '/': {'tools.staticdir.on': True,
-                                                           'tools.staticdir.dir': http_folder,
-                                                           'tools.staticdir.index': "index.html"}})
+                                                              'tools.staticdir.dir': os.path.join(http_folder, 'img')}})
+                                                     # '/': {'tools.staticdir.on': True,
+                                                     #       'tools.staticdir.dir': http_folder,
+                                                     #       'tools.staticdir.index': "index.html"}})
 
 
 class webchat():
@@ -144,6 +150,7 @@ class webchat():
                 self.host = item[1]
             if item[0] == 'port':
                 self.port = item[1]
+        # cherrypy.tools.multiheaders = cherrypy.Tool('on_end_resource', multi_headers)
 
         s_thread = SocketThread(self.host, self.port, conf_folder)
         s_thread.start()
