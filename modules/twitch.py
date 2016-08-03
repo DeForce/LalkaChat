@@ -134,55 +134,60 @@ class twThread(threading.Thread):
         # irc.connect()
 
 
-def __init__(queue, pythonFolder):
-    print "Initializing twitch chat"
+class twitch:
+    def __init__(self, queue, pythonFolder):
+        print "Initializing twitch chat"
 
-    # Reading config from main directory.
-    conf_folder = os.path.join(pythonFolder, "conf")
-    conf_file = os.path.join(conf_folder, "chats.cfg")
-    config = ConfigParser.RawConfigParser(allow_no_value=True)
-    config.read(conf_file)
+        # Reading config from main directory.
+        conf_folder = os.path.join(pythonFolder, "conf")
+        conf_file = os.path.join(conf_folder, "chats.cfg")
+        config = ConfigParser.RawConfigParser(allow_no_value=True)
 
-    # Checking config file for needed variables
-    # host, port, channel = tuple ( [None] * 3 ) ?!?!?!?!
-    host = None
-    port = None
-    channel = None
-    bttv_smiles = False
+        self.conf_params = {'folder': conf_folder, 'file': conf_file,
+                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                            'parser': config}
 
-    # If any of the value are non-existent then exit the programm with error.
-    for item in config.items("twitch"):
-        if item[0] == 'port':
-            port = int(item[1])
-        elif item[0] == 'channel':
-            channel = item[1]
-            try:
-                request = requests.get("http://tmi.twitch.tv/servers?channel="+channel)
-                if request.status_code == 200:
-                    # print type(request.json())
-                    host = random.choice(request.json()['servers']).split(':')[0]
-                    # print request.json()['servers'][0].split(':')[0]
-            except:
-                print "Issue with twitch"
-                exit()
+        config.read(conf_file)
+        # Checking config file for needed variables
+        # host, port, channel = tuple ( [None] * 3 ) ?!?!?!?!
+        host = None
+        port = None
+        channel = None
+        bttv_smiles = False
 
-            try:
-                request = requests.get("https://api.twitch.tv/kraken/chat/{0}/badges".format(channel))
-                if request.status_code == 200:
-                    badges = request.json()
-            except:
-                print "Issue with twitch"
-                exit()
-        elif item[0] == 'bttv':
-            if item[1] == 'true':
-                # Load bttv smiles in thread
-                bttv_smiles = True
+        # If any of the value are non-existent then exit the programm with error.
+        for item in config.items("twitch"):
+            if item[0] == 'port':
+                port = int(item[1])
+            elif item[0] == 'channel':
+                channel = item[1]
+                try:
+                    request = requests.get("http://tmi.twitch.tv/servers?channel="+channel)
+                    if request.status_code == 200:
+                        # print type(request.json())
+                        host = random.choice(request.json()['servers']).split(':')[0]
+                        # print request.json()['servers'][0].split(':')[0]
+                except:
+                    print "Issue with twitch"
+                    exit()
 
-    # If any of the value are non-existent then exit the programm with error.
-    if (host is None) or (port is None) or (channel is None):
-        print "Config for twitch is not correct!"
-        exit()
+                try:
+                    request = requests.get("https://api.twitch.tv/kraken/chat/{0}/badges".format(channel))
+                    if request.status_code == 200:
+                        badges = request.json()
+                except:
+                    print "Issue with twitch"
+                    exit()
+            elif item[0] == 'bttv':
+                if item[1] == 'true':
+                    # Load bttv smiles in thread
+                    bttv_smiles = True
 
-    # Creating new thread with queue in place for messaging tranfers
-    tw = twThread(queue, host, port, channel, badges, bttv_smiles)
-    tw.start()
+        # If any of the value are non-existent then exit the programm with error.
+        if (host is None) or (port is None) or (channel is None):
+            print "Config for twitch is not correct!"
+            exit()
+
+        # Creating new thread with queue in place for messaging tranfers
+        tw = twThread(queue, host, port, channel, badges, bttv_smiles)
+        tw.start()

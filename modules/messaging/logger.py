@@ -9,8 +9,12 @@ class logger():
     def __init__(self, conf_folder):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "logger.cfg")
-
         config = ConfigParser.RawConfigParser(allow_no_value=True)
+
+        self.conf_params = {'folder': conf_folder, 'file': conf_file,
+                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                            'parser': config}
+
         config.read(conf_file)
         tag_config = 'config'
 

@@ -206,29 +206,34 @@ class fsThread(threading.Thread):
         ws.run_forever()
 
 
-def __init__(queue, python_folder):
-    print "Initializing funstream chat"
+class sc2tv:
+    def __init__(self, queue, python_folder):
+        print "Initializing funstream chat"
 
-    # Reading config from main directory.
-    conf_folder = os.path.join(python_folder, "conf")
-    conf_file = os.path.join(conf_folder, "chats.cfg")
-    config = ConfigParser.RawConfigParser(allow_no_value=True)
-    config.read(conf_file)
+        # Reading config from main directory.
+        conf_folder = os.path.join(python_folder, "conf")
+        conf_file = os.path.join(conf_folder, "chats.cfg")
+        config = ConfigParser.RawConfigParser(allow_no_value=True)
 
-    # Checking config file for needed variables
-    socket = None
-    nick = None
-    for item in config.items("sc2tv"):
-        if item[0] == 'socket':
-            socket = item[1]
-        elif item[0] == 'nick':
-            nick = item[1]
+        self.conf_params = {'folder': conf_folder, 'file': conf_file,
+                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                            'parser': config}
 
-    # If any of the value are non-existent then exit the programm with error.
-    if (socket is None) or (nick is None):
-        print "Config for funstream is not correct!"
-        exit()
+        config.read(conf_file)
+        # Checking config file for needed variables
+        socket = None
+        nick = None
+        for item in config.items("sc2tv"):
+            if item[0] == 'socket':
+                socket = item[1]
+            elif item[0] == 'nick':
+                nick = item[1]
 
-    # Creating new thread with queue in place for messaging tranfers
-    fs = fsThread(queue, socket, nick)
-    fs.start()
+        # If any of the value are non-existent then exit the programm with error.
+        if (socket is None) or (nick is None):
+            print "Config for funstream is not correct!"
+            exit()
+
+        # Creating new thread with queue in place for messaging tranfers
+        fs = fsThread(queue, socket, nick)
+        fs.start()

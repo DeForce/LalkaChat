@@ -7,11 +7,13 @@ import importlib
 import codecs
 import sys
 
+
 class Message(threading.Thread):
     def __init__(self, queue):
         super(self.__class__, self).__init__()
         # Creating dict for dynamic modules
         self.modules = []
+        self.modules_configs = {}
         self.daemon = True
         # self.modules = {}
         self.msg_counter = 0
@@ -34,8 +36,9 @@ class Message(threading.Thread):
                 tmp = importlib.import_module(module_tag + '.' + module[0])
                 init = getattr(tmp, module[0])
                 # self.modules[module[0]] = init(conf_folder)
-                module = init(conf_folder)
-                self.modules.append(module)
+                class_module = init(conf_folder)
+                self.modules.append(class_module)
+                self.modules_configs[module[0]] = class_module.conf_params
         self.daemon = "True"
         self.queue = queue
         self.start()

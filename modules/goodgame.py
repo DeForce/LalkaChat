@@ -159,50 +159,54 @@ class ggThread(threading.Thread):
         ws.run_forever()
 
 
-def __init__(queue, python_folder):
-    print "Initializing goodgame chat"
-    
-    # Reading config from main directory.
-    conf_folder = os.path.join(python_folder, "conf")
-    conf_file = os.path.join(conf_folder, "chats.cfg")
-    config = ConfigParser.RawConfigParser(allow_no_value=True)
-    config.read(conf_file)
+class goodgame:
+    def __init__(self, queue, python_folder):
+        print "Initializing goodgame chat"
+        # Reading config from main directory.
+        conf_folder = os.path.join(python_folder, "conf")
+        conf_file = os.path.join(conf_folder, "chats.cfg")
+        config = ConfigParser.RawConfigParser(allow_no_value=True)
 
-    # Checking config file for needed variables
-    address = None
-    ch_id = None
-    for item in config.items("goodgame"):
-        if item[0] == 'socket':
-            address = item[1]
-        if item[0] == 'channelid':
-            ch_id = item[1]
-            try:
-                request = requests.get("http://api2.goodgame.ru/streams/"+ch_id)
-                if request.status_code == 200:
-                    # print type(request.json())
-                    channel_name = request.json()['channel']['key']
-                    # print request.json()
-            except:
-                print "Issue with goodgame"
-                if ch_id is None:
-                    exit()
-        if item[0] == 'channelname':
-            channel_name = item[1]
-            try:
-                request = requests.get("http://api2.goodgame.ru/streams/"+channel_name)
-                if request.status_code == 200:
-                    # print type(request.json())
-                    ch_id = request.json()['channel']['id']
-                    # print request.json()
-            except:
-                print "Issue with goodgame"
-                if ch_id is None:
-                    exit()
-    # If any of the value are non-existent then exit the programm with error.
-    if (address is None) or (ch_id is None):
-        print "Config for goodgame is not correct!"
-        exit()
-    
-    # Creating new thread with queue in place for messaging tranfers
-    gg = ggThread(queue, address, ch_id, channel_name)
-    gg.start()
+        self.conf_params = {'folder': conf_folder, 'file': conf_file,
+                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                            'parser': config}
+
+        config.read(conf_file)
+        # Checking config file for needed variables
+        address = None
+        ch_id = None
+        for item in config.items("goodgame"):
+            if item[0] == 'socket':
+                address = item[1]
+            if item[0] == 'channelid':
+                ch_id = item[1]
+                try:
+                    request = requests.get("http://api2.goodgame.ru/streams/"+ch_id)
+                    if request.status_code == 200:
+                        # print type(request.json())
+                        channel_name = request.json()['channel']['key']
+                        # print request.json()
+                except:
+                    print "Issue with goodgame"
+                    if ch_id is None:
+                        exit()
+            if item[0] == 'channelname':
+                channel_name = item[1]
+                try:
+                    request = requests.get("http://api2.goodgame.ru/streams/"+channel_name)
+                    if request.status_code == 200:
+                        # print type(request.json())
+                        ch_id = request.json()['channel']['id']
+                        # print request.json()
+                except:
+                    print "Issue with goodgame"
+                    if ch_id is None:
+                        exit()
+        # If any of the value are non-existent then exit the programm with error.
+        if (address is None) or (ch_id is None):
+            print "Config for goodgame is not correct!"
+            exit()
+
+        # Creating new thread with queue in place for messaging tranfers
+        gg = ggThread(queue, address, ch_id, channel_name)
+        gg.start()

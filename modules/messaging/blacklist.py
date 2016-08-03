@@ -5,14 +5,18 @@ import os
 import ConfigParser
 
 
-class blacklist():
+class blacklist:
     def __init__(self, conf_folder):
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "blacklist.cfg")
 
         config = ConfigParser.RawConfigParser(allow_no_value=True)
-        config.read(conf_file)
 
+        self.conf_params = {'folder': conf_folder, 'file': conf_file,
+                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                            'parser': config}
+
+        config.read(conf_file)
         tag_config = 'main'
         tag_users = 'users'
         tag_users_hide = 'users_hide'

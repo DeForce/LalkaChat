@@ -5,13 +5,19 @@ import os
 import ConfigParser
 
 
-class df():
+class df:
     def __init__(self, conf_folder):
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "df.cfg")
+
         grep_tag = 'grep'
         prof_tag = 'prof'
         config = ConfigParser.RawConfigParser(allow_no_value=True)
+
+        self.conf_params = {'folder': conf_folder, 'file': conf_file,
+                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                            'parser': config}
+
         config.read(conf_file)
 
         for grep in config.items(grep_tag):
