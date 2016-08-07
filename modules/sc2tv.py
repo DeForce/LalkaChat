@@ -6,6 +6,7 @@ import requests
 import os
 import ConfigParser
 from ws4py.client.threadedclient import WebSocketClient
+from modules.helpers.parser import FlagConfigParser
 
 
 class fsChat(WebSocketClient):
@@ -212,8 +213,8 @@ class sc2tv:
 
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
-        conf_file = os.path.join(conf_folder, "chats.cfg")
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
+        conf_file = os.path.join(conf_folder, "sc2tv.cfg")
+        config = FlagConfigParser(allow_no_value=True)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -223,7 +224,7 @@ class sc2tv:
         # Checking config file for needed variables
         socket = None
         nick = None
-        for item in config.items("sc2tv"):
+        for item in config.get_items("main"):
             if item[0] == 'socket':
                 socket = item[1]
             elif item[0] == 'nick':

@@ -10,7 +10,7 @@ import thread
 
 def init():
     # For system compatibility, loading chats
-    loaded_module_config = {}
+    loaded_module_config = []
     loaded_modules = {}
 
     python_folder = os.path.dirname(os.path.abspath(__file__))
@@ -44,9 +44,11 @@ def init():
     print "Loading basic configuration"
     config = ConfigParser.ConfigParser(allow_no_value=True)
 
-    loaded_module_config['config'] = {'folder': conf_folder, 'file': main_config['file_loc'],
-                                      'filename': main_config['main'],
-                                      'parser': config}
+    loaded_module_config.append({'config': {'folder': conf_folder, 'file': main_config['file_loc'],
+                                            'filename': ''.join(os.path.basename(main_config['file_loc']).split('.')[:-1]),
+                                            'parser': config}})
+
+    # print loaded_module_config
 
     config.read(main_conf_file)
     gui_settings = {}
@@ -67,7 +69,9 @@ def init():
     # Loading module for message processing...
     msg = messaging.Message(queue)
 
-    loaded_module_config.update(msg.modules_configs)
+    loaded_module_config += msg.modules_configs
+
+    # print loaded_module_config
 
     print "Loading Chats Configuration File"
     module_tag = "chats"
@@ -77,6 +81,7 @@ def init():
     config = ConfigParser.RawConfigParser(allow_no_value=True)
 
     config.read(module_conf_file)
+    module_id = 1
     for module in config.items(module_tag):
         print "Loading chat module: %s" % module[0]
         if module[1] is not None:
@@ -91,7 +96,8 @@ def init():
             tmp = importlib.import_module(module_import_folder + '.' + module[0])
             class_name = getattr(tmp, module[0])
             loaded_modules[module[0]] = class_name(queue, python_folder)
-            loaded_module_config[module[0]] = loaded_modules[module[0]].conf_params
+            loaded_module_config.insert(module_id, {module[0]: loaded_modules[module[0]].conf_params})
+            module_id += 1
         else:
             # If module find/load fails exit all program
             print "[Error] %s module not found" % module[0]

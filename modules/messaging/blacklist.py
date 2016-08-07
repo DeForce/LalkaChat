@@ -2,74 +2,73 @@
 # -*- coding: utf-8 -*-
 import re
 import os
-import ConfigParser
+from modules.helpers.parser import FlagConfigParser
 
 
 class blacklist:
+    users = {}
+    words = {}
+
     def __init__(self, conf_folder):
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "blacklist.cfg")
 
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
+        config = FlagConfigParser(allow_no_value=True)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
 
         config.read(conf_file)
-        tag_config = 'main'
-        tag_users = 'users'
-        tag_users_hide = 'users_hide'
-        tag_words = 'words'
-        tag_words_hide = 'words_hide'
-
-        for item in config.items(tag_config):
-            if item[0] == 'message':
-                self.blacklist_message = item[1].decode('utf-8')
-
-        self.users = []
-        for user in config.items(tag_users):
-            comp = {'type': user[0], 'filter': user[1].split(',')}
-            comp['filter'] = map(lambda x: x.strip().decode('utf-8'), comp['filter'])
-            self.users.append(comp)
-        for user in config.items(tag_users_hide):
-            comp = {'type': 'hide', 'filter': user[1].split(',')}
-            comp['filter'] = map(lambda x: x.strip().decode('utf-8'), comp['filter'])
-            self.users.append(comp)
-
-        self.words = []
-        for word in config.items(tag_words):
-            comp = {'type': word[0], 'filter': word[1]}
-            self.words.append(comp)
-        for word in config.items(tag_words_hide):
-            comp = {'type': 'hide', 'filter': word[1]}
-            self.words.append(comp)
+        sections = config._sections
+        for item in sections:
+            for param, value in config.get_items(item):
+                if item == 'main':
+                    if param == 'message':
+                        self.message = value.decode('utf-8')
+                elif item == 'users_hide':
+                    self.users[param] = 'h'
+                elif item == 'words_hide':
+                    self.words[param] = 'h'
+                elif item == 'users_block':
+                    self.users[param] = 'b'
+                elif item == 'words_block':
+                    self.words[param] = 'b'
 
     def get_message(self, message, queue):
         if message is None:
             # print "Blackist recieved no message"
             return
         else:
-            for regexp in self.users:
-                for re_item in regexp['filter']:
-                    if message['user'] == re_item:
-                        if regexp['type'] == 'hide':
-                            message['flags'] = 'hide'
-                        else:
-                            message['flags'] = 'blacklist'
-                        break
+            user = self.process_user(message)
+            # True = Hide, False = Del, None = Do Nothing
+            if user:
+                message['text'] = self.message
+            elif user == False:
+                return
 
-            for regexp in self.words:
-                if re.search(regexp['filter'], message['text']):
-                    if regexp['type'] == 'hide':
-                        message['flags'] = 'hide'
-                    else:
-                        message['flags'] = 'blacklist'
-                    break
-            if 'flags' in message:
-                if message['flags'] == 'blacklist':
-                    message['text'] = self.blacklist_message
+            words = self.process_message(message)
+            if words:
+                message['text'] = self.message
+            elif words == False:
+                return
 
-                if message['flags'] == 'hide':
-                    return
             return message
+
+    def process_user(self, message):
+        user = message['user'].lower()
+        if user in self.users:
+            if self.users[user] == 'h':
+                return True
+            else:
+                return False
+        return None
+
+    def process_message(self, message):
+        for word in self.words:
+            if re.search(word, message['text'].encode('utf-8')):
+                if self.words[word] == 'h':
+                    return True
+                else:
+                    return False
+        return None

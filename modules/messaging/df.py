@@ -3,6 +3,7 @@
 import re
 import os
 import ConfigParser
+from modules.helpers.parser import FlagConfigParser
 
 
 class df:
@@ -12,7 +13,7 @@ class df:
 
         grep_tag = 'grep'
         prof_tag = 'prof'
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
+        config = FlagConfigParser(allow_no_value=True)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -20,7 +21,7 @@ class df:
 
         config.read(conf_file)
 
-        for grep in config.items(grep_tag):
+        for grep in config.get_items(grep_tag):
             if grep[0] == 'symbol':
                 self.symbol = grep[1]
             elif grep[0] == 'file':
@@ -30,7 +31,7 @@ class df:
                         pass
 
         self.prof = []
-        for prof in config.items(prof_tag):
+        for prof in config.get_items(prof_tag):
             comp = [prof[0].capitalize(), self.symbol + prof[1].decode('utf-8')]
             self.prof.append(comp)
 

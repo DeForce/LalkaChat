@@ -5,6 +5,7 @@ import re
 import ConfigParser
 import random
 import requests
+from modules.helpers.parser import FlagConfigParser
 
 
 class IRC(irc.client.SimpleIRCClient):
@@ -140,8 +141,8 @@ class twitch:
 
         # Reading config from main directory.
         conf_folder = os.path.join(pythonFolder, "conf")
-        conf_file = os.path.join(conf_folder, "chats.cfg")
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
+        conf_file = os.path.join(conf_folder, "twitch.cfg")
+        config = FlagConfigParser(allow_no_value=True)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -156,7 +157,7 @@ class twitch:
         bttv_smiles = False
 
         # If any of the value are non-existent then exit the programm with error.
-        for item in config.items("twitch"):
+        for item in config.get_items("main"):
             if item[0] == 'port':
                 port = int(item[1])
             elif item[0] == 'channel':

@@ -3,13 +3,13 @@
 import os
 import ConfigParser
 import re
-
+from modules.helpers.parser import FlagConfigParser
 
 class mentions():
     def __init__(self, conf_folder):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "mentions.cfg")
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
+        config = FlagConfigParser(allow_no_value=True)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -19,7 +19,7 @@ class mentions():
         tag_config = 'config'
         self.mentions = []
         self.addresses = []
-        for item in config.items(tag_config):
+        for item in config.get_items(tag_config):
             if item[0] == 'mentions':
                 mention = item[1].split(',')
                 mention = map(lambda x: x.strip().lower().decode('utf-8'), mention)

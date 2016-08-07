@@ -5,6 +5,7 @@ import ConfigParser
 import requests
 import Queue
 import re
+from modules.helpers.parser import FlagConfigParser
 from ws4py.client.threadedclient import WebSocketClient
 
 
@@ -164,8 +165,8 @@ class goodgame:
         print "Initializing goodgame chat"
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
-        conf_file = os.path.join(conf_folder, "chats.cfg")
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
+        conf_file = os.path.join(conf_folder, "goodgame.cfg")
+        config = FlagConfigParser(allow_no_value=True)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -175,7 +176,8 @@ class goodgame:
         # Checking config file for needed variables
         address = None
         ch_id = None
-        for item in config.items("goodgame"):
+        for item in config.get_items("main", flags=False):
+            # print item
             if item[0] == 'socket':
                 address = item[1]
             if item[0] == 'channelid':

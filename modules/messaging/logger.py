@@ -3,13 +3,14 @@
 import os
 import ConfigParser
 import datetime
+from modules.helpers.parser import FlagConfigParser
 
 
 class logger():
     def __init__(self, conf_folder):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "logger.cfg")
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
+        config = FlagConfigParser(allow_no_value=True)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -25,7 +26,7 @@ class logger():
 
         self.folder = 'logs'
 
-        for item in config.items(tag_config):
+        for item in config.get_items(tag_config):
             if item[0] == 'logging':
                 if item[0] == 'true':
                     self.logging = True

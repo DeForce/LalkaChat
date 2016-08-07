@@ -6,6 +6,7 @@ import random
 import sqlite3
 import math
 import xml.etree.ElementTree as ElementTree
+from modules.helpers.parser import FlagConfigParser
 
 
 class levels():
@@ -13,7 +14,7 @@ class levels():
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "levels.cfg")
 
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
+        config = FlagConfigParser(allow_no_value=True)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -30,8 +31,9 @@ class levels():
         self.special_levels = []
         self.db = None
         self.cursor = None
+        self.message = u'{0} has leveled up, now he is {1}'
 
-        for item in config.items(tag_config):
+        for item in config.get_items(tag_config):
             if item[0] == 'experience':
                 self.experience = item[1]
             if item[0] == 'exp_for_level':
@@ -40,6 +42,8 @@ class levels():
                 self.filename = item[1]
             if item[0] == 'db':
                 self.db_location = item[1]
+            if item[0] == 'message':
+                self.message = item[1].decode('utf-8')
 
         exists = False
         if self.experience == 'random':
@@ -127,7 +131,7 @@ class levels():
             lvlup_message = {'source': 'tw',
                              'user': u'System',
                              'text':
-                                 u'{0} has leveled up, now he is {1}'.format(user, self.levels[max_level]['name'])}
+                                 self.message.format(user, self.levels[max_level]['name'])}
             queue.put(lvlup_message)
         cursor.close()
         return self.levels[max_level]

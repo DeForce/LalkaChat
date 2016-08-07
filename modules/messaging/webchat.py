@@ -8,6 +8,7 @@ from cherrypy.lib.static import serve_file
 from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
+from modules.helpers.parser import FlagConfigParser
 
 s_queue = Queue.Queue()
 
@@ -141,7 +142,7 @@ class webchat():
     def __init__(self, conf_folder):
         conf_file = os.path.join(conf_folder, "webchat.cfg")
 
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
+        config = FlagConfigParser(allow_no_value=True)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -150,7 +151,7 @@ class webchat():
         config.read(conf_file)
 
         tag_server = 'server'
-        for item in config.items(tag_server):
+        for item in config.get_items(tag_server):
             if item[0] == 'host':
                 self.host = item[1]
             if item[0] == 'port':
