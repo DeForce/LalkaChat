@@ -11,7 +11,13 @@ class logger():
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "logger.cfg")
         config = FlagConfigParser(allow_no_value=True)
-
+        if not os.path.exists(conf_file):
+            config.add_section('config')
+            config.set('config', 'logging', 'true')
+            config.set('config', 'rotation', 'daily')
+            config.set('config', 'file_format', '%Y-%m-%d')
+            config.set('config', 'message_date_format', '%Y-%m-%d %H:%M:%S')
+            config.write(open(conf_file))
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
@@ -19,26 +25,12 @@ class logger():
         config.read(conf_file)
         tag_config = 'config'
 
-        self.format = '%Y-%m-%d'
-        self.ts_format = '%Y-%m-%d %H:%M'
-        self.logging = True
-        self.rotation = 'daily'
+        self.format = config.get_or_default(tag_config, 'file_format', '%Y-%m-%d')
+        self.ts_format = config.get_or_default(tag_config, 'message_date_format', '%Y-%m-%d %H:%M')
+        self.logging = config.get_or_default(tag_config, 'logging', True)
+        self.rotation = config.get_or_default(tag_config, 'logging', 'daily')
 
         self.folder = 'logs'
-
-        for item in config.get_items(tag_config):
-            if item[0] == 'logging':
-                if item[0] == 'true':
-                    self.logging = True
-                else:
-                    self.logging = False
-            elif item[0] == 'rotation':
-                if item[1] == 'daily':
-                    self.rotation = 'daily'
-            elif item[0] == 'file_format':
-                self.format = item[1]
-            elif item[0] == 'message_date_format':
-                self.ts_format = item[1]
 
         self.destination = os.path.join(conf_folder, '..', self.folder)
         if not os.path.exists(self.destination):

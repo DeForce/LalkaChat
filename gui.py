@@ -9,6 +9,7 @@ from wx import html2
 # import signal
 # import thread
 # ToDO: Support customization of borders/spacings
+# ToDO: Exit by cancel button
 
 translations = {}
 ids = {}
@@ -46,16 +47,15 @@ def fix_sizes(size1, size2):
 
 
 def load_translations(settings, language):
+    language = language.lower()
     conf_file = 'translations.cfg'
-    config = ConfigParser.ConfigParser(allow_no_value=True)
+    config = FlagConfigParser(allow_no_value=True)
     config.read(os.path.join(settings['conf'], conf_file))
     # print config
 
-    try:
-        config.items(language)
-    except ConfigParser.NoSectionError:
+    if not config.has_section(language):
         print "Warning, have not found language ", language
-        language = 'English'
+        language = 'english'
 
     for param, value in config.items(language):
         # print param, value
@@ -272,7 +272,7 @@ class SettingsWindow(wx.Frame):
                                 print "got listbox, getting items", id_item
                                 window = self.FindWindowById(id_item)
                                 for item in window.GetItems():
-                                    parser.set(section, item)
+                                    parser.set(section, item.encode('utf-8'))
                     else:
                         window = self.FindWindowById(id_item)
                         # get type of item and do shit
@@ -388,7 +388,7 @@ class SettingsWindow(wx.Frame):
 
                     values = []
                     for param, value in config.get_items(item):
-                        values.append(param)
+                        values.append(param.decode('utf-8'))
 
                     if not values:
                         values = ['']

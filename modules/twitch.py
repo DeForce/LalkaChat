@@ -143,7 +143,14 @@ class twitch:
         conf_folder = os.path.join(pythonFolder, "conf")
         conf_file = os.path.join(conf_folder, "twitch.cfg")
         config = FlagConfigParser(allow_no_value=True)
+        if not os.path.exists(conf_file):
+            config.add_section('config')
+            config.set('config', 'host', 'irc.twitch.tv')
+            config.set('config', 'port', '6667')
+            config.set('config', 'channel', 'MOISTURISE ME')
+            config.set('config', 'bttv', 'false')
 
+            config.write(open(conf_file))
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
@@ -151,10 +158,11 @@ class twitch:
         config.read(conf_file)
         # Checking config file for needed variables
         # host, port, channel = tuple ( [None] * 3 ) ?!?!?!?!
-        host = None
-        port = None
-        channel = None
-        bttv_smiles = False
+        config_tag = 'config'
+        host = config.get_or_default(config_tag, 'host', None)
+        port = config.get_or_default(config_tag, 'port', None)
+        channel = config.get_or_default(config_tag, 'channel', None)
+        bttv_smiles = config.get_or_default(config_tag, 'bttv', False)
 
         # If any of the value are non-existent then exit the programm with error.
         for item in config.get_items("main"):

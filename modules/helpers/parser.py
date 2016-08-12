@@ -25,3 +25,25 @@ class FlagConfigParser(ConfigParser):
             return self.items_with_flags(section)
         else:
             return self.items_skip_flags(section)
+
+    def get_dict(self, section):
+        dict_items = {}
+        for param, value in self.get_items(section):
+            if value is not None:
+                if value.lower() == 'true':
+                    value = True
+                elif value.lower() == 'false':
+                    value = False
+            dict_items[param] = value
+        return dict_items
+
+    def get_or_default(self, section, option, default=None, raw=False, vars=None):
+        try:
+            item = self.get_items(section, option)
+        except:
+            item = None
+
+        if item:
+            return item
+        else:
+            return default

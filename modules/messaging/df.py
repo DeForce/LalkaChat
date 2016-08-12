@@ -14,6 +14,14 @@ class df:
         grep_tag = 'grep'
         prof_tag = 'prof'
         config = FlagConfigParser(allow_no_value=True)
+        if not os.path.exists(conf_file):
+            config.add_section('grep')
+            config.set('grep', 'symbol', '#')
+            config.set('grep', 'file', 'df.txt')
+
+            config.add_section('prof')
+            config.set('prof', 'Nothing', '([Нн]икто|[Nn]othing|\w*)')
+            config.write(open(conf_file))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),

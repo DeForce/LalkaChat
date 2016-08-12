@@ -215,6 +215,12 @@ class sc2tv:
         conf_folder = os.path.join(python_folder, "conf")
         conf_file = os.path.join(conf_folder, "sc2tv.cfg")
         config = FlagConfigParser(allow_no_value=True)
+        if not os.path.exists(conf_file):
+            config.add_section('config')
+            config.set('config', 'socket/hidden', 'ws://funstream.tv/socket.io/')
+            config.set('config', 'nick', 'MOISTURISE ME')
+
+            config.write(open(conf_file))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -222,13 +228,9 @@ class sc2tv:
 
         config.read(conf_file)
         # Checking config file for needed variables
-        socket = None
-        nick = None
-        for item in config.get_items("main"):
-            if item[0] == 'socket':
-                socket = item[1]
-            elif item[0] == 'nick':
-                nick = item[1]
+        config_tag = 'config'
+        socket = config.get_or_default(config_tag, 'socket', None)
+        nick = config.get_or_default(config_tag, 'nick', None)
 
         # If any of the value are non-existent then exit the programm with error.
         if (socket is None) or (nick is None):

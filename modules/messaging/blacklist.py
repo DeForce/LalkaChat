@@ -14,6 +14,25 @@ class blacklist:
         conf_file = os.path.join(conf_folder, "blacklist.cfg")
 
         config = FlagConfigParser(allow_no_value=True)
+        if not os.path.exists(conf_file):
+            config.add_section('main')
+            config.set('main', 'message', 'Trying to say something but has a trout in his mouth')
+            config.add_section('users_gui')
+            config.set('users_gui', 'for', 'users_hide, users_block')
+            config.set('users_gui', 'view', 'list')
+            config.set('users_gui', 'addable', 'true')
+
+            config.add_section('users_hide')
+            config.add_section('users_block')
+
+            config.add_section('words_gui')
+            config.set('words_gui', 'for', 'users_hide, users_block')
+            config.set('words_gui', 'view', 'list')
+            config.set('words_gui', 'addable', 'true')
+
+            config.add_section('words_hide')
+            config.add_section('words_block')
+            config.write(open(conf_file))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),

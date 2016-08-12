@@ -13,6 +13,9 @@ class c2b:
         conf_file = os.path.join(conf_folder, "c2b.cfg")
 
         config = FlagConfigParser(allow_no_value=True)
+        if not os.path.exists(conf_file):
+            config.add_section('config')
+            config.write(open(conf_file))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -21,8 +24,8 @@ class c2b:
         config.read(conf_file)
         tag_config = 'config'
         self.f_items = []
-        for item in config.get_items(tag_config):
-            f_item = {'filter': item[0].decode('utf-8'), 'replace': item[1].split('/')}
+        for param, value in config.get_items(tag_config):
+            f_item = {'filter': param.decode('utf-8'), 'replace': value.split('/')}
             f_item['replace'] = map(lambda x: x.strip().decode('utf-8'), f_item['replace'])
             self.f_items.append(f_item)
 

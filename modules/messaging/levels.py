@@ -15,6 +15,15 @@ class levels():
         conf_file = os.path.join(conf_folder, "levels.cfg")
 
         config = FlagConfigParser(allow_no_value=True)
+        if not os.path.exists(conf_file):
+            config.add_section('config')
+            config.set('config', 'experience', 'static')
+            config.set('config', 'exp_for_level', 100)
+            config.set('config', 'levels', 'levels.xml')
+            config.set('config', 'db', 'levels.db')
+            config.set('config', 'message', '{0} has leveled up, now he is {1}')
+
+            config.write(open(conf_file))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -24,26 +33,15 @@ class levels():
         tag_config = 'config'
 
         self.conf_folder = conf_folder
-        self.experience = 'static'
-        self.exp_for_level = 100
-        self.filename = 'levels.xml'
+        self.experience = config.get_or_default(tag_config, 'experience', 'static')
+        self.exp_for_level = int(config.get_or_default(tag_config, 'exp_for_level', 100))
+        self.filename = config.get_or_default(tag_config, 'filename', 'levels.xml')
         self.levels = []
         self.special_levels = []
         self.db = None
+        self.db_location = config.get_or_default(tag_config, 'db', None)
         self.cursor = None
-        self.message = u'{0} has leveled up, now he is {1}'
-
-        for item in config.get_items(tag_config):
-            if item[0] == 'experience':
-                self.experience = item[1]
-            if item[0] == 'exp_for_level':
-                self.exp_for_level = int(item[1])
-            if item[0] == 'filename':
-                self.filename = item[1]
-            if item[0] == 'db':
-                self.db_location = item[1]
-            if item[0] == 'message':
-                self.message = item[1].decode('utf-8')
+        self.message = config.get_or_default(tag_config, 'message', u'{0} has leveled up, now he is {1}').decode('utf-8')
 
         exists = False
         if self.experience == 'random':

@@ -143,6 +143,12 @@ class webchat():
         conf_file = os.path.join(conf_folder, "webchat.cfg")
 
         config = FlagConfigParser(allow_no_value=True)
+        if not os.path.exists(conf_file):
+            config.add_section('server')
+            config.set('server', 'host', '127.0.0.1')
+            config.set('server', 'port', '8080')
+
+            config.write(open(conf_file))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -151,12 +157,8 @@ class webchat():
         config.read(conf_file)
 
         tag_server = 'server'
-        for item in config.get_items(tag_server):
-            if item[0] == 'host':
-                self.host = item[1]
-            if item[0] == 'port':
-                self.port = item[1]
-        # cherrypy.tools.multiheaders = cherrypy.Tool('on_end_resource', multi_headers)
+        self.host = config.get_or_default(tag_server, 'host', '127.0.0.1')
+        self.port = config.get_or_default(tag_server, 'port', '8080')
 
         s_thread = SocketThread(self.host, self.port, conf_folder)
         s_thread.start()

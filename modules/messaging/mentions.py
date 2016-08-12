@@ -10,25 +10,26 @@ class mentions():
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "mentions.cfg")
         config = FlagConfigParser(allow_no_value=True)
+        if not os.path.exists(conf_file):
+            config.add_section('config')
+            config.add_section('config_gui')
+            config.set('config_gui', 'for', 'mentions, address')
+            config.set('config_gui', 'view', 'list')
+            config.set('config_gui', 'addable', 'true')
+            config.add_section('mentions')
+            config.add_section('address')
 
+            config.write(open(conf_file))
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
 
         config.read(conf_file)
-        tag_config = 'config'
-        self.mentions = []
-        self.addresses = []
-        for item in config.get_items(tag_config):
-            if item[0] == 'mentions':
-                mention = item[1].split(',')
-                mention = map(lambda x: x.strip().lower().decode('utf-8'), mention)
-                map(lambda x: self.mentions.append(x), mention)
-            elif item[0] == 'address':
-                address = item[1].split(',')
-                # address = map(lambda x: x.strip().lower().decode('utf-8'), address)
-                address = map(lambda x: x.strip().lower(), address)
-                map(lambda x: self.addresses.append(x), address)
+        mention_tag = 'mentions'
+        address_tag = 'address'
+
+        self.mentions = map(lambda x: x[0], config.get_items(mention_tag))
+        self.addresses = map(lambda x: x[0], config.get_items(address_tag))
 
     def get_message(self, message, queue):
         # Replacing the message if needed.
