@@ -1,7 +1,0 @@
-CzT1,Farmer 
-CzT1,Farmer 
-CzT1,Miner 
-CzT1,Miner 
-CzT1,Nothing 
-CzT1,Nothing
-CzT1,Miner

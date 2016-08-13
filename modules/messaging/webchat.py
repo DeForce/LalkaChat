@@ -148,7 +148,7 @@ class webchat():
             config.set('server', 'host', '127.0.0.1')
             config.set('server', 'port', '8080')
 
-            config.write(open(conf_file))
+            config.write(open(conf_file, 'w'))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),

@@ -23,7 +23,7 @@ class levels():
             config.set('config', 'db', 'levels.db')
             config.set('config', 'message', '{0} has leveled up, now he is {1}')
 
-            config.write(open(conf_file))
+            config.write(open(conf_file, 'w'))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -39,7 +39,7 @@ class levels():
         self.levels = []
         self.special_levels = []
         self.db = None
-        self.db_location = config.get_or_default(tag_config, 'db', None)
+        self.db_location = config.get_or_default(tag_config, 'db', 'levels.db')
         self.cursor = None
         self.message = config.get_or_default(tag_config, 'message', u'{0} has leveled up, now he is {1}').decode('utf-8')
 
@@ -60,6 +60,11 @@ class levels():
             self.db = None
 
         # Load levels
+
+        if not os.path.exists(os.path.join(conf_folder, self.filename)):
+            print "Levels.xml not found, exiting"
+            exit()
+
         tree = ElementTree.parse(os.path.join(conf_folder, self.filename))
         lvl_xml = tree.getroot()
 

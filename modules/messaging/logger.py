@@ -17,7 +17,7 @@ class logger():
             config.set('config', 'rotation', 'daily')
             config.set('config', 'file_format', '%Y-%m-%d')
             config.set('config', 'message_date_format', '%Y-%m-%d %H:%M:%S')
-            config.write(open(conf_file))
+            config.write(open(conf_file, 'w'))
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}

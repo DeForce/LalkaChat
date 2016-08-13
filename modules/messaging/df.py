@@ -21,22 +21,19 @@ class df:
 
             config.add_section('prof')
             config.set('prof', 'Nothing', '([Нн]икто|[Nn]othing|\w*)')
-            config.write(open(conf_file))
+            config.write(open(conf_file, 'w'))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
 
         config.read(conf_file)
+        self.symbol = config.get_or_default(grep_tag, 'symbol', '#')
+        self.file = config.get_or_default(grep_tag, 'file', 'df.txt')
 
-        for grep in config.get_items(grep_tag):
-            if grep[0] == 'symbol':
-                self.symbol = grep[1]
-            elif grep[0] == 'file':
-                self.file = grep[1]
-                if not os.path.isfile(grep[1]):
-                    with open(grep[1], 'w'):
-                        pass
+        if not os.path.isfile(self.file):
+            with open(self.file, 'w'):
+                pass
 
         self.prof = []
         for prof in config.get_items(prof_tag):
