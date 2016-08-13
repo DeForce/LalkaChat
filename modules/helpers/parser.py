@@ -37,13 +37,10 @@ class FlagConfigParser(ConfigParser):
             dict_items[param] = value
         return dict_items
 
-    def get_or_default(self, section, option, default=None, raw=False, vars=None):
-        try:
-            item = self.get_items(section, option)
-        except:
-            item = None
+    def get_or_default(self, section, option, default=None, raw=False, vars=None, flags=None):
+        items = self.get_items(section)
 
-        if item:
-            return item
-        else:
-            return default
+        for item, value in items:
+            if item == option:
+                return value
+        return default

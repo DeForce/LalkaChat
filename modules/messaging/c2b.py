@@ -15,7 +15,7 @@ class c2b:
         config = FlagConfigParser(allow_no_value=True)
         if not os.path.exists(conf_file):
             config.add_section('config')
-            config.write(open(conf_file))
+            config.write(open(conf_file, 'w'))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),

@@ -147,10 +147,10 @@ class twitch:
             config.add_section('config')
             config.set('config', 'host', 'irc.twitch.tv')
             config.set('config', 'port', '6667')
-            config.set('config', 'channel', 'MOISTURISE ME')
+            config.set('config', 'channel', 'monstercat')
             config.set('config', 'bttv', 'false')
 
-            config.write(open(conf_file))
+            config.write(open(conf_file, 'w'))
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
@@ -159,38 +159,31 @@ class twitch:
         # Checking config file for needed variables
         # host, port, channel = tuple ( [None] * 3 ) ?!?!?!?!
         config_tag = 'config'
-        host = config.get_or_default(config_tag, 'host', None)
-        port = config.get_or_default(config_tag, 'port', None)
-        channel = config.get_or_default(config_tag, 'channel', None)
+        host = config.get_or_default(config_tag, 'host', 'irc.twitch.tv')
+        port = int(config.get_or_default(config_tag, 'port', 6667))
+        channel = config.get_or_default(config_tag, 'channel', 'monstercat')
         bttv_smiles = config.get_or_default(config_tag, 'bttv', False)
+        badges = {}
 
         # If any of the value are non-existent then exit the programm with error.
-        for item in config.get_items("main"):
-            if item[0] == 'port':
-                port = int(item[1])
-            elif item[0] == 'channel':
-                channel = item[1]
-                try:
-                    request = requests.get("http://tmi.twitch.tv/servers?channel="+channel)
-                    if request.status_code == 200:
-                        # print type(request.json())
-                        host = random.choice(request.json()['servers']).split(':')[0]
-                        # print request.json()['servers'][0].split(':')[0]
-                except:
-                    print "Issue with twitch"
-                    exit()
 
-                try:
-                    request = requests.get("https://api.twitch.tv/kraken/chat/{0}/badges".format(channel))
-                    if request.status_code == 200:
-                        badges = request.json()
-                except:
-                    print "Issue with twitch"
-                    exit()
-            elif item[0] == 'bttv':
-                if item[1] == 'true':
-                    # Load bttv smiles in thread
-                    bttv_smiles = True
+        try:
+            request = requests.get("http://tmi.twitch.tv/servers?channel="+channel)
+            if request.status_code == 200:
+                # print type(request.json())
+                host = random.choice(request.json()['servers']).split(':')[0]
+                # print request.json()['servers'][0].split(':')[0]
+        except:
+            print "Issue with twitch"
+            exit()
+
+        try:
+            request = requests.get("https://api.twitch.tv/kraken/chat/{0}/badges".format(channel))
+            if request.status_code == 200:
+                badges = request.json()
+        except:
+            print "Issue with twitch"
+            exit()
 
         # If any of the value are non-existent then exit the programm with error.
         if (host is None) or (port is None) or (channel is None):

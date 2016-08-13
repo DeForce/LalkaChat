@@ -32,7 +32,7 @@ class blacklist:
 
             config.add_section('words_hide')
             config.add_section('words_block')
-            config.write(open(conf_file))
+            config.write(open(conf_file, 'w'))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),

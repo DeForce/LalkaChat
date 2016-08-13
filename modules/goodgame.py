@@ -170,9 +170,9 @@ class goodgame:
         if not os.path.exists(conf_file):
             config.add_section('config')
             config.set('config', 'socket/hidden', 'ws://chat.goodgame.ru:8081/chat/websocket')
-            config.set('config', 'channelname', 'MOISTURISE ME')
+            config.set('config', 'channel_name', 'oxlamon')
 
-            config.write(open(conf_file))
+            config.write(open(conf_file, 'w'))
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -181,9 +181,9 @@ class goodgame:
         config.read(conf_file)
         # Checking config file for needed variables
         conf_tag = 'config'
-        address = config.get_or_default(conf_tag, 'socket/hidden', None)
+        address = config.get_or_default(conf_tag, 'socket', 'ws://chat.goodgame.ru:8081/chat/websocket')
         ch_id = config.get_or_default(conf_tag, 'channel_id', None)
-        channel_name = config.get_or_default(conf_tag, 'channel_name', None)
+        channel_name = config.get_or_default(conf_tag, 'channel_name', 'oxlamon')
         if ch_id and not channel_name:
             try:
                 request = requests.get("http://api2.goodgame.ru/streams/"+ch_id)
@@ -203,8 +203,6 @@ class goodgame:
                     # print request.json()
             except:
                 print "Issue with goodgame"
-                if ch_id is None:
-                    exit()
         # If any of the value are non-existent then exit the programm with error.
         if (address is None) or (ch_id is None):
             print "Config for goodgame is not correct!"

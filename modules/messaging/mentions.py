@@ -19,7 +19,7 @@ class mentions():
             config.add_section('mentions')
             config.add_section('address')
 
-            config.write(open(conf_file))
+            config.write(open(conf_file, 'w'))
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
@@ -27,9 +27,15 @@ class mentions():
         config.read(conf_file)
         mention_tag = 'mentions'
         address_tag = 'address'
+        if config.has_section(mention_tag):
+            self.mentions = map(lambda x: x[0], config.get_items(mention_tag))
+        else:
+            self.mentions = {}
 
-        self.mentions = map(lambda x: x[0], config.get_items(mention_tag))
-        self.addresses = map(lambda x: x[0], config.get_items(address_tag))
+        if config.has_section(address_tag):
+            self.addresses = map(lambda x: x[0], config.get_items(address_tag))
+        else:
+            self.addresses = {}
 
     def get_message(self, message, queue):
         # Replacing the message if needed.
