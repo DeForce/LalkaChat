@@ -1,7 +1,6 @@
 import json
 import threading
 import os
-import ConfigParser
 import requests
 import Queue
 import re
@@ -133,7 +132,6 @@ class ggThread(threading.Thread):
         self.smiles = []
         
     def run(self):
-        # Get the fucking smiles
         try:
             smile_request = requests.get("http://api2.goodgame.ru/smiles")
             next_page = smile_request.json()['_links']['first']['href']
@@ -188,9 +186,7 @@ class goodgame:
             try:
                 request = requests.get("http://api2.goodgame.ru/streams/"+ch_id)
                 if request.status_code == 200:
-                    # print type(request.json())
                     channel_name = request.json()['channel']['key']
-                    # print request.json()
             except:
                 print "Issue with goodgame"
 
@@ -198,16 +194,14 @@ class goodgame:
             try:
                 request = requests.get("http://api2.goodgame.ru/streams/"+channel_name)
                 if request.status_code == 200:
-                    # print type(request.json())
                     ch_id = request.json()['channel']['id']
-                    # print request.json()
             except:
                 print "Issue with goodgame"
-        # If any of the value are non-existent then exit the programm with error.
+        # If any of the value are non-existent then exit the program with error.
         if (address is None) or (ch_id is None):
             print "Config for goodgame is not correct!"
             exit()
 
-        # Creating new thread with queue in place for messaging tranfers
+        # Creating new thread with queue in place for messaging transfers
         gg = ggThread(queue, address, ch_id, channel_name)
         gg.start()

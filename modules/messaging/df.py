@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import re
 import os
-import ConfigParser
 from modules.helpers.parser import FlagConfigParser
 
 
@@ -40,24 +39,22 @@ class df:
             comp = [prof[0].capitalize(), self.symbol + prof[1].decode('utf-8')]
             self.prof.append(comp)
 
-    def write_to_tile(self, message):
+    def write_to_file(self, message):
         with open(self.file, 'r') as f:
             for line in f.readlines():
                 if message['user'] == line.split(',')[0]:
                     return
-            text = "%s,%s\n" %(message['user'], message['text'])
+            text = "{user},{text}\n".format(message['user'], message['text'])
         with open(self.file, 'a') as f:
             f.write(text)
 
     def get_message(self, message, queue):
         if message is None:
-            # print "df received empty message"
             return
         else:
             for regexp in self.prof:
                 if re.search(regexp[1], message['text']):
-                    # print "Got Hit %s" % regexp[0]
                     comp = {'user': message['user'], 'text': regexp[0]}
-                    self.write_to_tile(comp)
+                    self.write_to_file(comp)
                     break
             return message

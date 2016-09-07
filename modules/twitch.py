@@ -2,7 +2,6 @@ import irc.client
 import threading
 import os
 import re
-import ConfigParser
 import random
 import requests
 from modules.helpers.parser import FlagConfigParser
@@ -40,7 +39,6 @@ class IRC(irc.client.SimpleIRCClient):
         # Also, there is slight problem with some users, they dont have
         #  the display-name tag, so we have to check their "real" username
         #  and capitalize it because twitch does so, so we do the same.
-        # print event
         comp = {'source': self.source}
         badges = []
         emotes = []
@@ -131,8 +129,6 @@ class twThread(threading.Thread):
         ircClient = IRC(self.queue, self.channel, self.badges, bttv_smiles)
         ircClient.connect(self.host, self.port, self.nickname)
         ircClient.start()
-        # print dir(IRCCat)
-        # irc.connect()
 
 
 class twitch:
@@ -170,9 +166,7 @@ class twitch:
         try:
             request = requests.get("http://tmi.twitch.tv/servers?channel="+channel)
             if request.status_code == 200:
-                # print type(request.json())
                 host = random.choice(request.json()['servers']).split(':')[0]
-                # print request.json()['servers'][0].split(':')[0]
         except:
             print "Issue with twitch"
             exit()

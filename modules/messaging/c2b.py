@@ -1,7 +1,6 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 import os
-import ConfigParser
 import random
 import re
 from modules.helpers.parser import FlagConfigParser
@@ -33,7 +32,6 @@ class c2b:
         # Replacing the message if needed.
         # Please do the needful
         if message is None:
-            # print "C2B recieved empty message"
             return
         else:
             for replace in self.f_items:

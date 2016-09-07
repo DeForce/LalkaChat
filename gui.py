@@ -1,13 +1,9 @@
-from pprint import pprint
 import threading
 import wx
 import os
-import ConfigParser
 import re
 from modules.helpers.parser import FlagConfigParser
 from wx import html2
-# import signal
-# import thread
 # ToDO: Support customization of borders/spacings
 # ToDO: Exit by cancel button
 
@@ -51,14 +47,12 @@ def load_translations(settings, language):
     conf_file = 'translations.cfg'
     config = FlagConfigParser(allow_no_value=True)
     config.read(os.path.join(settings['conf'], conf_file))
-    # print config
 
     if not config.has_section(language):
         print "Warning, have not found language ", language
         language = 'english'
 
     for param, value in config.items(language):
-        # print param, value
         translations[param] = value
 
 
@@ -154,8 +148,6 @@ class SettingsWindow(wx.Frame):
         self.configs = configs
         self.gui_settings = {}
 
-        # pprint(self.main_class.modules_configs)
-
         self.main_grid = wx.BoxSizer(wx.VERTICAL)
 
         if on_top:
@@ -165,9 +157,6 @@ class SettingsWindow(wx.Frame):
 
         self.SetSizer(self.main_grid)
         self.Layout()
-        # self.main_grid.Fit(self)
-        # print config_size_max
-        # self.SetSize(config_size_max)
         self.Show(True)
 
     def on_exit(self, event):
@@ -230,11 +219,9 @@ class SettingsWindow(wx.Frame):
         print ids[event.GetId()]
         module_groups = ids[event.GetId()].split('.')
         if module_groups[1] == 'apply_button':
-            # print "Got Apply Event"
             self.write_config(module_groups)
             self.on_close(event)
         elif module_groups[1] == 'cancel_button':
-            # print "Got Cancel Event"
             event.Skip()
         elif 'list_add' in module_groups:
             self.add_list_item(module_groups)
@@ -279,7 +266,6 @@ class SettingsWindow(wx.Frame):
                         if isinstance(window, wx.CheckBox):
                             parser.set(section, param, str(window.IsChecked()).lower())
                         elif isinstance(window, wx.TextCtrl):
-                            # print "Got TextCtrl, YAY", str(window.GetValue())
                             parser.set(section, param, window.GetValue().encode('utf-8'))
 
             with open(conf_file, 'w') as config_file:
@@ -290,19 +276,13 @@ class SettingsWindow(wx.Frame):
         notebook_text = translate_language('config')
         notebook = wx.Notebook(main_panel, id=notebook_id, style=wx.NB_TOP, name=notebook_text)
 
-        # self.main_class.modules_configs = [self.main_class.modules_configs[0]]
-
         for config in self.main_class.modules_configs:
             panel_id = wx.Window_NewControlId()
             config_name = config.keys()[0]
             panel_name = translate_language(config_name)
             panel = wx.Panel(notebook, id=panel_id)
-            # panel.SetScrollbars(5, 5, 10, 10)
-
-            # print config[config_name]
             panel_sizer = self.load_config(config_params=config[config_name], panel=panel)
             panel.SetSizer(panel_sizer)
-            # panel.Fit()
 
             notebook.AddPage(panel, panel_name)
 
@@ -310,7 +290,6 @@ class SettingsWindow(wx.Frame):
 
     def load_config(self, config_params=None, panel=None, **kwargs):
         conf_params = config_params
-        # print conf_params
         sizer = wx.BoxSizer(wx.VERTICAL)
 
         config = FlagConfigParser(allow_no_value=True)
@@ -324,16 +303,13 @@ class SettingsWindow(wx.Frame):
         module_prefix = conf_params['filename']
 
         sections = config._sections
-        # print sections
         for item in sections:
             # Check if it is GUI settings
             item_split = item.split('_')
             if len(item_split) > 1 and item_split[-1] == 'gui':
-                # print "found GUI settings ", '.'.join([module_prefix, '_'.join(item_split[:-1])])
                 for gui_item in config.get(item, 'for').split(','):
                     gui_item = gui_item.strip()
                     gui_item = self.module_key.join([module_prefix, gui_item])
-                    # print gui_item
                     self.gui_settings[gui_item] = {}
                     for param, value in config.get_items(item):
                         if param != 'for':
@@ -343,8 +319,6 @@ class SettingsWindow(wx.Frame):
                 view = None
                 gui_module = self.module_key.join([module_prefix, item])
                 if gui_module in self.gui_settings:
-                    # print "Found Settings for this section", item
-                    # print self.gui_settings[item]
                     view = self.gui_settings[gui_module].get('view', None)
 
                 # Create header for section
@@ -383,7 +357,6 @@ class SettingsWindow(wx.Frame):
                     list_box_name = '.'.join([module_prefix, item, 'list_box'])
                     list_box_id = id_change_to_new(list_box_name)
                     ids[list_box_id] = list_box_name
-                    # list_box_text = translate_language(ids[list_box_id])
                     list_box = wx.ListBox(f_panel, id=list_box_id, style=wx.LB_EXTENDED)
 
                     values = []
@@ -402,14 +375,12 @@ class SettingsWindow(wx.Frame):
                     for param, value, flags in config.items_with_flags(item):
                         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
                         rotate = False
-                        # print param, flags
                         # Creating item settings
                         if flags:
                             module_name = self.keyword.join(['.'.join([module_prefix, item, param]),
                                                              self.flag_keyword.join(flags)])
                         else:
                             module_name = '.'.join([module_prefix, item, param])
-                        # print module_name
 
                         if 'hidden' in flags:
                             if self.show_hidden:
@@ -424,8 +395,6 @@ class SettingsWindow(wx.Frame):
                         text_text = translate_language(module_name)
                         text = wx.StaticText(f_panel, wx.ID_ANY, text_text,
                                              style=wx.ALIGN_RIGHT)
-                        # text.SetBackgroundColour('red')
-                        # text.SetMinSize(fix_sizes(text.GetSize(), self.labelMinSize))
 
                         # Creating item objects
                         if value is not None:
@@ -435,7 +404,6 @@ class SettingsWindow(wx.Frame):
                                 if module_name == 'config.gui.show_hidden' and value == 'true':
                                     self.show_hidden = True
                                 box = wx.CheckBox(f_panel, id=module_id)
-                                # self.main_class.Bind(wx.EVT_CHECKBOX, self.check_box_clicked, id=module_id)
                                 if value == 'true':
                                     box.SetValue(True)
                                 else:
@@ -443,7 +411,6 @@ class SettingsWindow(wx.Frame):
                             # If not - it's text control
                             else:
                                 box = wx.TextCtrl(f_panel, id=module_id, value=value.decode('utf-8'))
-                                # box.AppendText(value)
 
                         # If item doesn't have any values it's a button
                         else:
@@ -475,8 +442,6 @@ class SettingsWindow(wx.Frame):
         self.main_class.Bind(wx.EVT_BUTTON, self.button_clicked, id=button_id)
         buttons_sizer.Add(apply_button, 0, wx.ALIGN_RIGHT)
 
-        # buttons_sizer.AddSpacer(self.flex_horizontal_gap*2)
-
         button_name = '.'.join([module_prefix, 'cancel_button'])
         button_id = id_change_to_new(button_name)
         ids[button_id] = button_name
@@ -505,25 +470,19 @@ class ChatGui(wx.Frame):
             print "Application is on top"
             styles = styles | wx.STAY_ON_TOP
 
-        # print styles
         self.SetWindowStyle(styles)
 
         vbox = wx.BoxSizer(wx.VERTICAL)
 
         toolbar = MainMenuToolBar(self, main_class=self)
         self.main_window = html2.WebView.New(parent=self, url=url, name='LalkaWebViewGui')
-        # self.main_window
-        # self.main_window = html2.WebView.New(parent=self, url=url, name='LalkaWebViewGui', size=(300, 600))
 
         vbox.Add(toolbar, 0, wx.EXPAND)
         vbox.Add(self.main_window, 1, wx.EXPAND)
 
         self.Bind(wx.EVT_LEFT_DOWN, self.on_right_down, self.main_window)
         self.Bind(wx.EVT_CLOSE, self.on_exit)
-        # self.Bind(wx.EVT_TOOL, self.on_settings, id=get_id_from_name('settings'))
-        # self.Bind(wx.EVT_TOOL, self.on_about, id=ids['about'])
 
-        # vbox.Fit(self)
         self.SetSizer(vbox)
         self.Show(True)
 
@@ -538,8 +497,6 @@ class ChatGui(wx.Frame):
         print "RClick"
 
     def on_settings(self, event):
-        # print event
-        # print wx.STAY_ON_TOP, self.GetWindowStyle()
         if not self.settingWindow:
             if wx.STAY_ON_TOP & self.GetWindowStyle() == wx.STAY_ON_TOP:
                 self.settingWindow = SettingsWindow(self, self.main_config, on_top=True,

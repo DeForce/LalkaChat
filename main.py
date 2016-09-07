@@ -1,6 +1,6 @@
 import os
 import ConfigParser
-import importlib
+import imp
 import Queue
 import messaging
 import gui
@@ -14,7 +14,7 @@ def init():
     loaded_modules = {}
     gui_settings = {}
 
-    python_folder = os.path.dirname(os.path.abspath(__file__))
+    python_folder = os.path.dirname(os.path.abspath('__file__'))
     conf_folder = os.path.join(python_folder, "conf")
     module_folder = os.path.join(python_folder, "modules")
 
@@ -79,8 +79,6 @@ def init():
 
     loaded_module_config += msg.modules_configs
 
-    # print loaded_module_config
-
     print "Loading Chats Configuration File"
     module_tag = "chats"
     module_import_folder = "modules"
@@ -99,7 +97,9 @@ def init():
             # Class should be named as in config
             # Also passing core folder to module so it can load it's own
             #  configuration correctly
-            tmp = importlib.import_module(module_import_folder + '.' + module[0])
+            file_path = os.path.join(main_config['python'], module_import_folder, '{0}.py'.format(module[0]))
+
+            tmp = imp.load_source(module[0], file_path)
             class_name = getattr(tmp, module[0])
             loaded_modules[module[0]] = class_name(queue, python_folder)
             loaded_module_config.insert(module_id, {module[0]: loaded_modules[module[0]].conf_params})
@@ -114,14 +114,12 @@ def init():
             print console
             if console == "exit":
                 print "Exiting now!"
-                # exit()
                 thread.interrupt_main()
             else:
                 print "Incorrect Command"
     except (KeyboardInterrupt, SystemExit):
         print "Exiting now!"
         thread.interrupt_main()
-        # exit()
     except Exception as exc:
         print exc
 

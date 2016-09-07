@@ -1,4 +1,3 @@
-import ConfigParser
 import os
 import threading
 import json
@@ -93,9 +92,6 @@ class WebChatPlugin(WebSocketPlugin):
 
 class HttpRoot(object):
     @cherrypy.expose
-    # @cherrypy.tools.response_headers([("Expires", '-1')])
-    # @cherrypy.tools.response_headers([("Pragma", "no-cache")])
-    # @cherrypy.tools.response_headers([("Cache-Control", "private, max-age=0, no-cache, no-store, must-revalidate")])
     def index(self):
         cherrypy.response.headers["Expires"] = -1
         cherrypy.response.headers["Pragma"] = "no-cache"
@@ -109,7 +105,7 @@ class HttpRoot(object):
 
 
 class SocketThread(threading.Thread):
-    def __init__(self, host, port, root_folder):
+    def __init__(self, host, port, root_folder, **kwargs):
         super(self.__class__, self).__init__()
         self.daemon = True
         self.host = host
@@ -133,9 +129,6 @@ class SocketThread(threading.Thread):
                                                               'tools.staticdir.dir': os.path.join(http_folder, 'css')},
                                                      '/img': {'tools.staticdir.on': True,
                                                               'tools.staticdir.dir': os.path.join(http_folder, 'img')}})
-                                                     # '/': {'tools.staticdir.on': True,
-                                                     #       'tools.staticdir.dir': http_folder,
-                                                     #       'tools.staticdir.index': "index.html"}})
 
 
 class webchat():

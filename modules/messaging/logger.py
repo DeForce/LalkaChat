@@ -1,7 +1,6 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 import os
-import ConfigParser
 import datetime
 from modules.helpers.parser import FlagConfigParser
 
@@ -38,7 +37,6 @@ class logger():
 
     def get_message(self, message, queue):
         if message is None:
-            # print "Logger recieved empty message"
             return
         else:
             with open('{0}.txt'.format(

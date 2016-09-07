@@ -1,9 +1,9 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 import os
-import ConfigParser
 import re
 from modules.helpers.parser import FlagConfigParser
+
 
 class mentions():
     def __init__(self, conf_folder):
@@ -41,7 +41,6 @@ class mentions():
         # Replacing the message if needed.
         # Please do the needful
         if message is None:
-            # print "C2B recieved empty message"
             return
         else:
             for mention in self.mentions:

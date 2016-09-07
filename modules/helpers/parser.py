@@ -14,7 +14,6 @@ class FlagConfigParser(ConfigParser):
         items = self.items(section)
         for param, value in items:
             split_param = param.split(self.keyword)
-            # print split_param
             if len(split_param) > 1:
                 yield split_param[0], value, split_param[1].split(self.flag_keyword)
             else:

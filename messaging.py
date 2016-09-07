@@ -3,7 +3,7 @@
 import os
 import ConfigParser
 import threading
-import importlib
+import imp
 import codecs
 import sys
 
@@ -15,7 +15,6 @@ class Message(threading.Thread):
         self.modules = []
         self.modules_configs = []
         self.daemon = True
-        # self.modules = {}
         self.msg_counter = 0
 
         print "Loading configuration file for messaging"
@@ -33,9 +32,11 @@ class Message(threading.Thread):
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
                 #  same name as module name
-                tmp = importlib.import_module(module_tag + '.' + module[0])
+                join_path = [python_folder] + module_tag.split('.') + ['{0}.py'.format(module[0])]
+                file_path = os.path.join(*join_path)
+
+                tmp = imp.load_source(module[0], file_path)
                 init = getattr(tmp, module[0])
-                # self.modules[module[0]] = init(conf_folder)
                 class_module = init(conf_folder)
                 self.modules.append(class_module)
                 self.modules_configs.append({module[0]: class_module.conf_params})
@@ -60,11 +61,6 @@ class Message(threading.Thread):
                 pass
             except Exception as exc:
                 print exc
-
-        # if message is not None:
-            # print type(message['text'])
-            # print type(message['text'].encode('utf-8').decode('utf-8'))
-            # print "[%s] %s: %s" % (message['source'], message['user'], message['text'])
 
     def run(self):
         while True:

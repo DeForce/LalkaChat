@@ -4,7 +4,6 @@ import time
 import re
 import requests
 import os
-import ConfigParser
 from ws4py.client.threadedclient import WebSocketClient
 from modules.helpers.parser import FlagConfigParser
 
@@ -24,10 +23,10 @@ class fsChat(WebSocketClient):
         #  requests in "proper" format:
         #
         #			42Iterator["command",{"params":"param"}]
-        #ex: 	420["/chat/join",{'channel':"stream/30000"}
-        #ex: 	421["/chat/join",{'channel':"stream/30000"}
-        #ex: 	429["/chat/join",{'channel':"stream/30000"}
-        #ex: 	4210["/chat/join",{'channel':"stream/30000"}
+        # ex: 	420["/chat/join",{'channel':"stream/30000"}
+        # ex: 	421["/chat/join",{'channel':"stream/30000"}
+        # ex: 	429["/chat/join",{'channel':"stream/30000"}
+        # ex: 	4210["/chat/join",{'channel':"stream/30000"}
         #
         # Also, funstream API send duplicates of the messages
         #  so we have to ignore the duplicates.

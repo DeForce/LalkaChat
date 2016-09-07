@@ -1,7 +1,6 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 import os
-import ConfigParser
 import random
 import sqlite3
 import math
@@ -60,7 +59,6 @@ class levels():
             self.db = None
 
         # Load levels
-
         if not os.path.exists(os.path.join(conf_folder, self.filename)):
             print "Levels.xml not found, exiting"
             exit()
@@ -77,13 +75,9 @@ class levels():
                 if self.experience == 'static':
                     level_exp = eval('self.exp_for_level * level_c')
                     level_c += 1
-                    # print level_exp
                 elif self.experience == 'geometrical':
-                    lvl_old = level_exp
                     level_exp = math.floor(eval('self.exp_for_level * (pow(level_c, 1.8)/2.0)'))
                     level_c += 1
-                    # print level_exp - lvl_old
-                    # print level_exp
                 elif self.experience == 'random':
                     level_exp = eval('self.exp_for_level * level_c')
                     level_c += 1
@@ -141,7 +135,6 @@ class levels():
 
     def get_message(self, message, queue):
         if message is None:
-            # print "levels recieved empty message"
             return
         else:
             message['s_levels'] = []

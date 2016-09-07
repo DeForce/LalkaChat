@@ -56,7 +56,6 @@ class blacklist:
 
     def get_message(self, message, queue):
         if message is None:
-            # print "Blackist recieved no message"
             return
         else:
             user = self.process_user(message)
