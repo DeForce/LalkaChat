@@ -3,7 +3,7 @@ import wx
 import os
 import re
 from modules.helpers.parser import FlagConfigParser
-from wx import html2
+from cefpython3.wx import chromectrl
 # ToDO: Support customization of borders/spacings
 # ToDO: Exit by cancel button
 
@@ -475,19 +475,19 @@ class ChatGui(wx.Frame):
         vbox = wx.BoxSizer(wx.VERTICAL)
 
         toolbar = MainMenuToolBar(self, main_class=self)
-        self.main_window = html2.WebView.New(parent=self, url=url, name='LalkaWebViewGui')
+        self.main_window = chromectrl.ChromeCtrl(self, useTimer=True, url=str(url), hasNavBar=False)
 
         vbox.Add(toolbar, 0, wx.EXPAND)
         vbox.Add(self.main_window, 1, wx.EXPAND)
 
-        self.Bind(wx.EVT_LEFT_DOWN, self.on_right_down, self.main_window)
         self.Bind(wx.EVT_CLOSE, self.on_exit)
 
         self.SetSizer(vbox)
         self.Show(True)
 
     def on_about(self, event):
-        self.main_window.Reload(wx.html2.WEBVIEW_RELOAD_NO_CACHE)
+        self.main_window.Refresh()
+        pass
 
     def on_exit(self, event):
         print "Exiting... "
@@ -521,6 +521,13 @@ class GuiThread(threading.Thread):
     url = 'http://localhost:8080'
 
     def run(self):
+        # Doesn't work for some reason at the moment
+        chrome_settings = {
+            "debug": False,
+            "log_file": ""
+        }
+
+        chromectrl.Initialize(chrome_settings)
         load_translations(self.main_config, self.gui_settings.get('language', 'default'))
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
         frame = ChatGui(None, "LalkaChat", self.url, main_config=self.main_config, gui_settings=self.gui_settings,
