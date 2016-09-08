@@ -1,16 +1,16 @@
 var socket = new WebSocket("ws://127.0.0.1:8080/ws");
 
 socket.onopen = function() {
-	console.log("Соединение установлено.");
+	//console.log("Соединение установлено.");
 };
 
 socket.onclose = function(event) {
 	if (event.wasClean) {
-		console.log('Соединение закрыто чисто');
+		//console.log('Соединение закрыто чисто');
 	} else {
-		console.log('Обрыв соединения'); // например, "убит" процесс сервера
+		//console.log('Обрыв соединения'); // например, "убит" процесс сервера
 	}
-	console.log('Код: ' + event.code + ' причина: ' + event.reason);
+	//console.log('Код: ' + event.code + ' причина: ' + event.reason);
 };
 
 socket.onmessage = function(event) {
@@ -19,7 +19,7 @@ socket.onmessage = function(event) {
 };
 
 socket.onerror = function(error) {
-	console.log("Ошибка " + error.message);
+	//console.log("Ошибка " + error.message);
 };
 
 twitch_processEmoticons = function(message, emotes) {
