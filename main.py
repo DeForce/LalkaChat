@@ -5,6 +5,7 @@ import Queue
 import messaging
 import gui
 import thread
+import sys
 from modules.helpers.parser import FlagConfigParser
 
 
@@ -14,7 +15,10 @@ def init():
     loaded_modules = {}
     gui_settings = {}
 
-    python_folder = os.path.dirname(os.path.abspath('__file__'))
+    if hasattr(sys, 'frozen'):
+        python_folder = os.path.dirname(sys.executable)
+    else:
+        python_folder = os.path.dirname(os.path.abspath('__file__'))
     conf_folder = os.path.join(python_folder, "conf")
     module_folder = os.path.join(python_folder, "modules")
 
