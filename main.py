@@ -32,6 +32,10 @@ def init():
                    'file_loc': main_conf_file,
                    'filename': ''.join(os.path.basename(main_conf_file).split('.')[:-1])}
 
+    if not os.path.isdir(module_folder):
+        print "[Error] Was not able to find modules folder, check you installation" % module_folder
+        exit()
+
     # Trying to load config file.
     # Create folder if doesn't exist
     if not os.path.isdir(conf_folder):
@@ -40,14 +44,6 @@ def init():
             os.mkdir(conf_folder)
         except:
             print "Was unable to create {0} folder.".format(conf_folder)
-            exit()
-
-    if not os.path.isdir(module_folder):
-        print "[Error] Could not find %s folder" % module_folder
-        try:
-            os.mkdir(module_folder)
-        except:
-            print "Was unable to create {0} folder.".format(module_folder)
             exit()
 
     print "Loading basic configuration"
