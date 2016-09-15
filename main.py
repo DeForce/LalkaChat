@@ -1,3 +1,5 @@
+# This Python file uses the following encoding: utf-8
+# -*- coding: utf-8 -*-
 import os
 import ConfigParser
 import imp
@@ -6,6 +8,8 @@ import messaging
 import gui
 import thread
 import sys
+import logging
+import logging.config
 from modules.helpers.parser import FlagConfigParser
 
 
@@ -26,6 +30,11 @@ def init():
     main_conf_file = os.path.join(conf_folder, "config.cfg")
     gui_tag = 'gui'
 
+    # Set up logging
+    log_file = os.path.join(python_folder, 'logs', 'chat_log.log')
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger('main')
+
     main_config = {'python': python_folder,
                    'conf': conf_folder,
                    'main': main_conf_file,
@@ -33,20 +42,20 @@ def init():
                    'filename': ''.join(os.path.basename(main_conf_file).split('.')[:-1])}
 
     if not os.path.isdir(module_folder):
-        print "[Error] Was not able to find modules folder, check you installation" % module_folder
+        logging.error("Was not able to find modules folder, check you installation")
         exit()
 
     # Trying to load config file.
     # Create folder if doesn't exist
     if not os.path.isdir(conf_folder):
-        print "[Error] Could not find %s folder" % conf_folder
+        logger.error("Could not find {0} folder".format(conf_folder))
         try:
             os.mkdir(conf_folder)
         except:
-            print "Was unable to create {0} folder.".format(conf_folder)
+            logger.error("Was unable to create {0} folder.".format(conf_folder))
             exit()
 
-    print "Loading basic configuration"
+    logger.info("Loading basic configuration")
     config = FlagConfigParser(allow_no_value=True)
     if not os.path.exists(main_conf_file):
         # Creating config from zero
@@ -69,8 +78,8 @@ def init():
     gui_settings['on_top'] = items.get('on_top', True)
     gui_settings['language'] = items.get('language', 'english')
 
-    print "Loading Messaging Handler"
-    print "Loading Queue for message handling"
+    logger.info("Loading Messaging Handler")
+    logger.info("Loading Queue for message handling")
 
     # Creating queues for messaging transfer between chat threads
     queue = Queue.Queue()
@@ -79,7 +88,7 @@ def init():
 
     loaded_module_config += msg.modules_configs
 
-    print "Loading Chats Configuration File"
+    logger.info("Loading Chats Configuration File")
     module_tag = "chats"
     module_import_folder = "modules"
 
@@ -90,9 +99,9 @@ def init():
     config.read(chats_conf_file)
     module_id = 1
     for module in config.items(module_tag):
-        print "Loading chat module: %s" % module[0]
+        logger.info("Loading chat module: {0}".format(module[0]))
         if os.path.isfile(os.path.join(module_folder, module[0] + ".py")):
-            print "found %s" % module[0]
+            logger.info("found {0}".format(module[0]))
             # After module is find, we are initializing it.
             # Class should be named as in config
             # Also passing core folder to module so it can load it's own
@@ -105,23 +114,23 @@ def init():
             loaded_module_config.insert(module_id, {module[0]: loaded_modules[module[0]].conf_params})
             module_id += 1
     if gui_settings['gui']:
-        print "STARTING GUI"
+        logger.info("STARTING GUI")
         window = gui.GuiThread(gui_settings=gui_settings, main_config=main_config, modules_configs=loaded_module_config)
         window.start()
     try:
         while True:
             console = raw_input("> ")
-            print console
+            logger.info(console)
             if console == "exit":
-                print "Exiting now!"
+                logger.info("Exiting now!")
                 thread.interrupt_main()
             else:
-                print "Incorrect Command"
+                logger.info("Incorrect Command")
     except (KeyboardInterrupt, SystemExit):
-        print "Exiting now!"
+        logger.info("Exiting now!")
         thread.interrupt_main()
     except Exception as exc:
-        print exc
+        logger.info(exc)
 
 
 if __name__ == '__main__':

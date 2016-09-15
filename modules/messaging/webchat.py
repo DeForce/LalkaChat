@@ -3,6 +3,7 @@ import threading
 import json
 import Queue
 import cherrypy
+import logging
 from cherrypy.lib.static import serve_file
 from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
@@ -113,9 +114,8 @@ class SocketThread(threading.Thread):
         self.root_folder = root_folder
 
         cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host,
-                                'global': {
-                                    'engine.autoreload.on': False
-                                }})
+                                'engine.autoreload.on': False
+                                })
         WebChatPlugin(cherrypy.engine).subscribe()
         cherrypy.tools.websocket = WebSocketTool()
 
@@ -134,6 +134,49 @@ class SocketThread(threading.Thread):
 class webchat():
     def __init__(self, conf_folder):
         conf_file = os.path.join(conf_folder, "webchat.cfg")
+        log_level = 'CRITICAL'
+
+        logger_dict = {
+            'version': 1,
+            'formatters': {
+                'void': {
+                    'format': ''
+                },
+                'standard': {
+                    'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+                },
+            },
+            'handlers': {
+                'cherrypy_console': {
+                    'level': log_level,
+                    'class': 'logging.StreamHandler',
+                    'formatter': 'standard'
+                },
+                'cherrypy_access': {
+                    'level': log_level,
+                    'class': 'logging.StreamHandler',
+                    'formatter': 'standard',
+                },
+                'cherrypy_error': {
+                    'level': log_level,
+                    'class': 'logging.StreamHandler',
+                    'formatter': 'standard',
+                },
+            },
+            'loggers': {
+                'cherrypy.access': {
+                    'handlers': ['cherrypy_access'],
+                    'level': log_level,
+                    'propagate': False
+                },
+                'cherrypy.error': {
+                    'handlers': ['cherrypy_console', 'cherrypy_error'],
+                    'level': log_level,
+                    'propagate': False
+                },
+            }
+        }
+        logging.config.dictConfig(logger_dict)
 
         config = FlagConfigParser(allow_no_value=True)
         if not os.path.exists(conf_file):
@@ -161,7 +204,6 @@ class webchat():
 
     def get_message(self, message, queue):
         if message is None:
-            # print "webchat received empty message"
             return
         else:
             if 'flags' in message:

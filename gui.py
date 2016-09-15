@@ -2,6 +2,7 @@ import threading
 import wx
 import os
 import re
+import logging
 from modules.helpers.parser import FlagConfigParser
 from cefpython3.wx import chromectrl
 # ToDO: Support customization of borders/spacings
@@ -9,6 +10,7 @@ from cefpython3.wx import chromectrl
 
 translations = {}
 ids = {}
+log = logging.getLogger('gui')
 
 
 def get_id_from_name(name):
@@ -49,7 +51,7 @@ def load_translations(settings, language):
     config.read(os.path.join(settings['conf'], conf_file))
 
     if not config.has_section(language):
-        print "Warning, have not found language ", language
+        log.warning("Warning, have not found language: {0}".format(language))
         language = 'english'
 
     for param, value in config.items(language):
@@ -216,7 +218,7 @@ class SettingsWindow(wx.Frame):
                 ids_deleted += 1
 
     def button_clicked(self, event):
-        print ids[event.GetId()]
+        log.debug(ids[event.GetId()])
         module_groups = ids[event.GetId()].split('.')
         if module_groups[1] == 'apply_button':
             self.write_config(module_groups)
@@ -256,7 +258,7 @@ class SettingsWindow(wx.Frame):
                     if module_gui in self.gui_settings:
                         if self.gui_settings[module_gui]['view'] == 'list':
                             if ids[id_item].split(self.module_key)[-1] == 'list_box':
-                                print "got listbox, getting items", id_item
+                                log.debug("got listbox, getting items {0}".format(id_item))
                                 window = self.FindWindowById(id_item)
                                 for item in window.GetItems():
                                     parser.set(section, item.encode('utf-8'))
@@ -467,7 +469,7 @@ class ChatGui(wx.Frame):
         styles = wx.DEFAULT_FRAME_STYLE
 
         if self.gui_settings.get('on_top', False):
-            print "Application is on top"
+            log.info("Application is on top")
             styles = styles | wx.STAY_ON_TOP
 
         self.SetWindowStyle(styles)
@@ -490,11 +492,11 @@ class ChatGui(wx.Frame):
         pass
 
     def on_exit(self, event):
-        print "Exiting... "
+        log.info("Exiting...")
         self.Destroy()
 
     def on_right_down(self, event):
-        print "RClick"
+        log.infog("RClick")
 
     def on_settings(self, event):
         if not self.settingWindow:
@@ -523,11 +525,10 @@ class GuiThread(threading.Thread):
     def run(self):
         # Doesn't work for some reason at the moment
         chrome_settings = {
-            "debug": False,
-            "log_file": ""
+            "log_file": ''
         }
 
-        chromectrl.Initialize(chrome_settings)
+        chromectrl.Initialize(settings=chrome_settings, debug=False)
         load_translations(self.main_config, self.gui_settings.get('language', 'default'))
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
         frame = ChatGui(None, "LalkaChat", self.url, main_config=self.main_config, gui_settings=self.gui_settings,

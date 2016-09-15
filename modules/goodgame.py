@@ -4,8 +4,12 @@ import os
 import requests
 import Queue
 import re
+import logging
 from modules.helpers.parser import FlagConfigParser
 from ws4py.client.threadedclient import WebSocketClient
+
+logging.getLogger('requests').setLevel(logging.ERROR)
+log = logging.getLogger('goodgame')
 
 
 class ggChat(WebSocketClient):
@@ -23,15 +27,15 @@ class ggChat(WebSocketClient):
         self.smile_regex = ':(\w+|\d+):'
 
     def opened(self):
-        print "[%s] Connection Succesfull" % self.source
+        log.info("Connection Succesfull")
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
         # self.ggPing()
-        print "[%s] Sent join message" % self.source
+        log.info("Sent join message")
         
     def closed(self, code, reason=None):
-        print "[%s] Connection Closed Down" % self.source
+        log.info("Connection Closed Down")
         self.connect()
         
     def received_message(self, mes):
@@ -44,13 +48,11 @@ class ggChat(WebSocketClient):
                     'user': message['data']['user_name'],
                     'text': message['data']['text']}
 
-            # print message
             emotes = []
             smiles_array = re.findall(self.smile_regex, comp['text'])
             for smile in smiles_array:
                 for smile_find in self.smiles:
                     if smile_find['key'] == smile:
-                        # print smile_find
                         allow = False
                         gif = False
                         if message['data']['user_rights'] >= 40:
@@ -67,7 +69,6 @@ class ggChat(WebSocketClient):
                         for premium in message['data']['premiums']:
                             if smile_find['channel_id'] == str(premium):
                                 if smile_find['is_premium']:
-                                    # print smile_find['is_premium']
                                     allow = True
                                     gif = True
 
@@ -85,7 +86,6 @@ class ggChat(WebSocketClient):
 
         # elif message['type'] == "channel_counters":
             # self.pqueue.put(True)
-            # print "not put"
             
     # def ggPing(self):
         # pingThr = pingThread(self, self.pqueue)
@@ -148,8 +148,7 @@ class ggThread(threading.Thread):
                     else:
                         break
         except Exception as exc:
-            print exc
-            print "Unable to download smiles, YAY"
+            log.error("Unable to download smiles, YAY")
 
         # Connecting to goodgame websocket
         ws = ggChat(self.address, protocols=['websocket'], queue=self.queue, id=self.id, nick=self.nick,
@@ -160,9 +159,10 @@ class ggThread(threading.Thread):
 
 class goodgame:
     def __init__(self, queue, python_folder):
-        print "Initializing goodgame chat"
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
+
+        log.info("Initializing goodgame chat")
         conf_file = os.path.join(conf_folder, "goodgame.cfg")
         config = FlagConfigParser(allow_no_value=True)
         if not os.path.exists(conf_file):
@@ -188,7 +188,7 @@ class goodgame:
                 if request.status_code == 200:
                     channel_name = request.json()['channel']['key']
             except:
-                print "Issue with goodgame"
+                log.error("Issue with goodgame")
 
         if channel_name:
             try:
@@ -196,10 +196,10 @@ class goodgame:
                 if request.status_code == 200:
                     ch_id = request.json()['channel']['id']
             except:
-                print "Issue with goodgame"
+                log.error("Issue with goodgame")
         # If any of the value are non-existent then exit the program with error.
         if (address is None) or (ch_id is None):
-            print "Config for goodgame is not correct!"
+            log.error("Config for goodgame is not correct!")
             exit()
 
         # Creating new thread with queue in place for messaging transfers

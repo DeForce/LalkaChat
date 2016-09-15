@@ -6,6 +6,9 @@ import threading
 import imp
 import codecs
 import sys
+import logging
+
+log = logging.getLogger('messaging')
 
 
 class Message(threading.Thread):
@@ -17,7 +20,7 @@ class Message(threading.Thread):
         self.daemon = True
         self.msg_counter = 0
 
-        print "Loading configuration file for messaging"
+        log.info("Loading configuration file for messaging")
         python_folder = os.path.dirname(os.path.abspath(__file__))
         conf_folder = os.path.join(python_folder, "conf")
         conf_file = os.path.join(conf_folder, "messaging.cfg")
@@ -28,7 +31,7 @@ class Message(threading.Thread):
         # Dynamically loading the modules from cfg.
         if config.items("messaging") > 0:
             for module in config.items("messaging"):
-                print "Loading %s" % module[0]
+                log.info("Loading %s" % module[0])
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
                 #  same name as module name
@@ -60,7 +63,7 @@ class Message(threading.Thread):
             try:
                 pass
             except Exception as exc:
-                print exc
+                log.error(exc)
 
     def run(self):
         while True:
