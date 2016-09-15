@@ -5,7 +5,10 @@ import random
 import sqlite3
 import math
 import xml.etree.ElementTree as ElementTree
+import logging
 from modules.helpers.parser import FlagConfigParser
+
+logger = logging.getLogger('levels')
 
 
 class levels():
@@ -51,7 +54,7 @@ class levels():
         if not exists:
             self.db = sqlite3.connect(os.path.join(conf_folder, self.db_location))
             cursor = self.db.cursor()
-            print "Creating new tables"
+            logger.info("Creating new tables")
             cursor.execute('CREATE TABLE UserLevels (User, Experience)')
             cursor.close()
             self.db.commit()
@@ -60,7 +63,7 @@ class levels():
 
         # Load levels
         if not os.path.exists(os.path.join(conf_folder, self.filename)):
-            print "Levels.xml not found, exiting"
+            logger.error("Levels.xml not found, exiting")
             exit()
 
         tree = ElementTree.parse(os.path.join(conf_folder, self.filename))
@@ -103,7 +106,7 @@ class levels():
             cursor.execute('UPDATE UserLevels SET Experience = ? WHERE User = ? ', [experience, user])
             self.db.commit()
         elif len(user_select) > 1:
-            print "wtf, this should not happen"
+            logger.error("wtf, this should not happen")
         else:
             experience = 1
 

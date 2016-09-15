@@ -4,7 +4,13 @@ import os
 import re
 import random
 import requests
+import logging
+import logging.config
 from modules.helpers.parser import FlagConfigParser
+
+logging.getLogger('irc').setLevel(logging.ERROR)
+logging.getLogger('requests').setLevel(logging.ERROR)
+log = logging.getLogger('twitch')
 
 
 class IRC(irc.client.SimpleIRCClient):
@@ -19,10 +25,10 @@ class IRC(irc.client.SimpleIRCClient):
         self.bttv = bttv
 
     def on_connect(self, connection, event):
-        print "[%s] Connected" % self.source
+        log.info("Connected")
 
     def on_welcome(self, connection, event):
-        print "[%s] Welcome Received" % self.source
+        log.info("Welcome Received")
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilites (Twitch color, Display Name,
         #  Subscriber, etc)
@@ -30,7 +36,7 @@ class IRC(irc.client.SimpleIRCClient):
         connection.cap('REQ', ':twitch.tv/tags')
 
     def on_join(self, connection, event):
-        print "[%s] Joined %s channel" % (self.source, self.channel)
+        log.info("Joined {0} channel".format(self.channel))
 
     def on_pubmsg(self, connection, event):
         # After we receive the message we have to process the tags
@@ -133,7 +139,7 @@ class twThread(threading.Thread):
 
 class twitch:
     def __init__(self, queue, pythonFolder):
-        print "Initializing twitch chat"
+        log.info("Initializing twitch chat")
 
         # Reading config from main directory.
         conf_folder = os.path.join(pythonFolder, "conf")
@@ -168,7 +174,7 @@ class twitch:
             if request.status_code == 200:
                 host = random.choice(request.json()['servers']).split(':')[0]
         except:
-            print "Issue with twitch"
+            log.error("Issue with twitch")
             exit()
 
         try:
@@ -176,12 +182,12 @@ class twitch:
             if request.status_code == 200:
                 badges = request.json()
         except:
-            print "Issue with twitch"
+            log.error("Issue with twitch")
             exit()
 
         # If any of the value are non-existent then exit the programm with error.
         if (host is None) or (port is None) or (channel is None):
-            print "Config for twitch is not correct!"
+            log.error("Config for twitch is not correct!")
             exit()
 
         # Creating new thread with queue in place for messaging tranfers
