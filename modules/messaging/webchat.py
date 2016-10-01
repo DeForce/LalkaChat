@@ -11,6 +11,7 @@ from ws4py.websocket import WebSocket
 from modules.helpers.parser import FlagConfigParser
 
 s_queue = Queue.Queue()
+logging.getLogger('ws4py').setLevel(logging.ERROR)
 
 
 class MessagingThread(threading.Thread):
@@ -121,6 +122,14 @@ class SocketThread(threading.Thread):
 
     def run(self):
         http_folder = os.path.join(self.root_folder, '..', 'http')
+        cherrypy.log.access_file = ''
+        cherrypy.log.error_file = ''
+        cherrypy.log.screen = False
+
+        # Removing Access logs
+        cherrypy.log.access_log.propagate = False
+        cherrypy.log.error_log.setLevel(logging.ERROR)
+
         cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
                                                              'tools.websocket.handler_cls': WebChatSocketServer},
                                                      '/js': {'tools.staticdir.on': True,
@@ -134,49 +143,6 @@ class SocketThread(threading.Thread):
 class webchat():
     def __init__(self, conf_folder):
         conf_file = os.path.join(conf_folder, "webchat.cfg")
-        log_level = 'CRITICAL'
-
-        logger_dict = {
-            'version': 1,
-            'formatters': {
-                'void': {
-                    'format': ''
-                },
-                'standard': {
-                    'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-                },
-            },
-            'handlers': {
-                'cherrypy_console': {
-                    'level': log_level,
-                    'class': 'logging.StreamHandler',
-                    'formatter': 'standard'
-                },
-                'cherrypy_access': {
-                    'level': log_level,
-                    'class': 'logging.StreamHandler',
-                    'formatter': 'standard',
-                },
-                'cherrypy_error': {
-                    'level': log_level,
-                    'class': 'logging.StreamHandler',
-                    'formatter': 'standard',
-                },
-            },
-            'loggers': {
-                'cherrypy.access': {
-                    'handlers': ['cherrypy_access'],
-                    'level': log_level,
-                    'propagate': False
-                },
-                'cherrypy.error': {
-                    'handlers': ['cherrypy_console', 'cherrypy_error'],
-                    'level': log_level,
-                    'propagate': False
-                },
-            }
-        }
-        logging.config.dictConfig(logger_dict)
 
         config = FlagConfigParser(allow_no_value=True)
         if not os.path.exists(conf_file):
