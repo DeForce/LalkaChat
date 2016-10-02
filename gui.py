@@ -614,20 +614,24 @@ class ChatGui(wx.Frame):
 
 
 class GuiThread(threading.Thread):
+    title = 'LalkaChat'
+    url = 'http://localhost'
+    port = '8080'
+
     def __init__(self, **kwds):
         threading.Thread.__init__(self)
         self.daemon = True
         self.gui_settings = kwds.get('gui_settings', {})
         self.loaded_modules = kwds.get('loaded_modules', {})
         self.main_config = kwds.get('main_config', {})
-
-    title = 'LalkaChat'
-    url = 'http://localhost:8080'
+        if 'webchat' in self.loaded_modules:
+            self.port = self.loaded_modules['webchat']['port']
 
     def run(self):
         chromectrl.Initialize()
+        url = ':'.join([self.url, self.port])
         load_translations(self.main_config, self.gui_settings.get('language', 'default'))
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
-        frame = ChatGui(None, "LalkaChat", self.url, main_config=self.main_config, gui_settings=self.gui_settings,
+        frame = ChatGui(None, "LalkaChat", url, main_config=self.main_config, gui_settings=self.gui_settings,
                         loaded_modules=self.loaded_modules)  # A Frame is a top-level window.
         app.MainLoop()
