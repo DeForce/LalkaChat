@@ -31,7 +31,7 @@ def init():
     # Set up logging
     log_file = os.path.join(python_folder, 'logs', 'chat_log.log')
     # debug level
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger('main')
 
     # Creating dict with folder settings

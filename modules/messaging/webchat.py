@@ -171,9 +171,7 @@ class webchat():
         m_thread.start()
 
     def get_message(self, message, queue):
-        if message is None:
-            return
-        else:
+        if message:
             if 'flags' in message:
                 if message['flags'] == 'hidden':
                     return message
