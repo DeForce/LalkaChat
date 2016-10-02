@@ -36,11 +36,11 @@ class logger():
             os.makedirs(self.destination)
 
     def get_message(self, message, queue):
-        if message is None:
-            return
-        else:
+        if message:
             with open('{0}.txt'.format(
                     os.path.join(self.destination, datetime.datetime.now().strftime(self.format))), 'a') as f:
-                f.write('[{3}] [{0}] {1}: {2}\n'.format(message['source'], message['user'], message['text'],
-                                                        datetime.datetime.now().strftime(self.ts_format)))
+                f.write('[{3}] [{0}] {1}: {2}\n'.format(message['source'].encode('utf-8'),
+                                                        message['user'].encode('utf-8'),
+                                                        message['text'].encode('utf-8'),
+                                                        datetime.datetime.now().strftime(self.ts_format).encode('utf-8')))
             return message
