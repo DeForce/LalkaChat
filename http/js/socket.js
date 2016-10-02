@@ -1,5 +1,10 @@
-var socket = new WebSocket("ws://127.0.0.1:8080/ws");
+var find_location = window.location.href;
+var RegExp = /:(\d+)/;
+var find_list = RegExp.exec(find_location.toString());
+var find_port = find_list[1];
+var ws_url = "ws://127.0.0.1:".concat(find_port, "/ws");
 
+var socket = new WebSocket(ws_url);
 socket.onopen = function() {
 	//console.log("Соединение установлено.");
 };

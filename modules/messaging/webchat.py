@@ -162,6 +162,8 @@ class webchat():
         self.host = config.get_or_default(tag_server, 'host', '127.0.0.1')
         self.port = config.get_or_default(tag_server, 'port', '8080')
 
+        self.conf_params['port'] = self.port
+
         s_thread = SocketThread(self.host, self.port, conf_folder)
         s_thread.start()
 
