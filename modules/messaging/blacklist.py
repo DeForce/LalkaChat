@@ -74,7 +74,7 @@ class blacklist:
             return message
 
     def process_user(self, message):
-        user = message['user'].lower()
+        user = message.get('user').lower()
         if user in self.users:
             if self.users[user] == 'h':
                 return True
