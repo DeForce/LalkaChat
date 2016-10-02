@@ -4,8 +4,12 @@ import time
 import re
 import requests
 import os
+import logging
 from ws4py.client.threadedclient import WebSocketClient
 from modules.helpers.parser import FlagConfigParser
+
+logging.getLogger('requests').setLevel(logging.ERROR)
+log = logging.getLogger('sc2tv')
 
 
 class fsChat(WebSocketClient):
@@ -39,10 +43,10 @@ class fsChat(WebSocketClient):
         self.bufferForDup = 20
 
     def opened(self):
-        print "[%s] Connection Succesfull" % self.source
+        log.info("Connection Succesfull")
 
     def closed(self, code, reason=None):
-        print "[%s] Connection Closed Down" % self.source
+        log.info("Connection Closed Down")
 
     def allow_smile(self, smile, user_id):
         allow = False
@@ -134,13 +138,13 @@ class fsChat(WebSocketClient):
     def fsJoin(self):
         # Because we need to iterate each message we iterate it!
         iter = "42"+str(self.iter)
-        self.iter = self.iter+1
+        self.iter += 1
 
         # Then we send the message acording to needed format and
         #  hope it joins us
         join = str(iter) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channelID)}, sort_keys=False) + "]"
         self.send(join)
-        print "[%s] Joined channel %s" % (self.source, self.channelID)
+        log.info("Joined channel {0}".format(self.channelID))
 
     def fsPing(self):
         # Because funstream is not your normal websocket they
@@ -198,7 +202,7 @@ class fsThread(threading.Thread):
                 for smile in smiles_answer:
                     self.smiles.append(smile)
         except:
-            print "Unable to get smiles"
+            log.error("Unable to get smiles")
 
         # Connecting to funstream websocket
         ws = fsChat(self.socket, self.queue, self.nick, protocols=['websocket'], smiles=self.smiles,)
@@ -208,10 +212,11 @@ class fsThread(threading.Thread):
 
 class sc2tv:
     def __init__(self, queue, python_folder):
-        print "Initializing funstream chat"
+        log.info("Initializing funstream chat")
 
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
+
         conf_file = os.path.join(conf_folder, "sc2tv.cfg")
         config = FlagConfigParser(allow_no_value=True)
         if not os.path.exists(conf_file):
@@ -233,7 +238,7 @@ class sc2tv:
 
         # If any of the value are non-existent then exit the programm with error.
         if (socket is None) or (nick is None):
-            print "Config for funstream is not correct!"
+            log.critical("Config for funstream is not correct!")
             exit()
 
         # Creating new thread with queue in place for messaging tranfers

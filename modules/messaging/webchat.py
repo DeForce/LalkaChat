@@ -3,6 +3,7 @@ import threading
 import json
 import Queue
 import cherrypy
+import logging
 from cherrypy.lib.static import serve_file
 from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
@@ -10,6 +11,7 @@ from ws4py.websocket import WebSocket
 from modules.helpers.parser import FlagConfigParser
 
 s_queue = Queue.Queue()
+logging.getLogger('ws4py').setLevel(logging.ERROR)
 
 
 class MessagingThread(threading.Thread):
@@ -113,14 +115,21 @@ class SocketThread(threading.Thread):
         self.root_folder = root_folder
 
         cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host,
-                                'global': {
-                                    'engine.autoreload.on': False
-                                }})
+                                'engine.autoreload.on': False
+                                })
         WebChatPlugin(cherrypy.engine).subscribe()
         cherrypy.tools.websocket = WebSocketTool()
 
     def run(self):
         http_folder = os.path.join(self.root_folder, '..', 'http')
+        cherrypy.log.access_file = ''
+        cherrypy.log.error_file = ''
+        cherrypy.log.screen = False
+
+        # Removing Access logs
+        cherrypy.log.access_log.propagate = False
+        cherrypy.log.error_log.setLevel(logging.ERROR)
+
         cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
                                                              'tools.websocket.handler_cls': WebChatSocketServer},
                                                      '/js': {'tools.staticdir.on': True,
@@ -161,7 +170,6 @@ class webchat():
 
     def get_message(self, message, queue):
         if message is None:
-            # print "webchat received empty message"
             return
         else:
             if 'flags' in message:
