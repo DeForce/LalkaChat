@@ -37,11 +37,18 @@ class TwitchMessageHandler(threading.Thread):
             self.process_message(self.twitch_queue.get())
 
     def process_message(self, msg):
+        # After we receive the message we have to process the tags
+        # There are multiple things that are available, but
+        #  for now we use only display-name, which is case-able.
+        # Also, there is slight problem with some users, they don't have
+        #  the display-name tag, so we have to check their "real" username
+        #  and capitalize it because twitch does so, so we do the same.
         comp = {'source': self.source,
                 'badges': [],
                 'emotes': [],
                 'bttv_emotes': [],
-                'user': 'TwitchSystem'}
+                'user': 'TwitchSystem',
+                'msg_type': msg.type}
         for tag in msg.tags:
             tag_value, tag_key = tag.values()
             if tag_key == 'display-name':
@@ -124,12 +131,9 @@ class IRC(irc.client.SimpleIRCClient):
         log.info("Joined {0} channel".format(self.channel))
 
     def on_pubmsg(self, connection, event):
-        # After we receive the message we have to process the tags
-        # There are multiple things that are available, but
-        #  for now we use only display-name, which is case-able.
-        # Also, there is slight problem with some users, they don't have
-        #  the display-name tag, so we have to check their "real" username
-        #  and capitalize it because twitch does so, so we do the same.
+        self.twitch_queue.put(event)
+
+    def on_action(self, connection, event):
         self.twitch_queue.put(event)
 
 
