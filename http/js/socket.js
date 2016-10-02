@@ -83,16 +83,16 @@ escapeHtml = (function () {
     'use strict';
     var chr = { '"': '&quot;', '&': '&amp;', '<': '&lt;', '>': '&gt;' };
     return function (text) {
-        return text.replace(/[\"&<>]/g, function (a) { return chr[a]; });
+        return text.replace(/[\\"&<>]/g, function (a) { return chr[a]; });
     };
 }());
 
 function showMessage(message) {
 	var badge_colors = 1;
 	
-	var elements = {}
+	var elements = {};
 	elements['message'] = document.createElement('div');
-	elements.message.setAttribute('class', 'msg')
+	elements.message.setAttribute('class', 'msg');
 	
 	var messageJSON = JSON.parse(message);
   
@@ -111,10 +111,10 @@ function showMessage(message) {
 	
 	if(messageJSON.hasOwnProperty('levels')) {
 		elements.message['level'] = document.createElement('div');
-		elements.message.level.setAttribute('class', 'msgLevel')
+		elements.message.level.setAttribute('class', 'msgLevel');
 
 		elements.message.level['img'] = document.createElement('img');
-		elements.message.level.img.setAttribute('class', 'imgLevel')
+		elements.message.level.img.setAttribute('class', 'imgLevel');
 		elements.message.level.img.setAttribute('src', messageJSON.levels.url);
 		
 		elements.message.level.appendChild(elements.message.level.img);
@@ -125,10 +125,10 @@ function showMessage(message) {
 		
 		for (i = 0; i < messageJSON.s_levels.length; i++) {
 			elements.message['s_level'] = document.createElement('div');
-			elements.message.s_level.setAttribute('class', 'msgSLevel')
+			elements.message.s_level.setAttribute('class', 'msgSLevel');
 
 			elements.message.s_level['img'] = document.createElement('img');
-			elements.message.s_level.img.setAttribute('class', 'imgSLevel')
+			elements.message.s_level.img.setAttribute('class', 'imgSLevel');
 			elements.message.s_level.img.setAttribute('src', messageJSON.s_levels[i].url);
 			
 			elements.message.s_level.appendChild(elements.message.s_level.img);
@@ -140,10 +140,10 @@ function showMessage(message) {
 		
 		for (i = 0; i < messageJSON.badges.length; i++) {
 			elements.message['badge'] = document.createElement('div');
-			elements.message.badge.setAttribute('class', 'msgBadge')
+			elements.message.badge.setAttribute('class', 'msgBadge');
 
 			elements.message.badge['img'] = document.createElement('img');
-			elements.message.badge.img.setAttribute('class', 'imgBadge')
+			elements.message.badge.img.setAttribute('class', 'imgBadge');
 			elements.message.badge.img.setAttribute('src', messageJSON.badges[i].url);
 			
 			if(badge_colors) {
@@ -166,8 +166,18 @@ function showMessage(message) {
 		// console.log("message has user " + messageJSON.user);
 		elements.message['user'] = document.createElement('div');
 		elements.message.user.setAttribute('class', 'msgUser');
-		
-		elements.message.user.appendChild(document.createTextNode(messageJSON.user + ": "));
+        var addString = messageJSON.user;
+
+        if (messageJSON.hasOwnProperty('msg_type')) {
+            if (messageJSON.msg_type == 'pubmsg') {
+                addString += ": "
+            }
+        }
+        else {
+            addString += ": "
+        }
+
+		elements.message.user.appendChild(document.createTextNode(addString));
 		
 		elements.message.appendChild(elements.message.user);
 	}
