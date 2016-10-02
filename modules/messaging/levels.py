@@ -143,7 +143,7 @@ class levels():
             message['s_levels'] = []
 
             for user in self.special_levels:
-                if message['user'] == user['nick']:
+                if message.get('user') == user['nick']:
                     level_info = {'name': user['name'], 'url': user['url']}
                     message['s_levels'].append(level_info)
 

@@ -66,7 +66,4 @@ class Message(threading.Thread):
 
     def run(self):
         while True:
-            UTF8Writer = codecs.getwriter('utf8')
-            sys.stdout = UTF8Writer(sys.stdout)
-            message = self.queue.get()
-            self.msg_process(message)
+            self.msg_process(self.queue.get())
