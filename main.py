@@ -76,7 +76,7 @@ def init():
                                 'parser': config}
 
     items = config.get_dict(gui_tag)  # type: dict
-    gui_settings['gui'] = items.get('enabled', True)
+    gui_settings['gui'] = items.get('gui', True)
     gui_settings['on_top'] = items.get('on_top', True)
     gui_settings['language'] = items.get('language', 'english')
     gui_settings['show_hidden'] = items.get('show_hidden', False)
