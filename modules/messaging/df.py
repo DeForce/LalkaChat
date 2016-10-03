@@ -44,14 +44,11 @@ class df:
             for line in f.readlines():
                 if message['user'] == line.split(',')[0]:
                     return
-            text = "{user},{text}\n".format(message['user'], message['text'])
-        with open(self.file, 'a') as f:
-            f.write(text)
+            with open(self.file, 'a') as a_file:
+                a_file.write("{0},{1}\n".format(message['user'], message['text']))
 
     def get_message(self, message, queue):
-        if message is None:
-            return
-        else:
+        if message:
             for regexp in self.prof:
                 if re.search(regexp[1], message['text']):
                     comp = {'user': message['user'], 'text': regexp[0]}
