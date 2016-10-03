@@ -20,6 +20,8 @@ class fsChat(WebSocketClient):
         self.queue = queue
         self.nick = nick
 
+        self.channel_id = self.fsGetId()
+
         self.smiles = smiles
         self.smile_regex = ':(\w+|\d+):'
 
@@ -37,16 +39,15 @@ class fsChat(WebSocketClient):
         # We are doing so by creating special array which has
         #  last N buffer of unique ID's
         self.iter = 0
-        self.fsGetId()
         self.duplicates = []
         self.users = []
         self.bufferForDup = 20
 
     def opened(self):
-        log.info("Connection Succesfull")
+        log.info("Websocket Connection Succesfull")
 
     def closed(self, code, reason=None):
-        log.info("Connection Closed Down")
+        log.info("Websocket Connection Closed Down")
 
     def allow_smile(self, smile, user_id):
         allow = False
@@ -96,7 +97,6 @@ class fsChat(WebSocketClient):
                         # "Funstream" has some interesting infrastructure, so
                         #  we first need to find the channel ID from
                         #  nickname of streamer we need to connect to.
-                        self.fsGetId()
                         self.fsJoin()
                         self.fsPing()
                     elif dict_item == 'id':
@@ -133,7 +133,15 @@ class fsChat(WebSocketClient):
         payload = "{'id': null, 'name': \"" + self.nick + "\"}"
         request = requests.post("http://funstream.tv/api/user", data=payload)
         if request.status_code == 200:
-            self.channelID = json.loads(re.findall('{.*}', request.text)[0])['id']
+            channel_id = json.loads(re.findall('{.*}', request.text)[0])['id']
+        else:
+            error_message = request.json()
+            if 'message' in error_message:
+                log.error("Unable to get channel ID. {0}".format(error_message['message']))
+            else:
+                log.error("Unable to get channel ID. No message available")
+            channel_id = None
+        return channel_id
 
     def fsJoin(self):
         # Because we need to iterate each message we iterate it!
@@ -142,9 +150,10 @@ class fsChat(WebSocketClient):
 
         # Then we send the message acording to needed format and
         #  hope it joins us
-        join = str(iter) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channelID)}, sort_keys=False) + "]"
-        self.send(join)
-        log.info("Joined channel {0}".format(self.channelID))
+        if self.channel_id:
+            join = str(iter) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channel_id)}, sort_keys=False) + "]"
+            self.send(join)
+            log.info("Joined channel {0}".format(self.channel_id))
 
     def fsPing(self):
         # Because funstream is not your normal websocket they
