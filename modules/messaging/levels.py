@@ -7,6 +7,7 @@ import math
 import xml.etree.ElementTree as ElementTree
 import logging
 from modules.helpers.parser import FlagConfigParser
+from modules.chat_system import SOURCE, SOURCE_ICON
 
 logger = logging.getLogger('levels')
 
@@ -128,7 +129,8 @@ class levels():
                 self.db.commit()
             else:
                 max_level += 1
-            lvlup_message = {'source': 'tw',
+            lvlup_message = {'source': SOURCE,
+                             'source_icon': SOURCE_ICON,
                              'user': u'System',
                              'text':
                                  self.message.format(user, self.levels[max_level]['name'])}

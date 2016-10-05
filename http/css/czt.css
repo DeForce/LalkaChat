@@ -54,6 +54,12 @@ body{
     padding-left: 5px;
     color: #c0ffc0;
 }
+.msgTextSystem{
+    display: inline;
+    height: auto;
+    padding-left: 5px;
+    color: #ff68fb;
+}
 .imgSmile{
     margin-top: -4px;
     height: 20px;
@@ -62,6 +68,7 @@ body{
     position: relative;
 }
 .imgBadge,
+.imgSource,
 .imgLevel,
 .imgSLevel{
     width: 16px;

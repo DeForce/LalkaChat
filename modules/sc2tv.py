@@ -10,13 +10,15 @@ from modules.helpers.parser import FlagConfigParser
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
+SOURCE = 'fs'
+SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
 
 
 class fsChat(WebSocketClient):
-    def __init__(self, ws, queue, nick, protocols=None, smiles=[]):
+    def __init__(self, ws, queue, nick, protocols=None, smiles=None):
         super(self.__class__, self).__init__(ws, protocols=None)
         # Received value setting.
-        self.source = "fs"
+        self.source = SOURCE
         self.queue = queue
         self.nick = nick
 
@@ -104,8 +106,10 @@ class fsChat(WebSocketClient):
                             self.duplicates.index(message[dict_item])
                         except:
                             comp = {'source': self.source,
+                                    'source_icon': SOURCE_ICON,
                                     'user': message['from']['name'],
-                                    'text': message['text']}
+                                    'text': message['text'],
+                                    'emotes': []}
                             if message['to'] is not None:
                                 comp['to'] = message['to']['name']
                                 if comp['to'] == self.nick:
@@ -113,14 +117,12 @@ class fsChat(WebSocketClient):
                             else:
                                 comp['to'] = None
 
-                            emotes = []
                             smiles_array = re.findall(self.smile_regex, comp['text'])
                             for smile in smiles_array:
                                 for smile_find in self.smiles:
                                     if smile_find['code'] == smile:
                                         if self.allow_smile(smile_find, message['from']['id']):
-                                            emotes.append({'emote_id': smile, 'emote_url': smile_find['url']})
-                            comp['emotes'] = emotes
+                                            comp['emotes'].append({'emote_id': smile, 'emote_url': smile_find['url']})
 
                             self.queue.put(comp)
                             self.duplicates.append(message[dict_item])
