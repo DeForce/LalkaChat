@@ -17,6 +17,8 @@ emote_bits_theme = 'dark'
 emote_bits_type = 'static'
 emote_bits_url = 'static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
 NOT_FOUND = 'none'
+SOURCE = 'tw'
+SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -25,7 +27,7 @@ class TwitchMessageHandler(threading.Thread):
         self.daemon = True
         self.message_queue = queue
         self.twitch_queue = twitch_queue
-        self.source = "tw"
+        self.source = SOURCE
 
         self.nick = kwargs.get('nick')
         self.bttv = kwargs.get('bttv')
@@ -44,6 +46,7 @@ class TwitchMessageHandler(threading.Thread):
         #  the display-name tag, so we have to check their "real" username
         #  and capitalize it because twitch does so, so we do the same.
         comp = {'source': self.source,
+                'source_icon': SOURCE_ICON,
                 'badges': [],
                 'emotes': [],
                 'bttv_emotes': [],

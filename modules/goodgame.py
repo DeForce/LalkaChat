@@ -10,6 +10,8 @@ from ws4py.client.threadedclient import WebSocketClient
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('goodgame')
+SOURCE = 'gg'
+SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
 
 
 class GoodgameMessageHandler(threading.Thread):
@@ -18,7 +20,7 @@ class GoodgameMessageHandler(threading.Thread):
         self.daemon = True
         self.message_queue = queue
         self.gg_queue = gg_queue
-        self.source = "gg"
+        self.source = SOURCE
 
         self.nick = kwargs.get('nick')
         self.smiles = kwargs.get('smiles')
@@ -33,6 +35,7 @@ class GoodgameMessageHandler(threading.Thread):
             # Getting all needed data from received message
             # and sending it to queue for further message handling
             comp = {'source': self.source,
+                    'source_icon': SOURCE_ICON,
                     'user': msg['data']['user_name'],
                     'text': msg['data']['text'],
                     'emotes': []}
