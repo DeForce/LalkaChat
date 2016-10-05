@@ -73,7 +73,8 @@ def init():
     loaded_modules['config'] = {'folder': conf_folder,
                                 'file': main_config['main_conf_file_loc'],
                                 'filename': main_config['main_conf_file_name'],
-                                'parser': config}
+                                'parser': config,
+                                'root_folder': main_config['root_folder']}
 
     items = config.get_dict(gui_tag)  # type: dict
     gui_settings['gui'] = items.get('gui', True)
