@@ -39,14 +39,14 @@ def id_renew(name, update=False):
     return new_id
 
 
-def get_list_of_ids_from_module_name(name, id_group=1, tuple=False):
+def get_list_of_ids_from_module_name(name, id_group=1, return_tuple=False):
     split_key = MODULE_KEY
 
     id_array = []
     for item_key, item in IDS.items():
         item_name = split_key.join(item.split(split_key)[:id_group])
         if item_name == name:
-            if tuple:
+            if return_tuple:
                 id_array.append((item_key, item))
             else:
                 id_array.append(item_key)
@@ -179,6 +179,7 @@ class SettingsWindow(wx.Frame):
         self.create_layout()
 
     def on_exit(self, event):
+        log.debug(event)
         self.Destroy()
 
     def on_close(self, event):
@@ -376,6 +377,24 @@ class SettingsWindow(wx.Frame):
             item_sizer.Add(list_box, 1, wx.EXPAND)
 
             sizer.Add(item_sizer)
+        elif 'choose' in view:
+            is_single = True if 'single' in view else False
+            style = wx.LB_SINGLE if is_single else wx.LB_EXTENDED
+            item_sizer = wx.BoxSizer(wx.VERTICAL)
+            list_items = []
+
+            if 'dir_to_check' in section_gui:
+                for dir_item in os.listdir(os.path.join(self.main_class.main_config['root_folder'],
+                                                        section_gui['dir_to_check'])):
+                    list_items.append(dir_item)
+
+            item_key = MODULE_KEY.join([key, 'list_box'])
+            item_sizer.Add(wx.StaticText(parent, label=translate(item_key), style=wx.ALIGN_RIGHT))
+            item_list_box = wx.ListBox(parent, id=id_renew(item_key, update=True), choices=list_items, style=style)
+            item_list_box.SetSelection(list_items.index(section[0][0]))
+            item_sizer.Add(item_list_box, 1, wx.EXPAND)
+
+            sizer.Add(item_sizer)
         else:
             items_to_add = []
             if not section:
@@ -420,16 +439,16 @@ class SettingsWindow(wx.Frame):
         if keys[-1] in ['list_add', 'list_remove']:
             self.list_operation(MODULE_KEY.join(keys[:-1]), action=keys[-1])
         elif keys[-1] == 'apply_button':
-            self.save_settings(MODULE_KEY.join(keys[1:-1]), MODULE_KEY.join(keys[:-1]))
+            self.save_settings(MODULE_KEY.join(keys[1:-1]))
         elif keys[-1] == 'cancel_button':
             self.on_close(event)
         event.Skip()
 
-    def save_settings(self, module, key):
+    def save_settings(self, module):
         module_config = self.main_class.loaded_modules.get(module, {})
         if module_config:
             parser = module_config['parser']
-            items = get_list_of_ids_from_module_name(module, tuple=True)
+            items = get_list_of_ids_from_module_name(module, return_tuple=True)
             for item, name in items:
                 module_name, section, item_name = name.split(MODULE_KEY)
                 wx_window = wx.FindWindowById(item)
@@ -460,7 +479,19 @@ class SettingsWindow(wx.Frame):
                 elif isinstance(wx_window, wx.Button):
                     if item_name not in SKIP_BUTTONS:
                         parser.set(section, item_name)
-
+                elif isinstance(wx_window, wx.ListBox):
+                    item_ids = wx_window.GetSelections()
+                    parser_options = parser.options(section)
+                    items_values = [wx_window.GetString(item_id) for item_id in item_ids]
+                    if not items_values:
+                        for option in parser_options:
+                            parser.remove_option(section, option)
+                    else:
+                        for option in parser_options:
+                            if option not in items_values:
+                                parser.remove_option(section, option)
+                        for value in items_values:
+                            parser.set(section, value)
             with open(module_config['file'], 'w') as config_file:
                 parser.write(config_file)
 
@@ -552,7 +583,7 @@ class ChatGui(wx.Frame):
         event.Skip()
 
     def on_right_down(self, event):
-        log.info("RClick")
+        log.info(event)
         event.Skip()
 
     def on_settings(self, event):
@@ -632,6 +663,6 @@ class GuiThread(threading.Thread):
         url = ':'.join([self.url, self.port])
         load_translations(self.main_config, self.gui_settings.get('language', 'default'))
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
-        frame = ChatGui(None, "LalkaChat", url, main_config=self.main_config, gui_settings=self.gui_settings,
-                        loaded_modules=self.loaded_modules)  # A Frame is a top-level window.
+        ChatGui(None, "LalkaChat", url, main_config=self.main_config, gui_settings=self.gui_settings,
+                loaded_modules=self.loaded_modules)  # A Frame is a top-level window.
         app.MainLoop()
