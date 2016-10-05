@@ -383,10 +383,15 @@ class SettingsWindow(wx.Frame):
             item_sizer = wx.BoxSizer(wx.VERTICAL)
             list_items = []
 
-            if 'dir_to_check' in section_gui:
+            if section_gui['check_type'] == 'dir':
                 for dir_item in os.listdir(os.path.join(self.main_class.main_config['root_folder'],
-                                                        section_gui['dir_to_check'])):
+                                                        section_gui['check'])):
                     list_items.append(dir_item)
+            elif section_gui['check_type'] == 'sections':
+                parser = FlagConfigParser(allow_no_value=True)
+                parser.read(section_gui.get('check', ''))
+                for item in parser.sections():
+                    list_items.append(item)
 
             item_key = MODULE_KEY.join([key, 'list_box'])
             item_sizer.Add(wx.StaticText(parent, label=translate(item_key), style=wx.ALIGN_RIGHT))

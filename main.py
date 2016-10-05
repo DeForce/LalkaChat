@@ -79,7 +79,7 @@ def init():
     items = config.get_dict(gui_tag)  # type: dict
     gui_settings['gui'] = items.get('gui', True)
     gui_settings['on_top'] = items.get('on_top', True)
-    gui_settings['language'] = items.get('language', 'english')
+    gui_settings['language'],  null_element = config.items('language')[0]
     gui_settings['show_hidden'] = items.get('show_hidden', False)
 
     logger.info("Loading Messaging Handler")
