@@ -158,7 +158,8 @@ class webchat():
             config.add_section('style__gui')
             config.set('style__gui', 'for', 'style')
             config.set('style__gui', 'view', 'choose_single')
-            config.set('style__gui', 'dir_to_check', 'http')
+            config.set('style__gui', 'check_type', 'dir')
+            config.set('style__gui', 'check', 'http')
 
             config.add_section('style')
             config.set('style', 'czt')
