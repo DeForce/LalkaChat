@@ -91,6 +91,13 @@ def find_translation(item, length=0, wildcard=1):
     return translation
 
 
+def get_key_from_translation(translation):
+    for key, value in TRANSLATIONS.items():
+        if value == translation:
+            return key
+    return translation
+
+
 def translate(item):
     item_no_flags = item.split('/')[0]
     old_item = item_no_flags
@@ -382,21 +389,43 @@ class SettingsWindow(wx.Frame):
             style = wx.LB_SINGLE if is_single else wx.LB_EXTENDED
             item_sizer = wx.BoxSizer(wx.VERTICAL)
             list_items = []
+            translated_items = []
 
-            if section_gui['check_type'] == 'dir':
-                for dir_item in os.listdir(os.path.join(self.main_class.main_config['root_folder'],
-                                                        section_gui['check'])):
-                    list_items.append(dir_item)
+            if section_gui['check_type'] in ['dir', 'files']:
+                check_type = section_gui['check_type']
+                remove_extension = section_gui['file_extension'] if 'file_extension' in section_gui else False
+                for item_in_list in os.listdir(os.path.join(self.main_class.main_config['root_folder'],
+                                                            section_gui['check'])):
+                    item_path = os.path.join(self.main_class.main_config['root_folder'],
+                                             section_gui['check'], item_in_list)
+                    if check_type == 'dir' and os.path.isdir(item_path):
+                        list_items.append(item_in_list)
+                    elif check_type == 'files' and os.path.isfile(item_path):
+                        if remove_extension:
+                            item_in_list = ''.join(os.path.basename(item_path).split('.')[:-1])
+                        if '__init__' not in item_in_list:
+                            if item_in_list not in list_items:
+                                list_items.append(item_in_list)
+                                translated_items.append(translate(item_in_list))
             elif section_gui['check_type'] == 'sections':
                 parser = FlagConfigParser(allow_no_value=True)
                 parser.read(section_gui.get('check', ''))
                 for item in parser.sections():
-                    list_items.append(item)
+                    list_items.append(translate(item))
 
             item_key = MODULE_KEY.join([key, 'list_box'])
             item_sizer.Add(wx.StaticText(parent, label=translate(item_key), style=wx.ALIGN_RIGHT))
-            item_list_box = wx.ListBox(parent, id=id_renew(item_key, update=True), choices=list_items, style=style)
-            item_list_box.SetSelection(list_items.index(section[0][0]))
+            item_list_box = wx.ListBox(parent, id=id_renew(item_key, update=True),
+                                       choices=translated_items if translated_items else list_items, style=style)
+            section_for = section if 'multiple' in view else [section[0]]
+            for section_item, section_value in section_for:
+                try:
+                    item_list_box.SetSelection(list_items.index(translate(section_item)))
+                except ValueError:
+                    try:
+                        item_list_box.SetSelection(list_items.index(section_item))
+                    except ValueError as exc:
+                        log.debug("[create_items] Unable to find item {0} in list".format(exc.message))
             item_sizer.Add(item_list_box, 1, wx.EXPAND)
 
             sizer.Add(item_sizer)
@@ -487,7 +516,7 @@ class SettingsWindow(wx.Frame):
                 elif isinstance(wx_window, wx.ListBox):
                     item_ids = wx_window.GetSelections()
                     parser_options = parser.options(section)
-                    items_values = [wx_window.GetString(item_id) for item_id in item_ids]
+                    items_values = [get_key_from_translation(wx_window.GetString(item_id)) for item_id in item_ids]
                     if not items_values:
                         for option in parser_options:
                             parser.remove_option(section, option)

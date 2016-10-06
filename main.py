@@ -26,10 +26,11 @@ def init():
     conf_folder = os.path.join(python_folder, "conf")
     module_folder = os.path.join(python_folder, "modules")
     main_conf_file = os.path.join(conf_folder, "config.cfg")
+    log_folder = os.path.join(python_folder, "logs")
     gui_tag = 'gui'
 
     # Set up logging
-    log_file = os.path.join(python_folder, 'logs', 'chat_log.log')
+    log_file = os.path.join(log_folder, 'chat_log.log')
     # debug level
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger('main')
@@ -74,7 +75,8 @@ def init():
                                 'file': main_config['main_conf_file_loc'],
                                 'filename': main_config['main_conf_file_name'],
                                 'parser': config,
-                                'root_folder': main_config['root_folder']}
+                                'root_folder': main_config['root_folder'],
+                                'logs_folder': log_folder}
 
     items = config.get_dict(gui_tag)  # type: dict
     gui_settings['gui'] = items.get('gui', True)
@@ -93,30 +95,36 @@ def init():
     msg.start()
 
     logger.info("Loading Chats")
-    module_tag = "chats"
-    module_import_folder = "modules"
-
     # Trying to dynamically load chats that are in config file.
     chat_modules = os.path.join(conf_folder, "chat_modules.cfg")
-    config = ConfigParser.RawConfigParser(allow_no_value=True)
+    chat_tag = "chats"
+    chat_location = os.path.join(module_folder, "chats")
+    chat_config = ConfigParser.RawConfigParser(allow_no_value=True)
+
+    loaded_modules['chat_modules'] = {'folder': conf_folder, 'file': chat_modules,
+                                      'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
+                                      'parser': chat_config}
+
     if not os.path.exists(chat_modules):
-        config.write(open(chat_modules))
-    config.read(chat_modules)
-    for module in config.items(module_tag):
-        logger.info("Loading chat module: {0}".format(module[0]))
-        if os.path.isfile(os.path.join(module_folder, module[0] + ".py")):
-            logger.info("found {0}".format(module[0]))
+        chat_config.write(open(chat_modules))
+    chat_config.read(chat_modules)
+    for module, settings in chat_config.items(chat_tag):
+        logger.info("Loading chat module: {0}".format(module))
+        module_location = os.path.join(chat_location, module + ".py")
+        if os.path.isfile(module_location):
+            logger.info("found {0}".format(module))
             # After module is find, we are initializing it.
             # Class should be named as in config
             # Also passing core folder to module so it can load it's own
             #  configuration correctly
-            file_path = os.path.join(main_config['root_folder'], module_import_folder, '{0}.py'.format(module[0]))
 
-            tmp = imp.load_source(module[0], file_path)
-            chat_init = getattr(tmp, module[0])
+            tmp = imp.load_source(module, module_location)
+            chat_init = getattr(tmp, module)
             class_module = chat_init(queue, python_folder)
-            loaded_modules[module[0]] = class_module.conf_params
-            loaded_modules[module[0]]['class'] = class_module
+            loaded_modules[module] = class_module.conf_params
+            loaded_modules[module]['class'] = class_module
+        else:
+            logger.error("Unable to find {0} module")
     if gui_settings['gui']:
         logger.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,

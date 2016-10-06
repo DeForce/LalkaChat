@@ -1,19 +1,19 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
+import logging
+import math
 import os
 import random
 import sqlite3
-import math
 import xml.etree.ElementTree as ElementTree
-import logging
 from modules.helpers.parser import FlagConfigParser
-from modules.chat_system import SOURCE, SOURCE_ICON
+from modules.helpers.system import system_message
 
 logger = logging.getLogger('levels')
 
 
 class levels():
-    def __init__(self, conf_folder):
+    def __init__(self, conf_folder, **kwargs):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "levels.cfg")
 
@@ -129,12 +129,7 @@ class levels():
                 self.db.commit()
             else:
                 max_level += 1
-            lvlup_message = {'source': SOURCE,
-                             'source_icon': SOURCE_ICON,
-                             'user': u'System',
-                             'text':
-                                 self.message.format(user, self.levels[max_level]['name'])}
-            queue.put(lvlup_message)
+            system_message(self.message.format(user, self.levels[max_level]['name']), queue)
         cursor.close()
         return self.levels[max_level]
 

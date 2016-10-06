@@ -27,6 +27,11 @@ class Message(threading.Thread):
 
         conf_file = os.path.join(config_dict['conf_folder'], "messaging.cfg")
         config = ConfigParser.RawConfigParser(allow_no_value=True)
+
+        modules_list['messaging_modules'] = {'folder': config_dict['conf_folder'], 'file': conf_file,
+                                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                                             'parser': config}
+
         config.read(conf_file)
         # Dynamically loading the modules from cfg.
         if config.items("messaging") > 0:
@@ -40,7 +45,7 @@ class Message(threading.Thread):
 
                 tmp = imp.load_source(module[0], file_path)
                 class_init = getattr(tmp, module[0])
-                class_module = class_init(config_dict['conf_folder'])
+                class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'])
                 self.modules.append(class_module)
                 modules_list[module[0]] = class_module.conf_params
                 modules_list[module[0]]['class'] = class_module
@@ -59,10 +64,6 @@ class Message(threading.Thread):
 
         for module in self.modules:
             message = module.get_message(message, self.queue)
-            try:
-                pass
-            except Exception as exc:
-                log.error(exc)
 
     def run(self):
         while True:

@@ -12,6 +12,7 @@ from modules.helpers.parser import FlagConfigParser
 
 s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
+log = logging.getLogger('webchat')
 
 
 class MessagingThread(threading.Thread):
@@ -147,8 +148,10 @@ class SocketThread(threading.Thread):
 
 
 class webchat():
-    def __init__(self, conf_folder):
+    def __init__(self, conf_folder, **kwargs):
         conf_file = os.path.join(conf_folder, "webchat.cfg")
+        root_folder = kwargs.get('root_folder')
+        http_folder = 'http'
 
         config = FlagConfigParser(allow_no_value=True)
         if not os.path.exists(conf_file):
@@ -179,7 +182,16 @@ class webchat():
         tag_server = 'server'
         host = config.get_or_default(tag_server, 'host', '127.0.0.1')
         port = config.get_or_default(tag_server, 'port', '8080')
-        style, null_element = config.items('style')[0]
+
+        # Fallback if style folder not found
+        fallback_style = 'czt'
+        if len(config.items('style')) > 0:
+            style, null_element = config.items('style')[0]
+            path = os.path.abspath(os.path.join(root_folder, http_folder, style))
+            if not os.path.exists(path):
+                style = fallback_style
+        else:
+            style = fallback_style
 
         self.conf_params['port'] = port
 

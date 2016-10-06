@@ -6,7 +6,7 @@ from modules.helpers.parser import FlagConfigParser
 
 
 class df:
-    def __init__(self, conf_folder):
+    def __init__(self, conf_folder, **kwargs):
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "df.cfg")
 

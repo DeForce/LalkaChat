@@ -30,7 +30,7 @@ def twitch_replace_indexes(filter_name, text, filter_size, replace_size, emotes_
 
 
 class c2b:
-    def __init__(self, conf_folder):
+    def __init__(self, conf_folder, **kwargs):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "c2b.cfg")
 
