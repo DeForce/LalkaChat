@@ -4,6 +4,8 @@ import re
 import os
 from modules.helpers.parser import FlagConfigParser
 
+DEFAULT_PRIORITY = 30
+
 
 class blacklist:
     users = {}
@@ -15,8 +17,13 @@ class blacklist:
 
         config = FlagConfigParser(allow_no_value=True)
         if not os.path.exists(conf_file):
+            config.add_section('gui_information')
+            config.set('gui_information', 'category', 'messaging')
+            config.set('gui_information', 'id', '10')
+
             config.add_section('main')
             config.set('main', 'message', 'Trying to say something but has a trout in his mouth')
+
             config.add_section('users_gui')
             config.set('users_gui', 'for', 'users_hide, users_block')
             config.set('users_gui', 'view', 'list')
@@ -34,13 +41,13 @@ class blacklist:
             config.add_section('words_block')
             config.write(open(conf_file, 'w'))
 
+        config.read(conf_file)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+                            'parser': config,
+                            'id': config.get_or_default('gui_information', 'id', DEFAULT_PRIORITY)}
 
-        config.read(conf_file)
-        sections = config._sections
-        for item in sections:
+        for item in config._sections:
             for param, value in config.get_items(item):
                 if item == 'main':
                     if param == 'message':
@@ -53,6 +60,8 @@ class blacklist:
                     self.users[param] = 'b'
                 elif item == 'words_block':
                     self.words[param] = 'b'
+
+
 
     def get_message(self, message, queue):
         if message is None:

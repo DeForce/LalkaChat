@@ -6,6 +6,7 @@ import random
 import re
 from modules.helpers.parser import FlagConfigParser
 
+DEFAULT_PRIORITY = 10
 log = logging.getLogger('c2b')
 
 
@@ -39,11 +40,12 @@ class c2b:
             config.add_section('config')
             config.write(open(conf_file, 'w'))
 
+        config.read(conf_file)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+                            'parser': config,
+                            'id': config.get_or_default('gui_information', 'id', DEFAULT_PRIORITY)}
 
-        config.read(conf_file)
         tag_config = 'config'
         self.f_items = []
         for param, value in config.get_items(tag_config):
