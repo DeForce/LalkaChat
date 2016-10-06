@@ -6,7 +6,7 @@ from modules.helpers.parser import FlagConfigParser
 
 
 class logger():
-    def __init__(self, conf_folder):
+    def __init__(self, conf_folder, **kwargs):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "logger.cfg")
         config = FlagConfigParser(allow_no_value=True)
