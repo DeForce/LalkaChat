@@ -20,11 +20,11 @@ class mentions():
             config.add_section('address')
 
             config.write(open(conf_file, 'w'))
+
+        config.read(conf_file)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
-
-        config.read(conf_file)
         mention_tag = 'mentions'
         address_tag = 'address'
         if config.has_section(mention_tag):

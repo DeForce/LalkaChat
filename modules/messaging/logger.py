@@ -4,6 +4,7 @@ import os
 import datetime
 from modules.helpers.parser import FlagConfigParser
 
+DEFAULT_PRIORITY = 20
 
 class logger():
     def __init__(self, conf_folder, **kwargs):
@@ -17,11 +18,13 @@ class logger():
             config.set('config', 'file_format', '%Y-%m-%d')
             config.set('config', 'message_date_format', '%Y-%m-%d %H:%M:%S')
             config.write(open(conf_file, 'w'))
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
 
         config.read(conf_file)
+        self.conf_params = {'folder': conf_folder, 'file': conf_file,
+                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                            'parser': config,
+                            'id': config.get_or_default('gui_information', 'id', '10')}
+
         tag_config = 'config'
 
         self.format = config.get_or_default(tag_config, 'file_format', '%Y-%m-%d')

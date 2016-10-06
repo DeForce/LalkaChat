@@ -28,11 +28,10 @@ class levels():
 
             config.write(open(conf_file, 'w'))
 
+        config.read(conf_file)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
-
-        config.read(conf_file)
         tag_config = 'config'
 
         self.conf_folder = conf_folder

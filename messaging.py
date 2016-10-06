@@ -4,11 +4,11 @@ import os
 import ConfigParser
 import threading
 import imp
-import codecs
-import sys
+import operator
 import logging
 
 log = logging.getLogger('messaging')
+MODULE_PRI_DEFAULT = '100'
 
 
 class Message(threading.Thread):
@@ -33,7 +33,8 @@ class Message(threading.Thread):
                                              'parser': config}
 
         config.read(conf_file)
-        # Dynamically loading the modules from cfg.
+        modules = {}
+        # Loading modules from cfg.
         if config.items("messaging") > 0:
             for module in config.items("messaging"):
                 log.info("Loading %s" % module[0])
@@ -46,9 +47,19 @@ class Message(threading.Thread):
                 tmp = imp.load_source(module[0], file_path)
                 class_init = getattr(tmp, module[0])
                 class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'])
-                self.modules.append(class_module)
+
+                priority = class_module.conf_params['id'] if 'id' in class_module.conf_params else MODULE_PRI_DEFAULT
+                if int(priority) in modules:
+                    modules[int(priority)].append(class_module)
+                else:
+                    modules[int(priority)] = [class_module]
+
                 modules_list[module[0]] = class_module.conf_params
                 modules_list[module[0]]['class'] = class_module
+        sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
+        for sorted_priority, sorted_list in sorted_module:
+            for sorted_list_item in sorted_list:
+                self.modules.append(sorted_list_item)
         return modules_list
 
     def msg_process(self, message):

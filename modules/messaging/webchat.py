@@ -10,6 +10,7 @@ from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from modules.helpers.parser import FlagConfigParser
 
+DEFAULT_PRIORITY = 9001
 s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 log = logging.getLogger('webchat')
@@ -173,11 +174,11 @@ class webchat():
 
             config.write(open(conf_file, 'w'))
 
+        config.read(conf_file)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
-
-        config.read(conf_file)
+                            'parser': config,
+                            'id': config.get_or_default('gui_information', 'id', DEFAULT_PRIORITY)}
 
         tag_server = 'server'
         host = config.get_or_default(tag_server, 'host', '127.0.0.1')

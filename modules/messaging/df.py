@@ -22,11 +22,10 @@ class df:
             config.set('prof', 'Nothing', '([Нн]икто|[Nn]othing|\w*)')
             config.write(open(conf_file, 'w'))
 
+        config.read(conf_file)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
-
-        config.read(conf_file)
         self.symbol = config.get_or_default(grep_tag, 'symbol', '#')
         self.file = config.get_or_default(grep_tag, 'file', 'df.txt')
 
