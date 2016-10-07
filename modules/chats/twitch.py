@@ -7,7 +7,7 @@ import requests
 import logging
 import logging.config
 import Queue
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -234,22 +234,19 @@ class twitch:
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
         conf_file = os.path.join(conf_folder, "twitch.cfg")
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('gui_information')
-            config.set('gui_information', 'category', 'chat')
-
-            config.add_section('config__gui')
-            config.set('config__gui', 'for', 'config')
-            config.set('config__gui', 'hidden', 'host, port')
-
-            config.add_section('config')
-            config.set('config', 'host', 'irc.twitch.tv')
-            config.set('config', 'port', '6667')
-            config.set('config', 'channel', 'monstercat')
-            config.set('config', 'bttv', 'false')
-
-            config.write(open(conf_file, 'w'))
+        conf_dict = [
+            {'gui_information': {
+                'category': 'chat'}},
+            {'config__gui': {
+                'for': 'config',
+                'hidden': 'host, port'}},
+            {'config': {
+                'bttv': 'true',
+                'channel': 'CzT1',
+                'host': 'irc.twitch.tv',
+                'port': '6667'}}
+        ]
+        config = self_heal(conf_file, conf_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
@@ -257,10 +254,10 @@ class twitch:
         config.read(conf_file)
         # Checking config file for needed variables
         config_tag = 'config'
-        host = config.get_or_default(config_tag, 'host', 'irc.twitch.tv')
-        port = int(config.get_or_default(config_tag, 'port', 6667))
-        channel = config.get_or_default(config_tag, 'channel', 'monstercat')
-        bttv_smiles = config.get_or_default(config_tag, 'bttv', False)
+        host = config.get(config_tag, 'host')
+        port = int(config.get(config_tag, 'port'))
+        channel = config.get(config_tag, 'channel')
+        bttv_smiles = config.get(config_tag, 'bttv')
 
         # Creating new thread with queue in place for messaging tranfers
         tw = twThread(queue, host, port, channel, bttv_smiles)

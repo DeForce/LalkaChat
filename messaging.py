@@ -7,6 +7,8 @@ import imp
 import operator
 import logging
 
+from modules.helpers.system import ModuleLoadException
+
 log = logging.getLogger('messaging')
 MODULE_PRI_DEFAULT = '100'
 
@@ -36,26 +38,33 @@ class Message(threading.Thread):
         modules = {}
         # Loading modules from cfg.
         if config.items("messaging") > 0:
-            for module in config.items("messaging"):
-                log.info("Loading %s" % module[0])
+            for module, item in config.items("messaging"):
+                log.info("Loading %s" % module)
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
                 #  same name as module name
-                join_path = [config_dict['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(module[0])]
+                join_path = [config_dict['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(module)]
                 file_path = os.path.join(*join_path)
 
-                tmp = imp.load_source(module[0], file_path)
-                class_init = getattr(tmp, module[0])
-                class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'])
+                try:
+                    tmp = imp.load_source(module, file_path)
+                    class_init = getattr(tmp, module)
+                    class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'])
 
-                priority = class_module.conf_params['id'] if 'id' in class_module.conf_params else MODULE_PRI_DEFAULT
-                if int(priority) in modules:
-                    modules[int(priority)].append(class_module)
-                else:
-                    modules[int(priority)] = [class_module]
+                    if 'id' in class_module.conf_params:
+                        priority = class_module.conf_params['id']
+                    else:
+                        priority = MODULE_PRI_DEFAULT
 
-                modules_list[module[0]] = class_module.conf_params
-                modules_list[module[0]]['class'] = class_module
+                    if int(priority) in modules:
+                        modules[int(priority)].append(class_module)
+                    else:
+                        modules[int(priority)] = [class_module]
+
+                    modules_list[module] = class_module.conf_params
+                    modules_list[module]['class'] = class_module
+                except ModuleLoadException as exc:
+                    log.error("Unable to load module {0}".format(module))
         sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
         for sorted_priority, sorted_list in sorted_module:
             for sorted_list_item in sorted_list:

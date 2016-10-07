@@ -5,7 +5,7 @@ import requests
 import Queue
 import re
 import logging
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
 from ws4py.client.threadedclient import WebSocketClient
 
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -108,7 +108,7 @@ class ggChat(WebSocketClient):
 
 
 class ggThread(threading.Thread):
-    def __init__(self, queue, address, ch_id, nick):
+    def __init__(self, queue, address, nick):
         threading.Thread.__init__(self)
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -117,7 +117,7 @@ class ggThread(threading.Thread):
         self.queue = queue
         self.address = address
         self.nick = nick
-        self.ch_id = ch_id
+        self.ch_id = None
         self.kwargs = {}
 
     def load_config(self):
@@ -173,32 +173,27 @@ class goodgame:
 
         log.info("Initializing goodgame chat")
         conf_file = os.path.join(conf_folder, "goodgame.cfg")
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('gui_information')
-            config.set('gui_information', 'category', 'chat')
-
-            config.add_section('config__gui')
-            config.set('config__gui', 'for', 'config')
-            config.set('config__gui', 'hidden', 'socket')
-
-            config.add_section('config')
-            config.set('config', 'socket/hidden', 'ws://chat.goodgame.ru:8081/chat/websocket')
-            config.set('config', 'channel_name', 'oxlamon')
-
-            config.write(open(conf_file, 'w'))
-
+        conf_dict = [
+            {'gui_information': {
+                'category': 'chat'}},
+            {'config__gui': {
+                'for': 'config',
+                'hidden': 'socket'}},
+            {'config': {
+                'channel_name': 'CzT',
+                'socket': 'ws://chat.goodgame.ru:8081/chat/websocket'}}
+        ]
+        config = self_heal(conf_file, conf_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
 
-        config.read(conf_file)
         # Checking config file for needed variables
         conf_tag = 'config'
-        address = config.get_or_default(conf_tag, 'socket', 'ws://chat.goodgame.ru:8081/chat/websocket')
-        ch_id = config.get_or_default(conf_tag, 'channel_id', None)
-        channel_name = config.get_or_default(conf_tag, 'channel_name', 'oxlamon')
+        address = config.get(conf_tag, 'socket')
+        channel_name = config.get(conf_tag, 'channel_name')
+        # ch_id
 
         # Creating new thread with queue in place for messaging transfers
-        gg = ggThread(queue, address, ch_id, channel_name)
+        gg = ggThread(queue, address, channel_name)
         gg.start()

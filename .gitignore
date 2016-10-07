@@ -2,3 +2,8 @@
 .idea/*
 /logs
 /conf/levels.db*
+/build
+/dist
+/libs
+*.spec
+*.log

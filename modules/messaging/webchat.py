@@ -8,7 +8,7 @@ from cherrypy.lib.static import serve_file
 from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
 
 DEFAULT_PRIORITY = 9001
 s_queue = Queue.Queue()
@@ -151,38 +151,31 @@ class SocketThread(threading.Thread):
 class webchat():
     def __init__(self, conf_folder, **kwargs):
         conf_file = os.path.join(conf_folder, "webchat.cfg")
+        conf_dict = [
+            {'gui_information': {
+                'category': 'main',
+                'id': DEFAULT_PRIORITY}},
+            {'style__gui': {
+                'check': 'http',
+                'check_type': 'dir',
+                'for': 'style',
+                'view': 'choose_single'}},
+            {'style': 'czt'},
+            {'server': {
+                'host': '127.0.0.1',
+                'port': '8080'}}]
         root_folder = kwargs.get('root_folder')
         http_folder = 'http'
 
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('gui_information')
-            config.set('gui_information', 'category', 'main')
-
-            config.add_section('style__gui')
-            config.set('style__gui', 'for', 'style')
-            config.set('style__gui', 'view', 'choose_single')
-            config.set('style__gui', 'check_type', 'dir')
-            config.set('style__gui', 'check', 'http')
-
-            config.add_section('style')
-            config.set('style', 'czt')
-
-            config.add_section('server')
-            config.set('server', 'host', '127.0.0.1')
-            config.set('server', 'port', '8080')
-
-            config.write(open(conf_file, 'w'))
-
-        config.read(conf_file)
+        config = self_heal(conf_file, conf_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config,
-                            'id': config.get_or_default('gui_information', 'id', DEFAULT_PRIORITY)}
+                            'id': config.get('gui_information', 'id')}
 
         tag_server = 'server'
-        host = config.get_or_default(tag_server, 'host', '127.0.0.1')
-        port = config.get_or_default(tag_server, 'port', '8080')
+        host = config.get(tag_server, 'host')
+        port = config.get(tag_server, 'port')
 
         # Fallback if style folder not found
         fallback_style = 'czt'

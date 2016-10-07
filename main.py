@@ -1,7 +1,6 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 import os
-import ConfigParser
 import imp
 import Queue
 import messaging
@@ -10,7 +9,7 @@ import thread
 import sys
 import logging
 import logging.config
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
 
 
 def init():
@@ -57,19 +56,24 @@ def init():
             exit()
 
     logger.info("Loading basic configuration")
-    config = FlagConfigParser(allow_no_value=True)
-    if not os.path.exists(main_conf_file):
-        # Creating config from zero
-        config.add_section(gui_tag)
-        config.set(gui_tag, 'gui', 'true')
-        config.set(gui_tag, 'on_top', 'true')
-        config.set(gui_tag, 'language', 'english')
-        config.set(gui_tag, 'show_hidden', 'true')
-        config.set(gui_tag, 'reload')
-
-        config.write(open(main_conf_file))
-    config.read(main_conf_file)
-
+    main_config_dict = [
+            {'gui_information': {
+                'category': 'main'}},
+            {'language__gui': {
+                'for': 'language',
+                'view': 'choose_single',
+                'check_type': 'sections',
+                'check': 'conf/translations.cfg'
+            }},
+            {'gui': {
+                'show_hidden': True,
+                'gui': True,
+                'on_top': True,
+                'reload': None
+            }},
+            {'language': 'english'}
+    ]
+    config = self_heal(main_conf_file, main_config_dict)
     # Adding config for main module
     loaded_modules['config'] = {'folder': conf_folder,
                                 'file': main_config['main_conf_file_loc'],
@@ -78,11 +82,10 @@ def init():
                                 'root_folder': main_config['root_folder'],
                                 'logs_folder': log_folder}
 
-    items = config.get_dict(gui_tag)  # type: dict
-    gui_settings['gui'] = items.get('gui', True)
-    gui_settings['on_top'] = items.get('on_top', True)
+    gui_settings['gui'] = config.get(gui_tag, 'gui')
+    gui_settings['on_top'] = config.get(gui_tag, 'gui')
     gui_settings['language'],  null_element = config.items('language')[0]
-    gui_settings['show_hidden'] = items.get('show_hidden', False)
+    gui_settings['show_hidden'] = config.get(gui_tag, 'show_hidden')
 
     logger.info("Loading Messaging Handler")
     logger.info("Loading Queue for message handling")
@@ -99,15 +102,23 @@ def init():
     chat_modules = os.path.join(conf_folder, "chat_modules.cfg")
     chat_tag = "chats"
     chat_location = os.path.join(module_folder, "chats")
-    chat_config = ConfigParser.RawConfigParser(allow_no_value=True)
+    chat_conf_dict = [
+        {'gui_information': {
+            'category': 'main'}},
+        {'chats__gui': {
+            'for': 'chats',
+            'view': 'choose_multiple',
+            'check_type': 'files',
+            'check': 'modules/chats',
+            'file_extension': False}},
+        {'chats': {}}
+    ]
 
+    chat_config = self_heal(chat_modules, chat_conf_dict)
     loaded_modules['chat_modules'] = {'folder': conf_folder, 'file': chat_modules,
                                       'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
                                       'parser': chat_config}
 
-    if not os.path.exists(chat_modules):
-        chat_config.write(open(chat_modules))
-    chat_config.read(chat_modules)
     for module, settings in chat_config.items(chat_tag):
         logger.info("Loading chat module: {0}".format(module))
         module_location = os.path.join(chat_location, module + ".py")
