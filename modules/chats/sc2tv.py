@@ -51,28 +51,17 @@ class fsChat(WebSocketClient):
     def closed(self, code, reason=None):
         log.info("Websocket Connection Closed Down")
 
-    def allow_smile(self, smile, user_id):
+    def allow_smile(self, smile, subscriptions):
         allow = False
 
-        if smile['level'] == 0:
+        if smile['user']:
+            channel_id = smile['user']['id']
+            for sub in subscriptions:
+                if sub == channel_id:
+                    allow = True
+        else:
             allow = True
-        # else:
-        #     user_match = False
-        #     for user_iter in self.users:
-        #         if user_iter['id'] == user_id:
-        #             user_match = True
-        #
-        #     if not user_match:
-        #         try:
-        #             user_id = {'id': user_id}
-        #             req_user = requests.post('http://funstream.tv/api/user/full', json=user_id)
-        #             if req_user.status_code == 200:
-        #                 req_user_answer = req_user.json()
-        #                 print "HelloWorld"
-        #                 print req_user_answer
-        #
-        #         except:
-        #             print "Unable to get smiles"
+
         return allow
 
     def received_message(self, mes):
@@ -121,7 +110,7 @@ class fsChat(WebSocketClient):
                             for smile in smiles_array:
                                 for smile_find in self.smiles:
                                     if smile_find['code'] == smile:
-                                        if self.allow_smile(smile_find, message['from']['id']):
+                                        if self.allow_smile(smile_find, message['store']['subscriptions']):
                                             comp['emotes'].append({'emote_id': smile, 'emote_url': smile_find['url']})
 
                             self.queue.put(comp)
