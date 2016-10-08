@@ -6,7 +6,7 @@ import requests
 import os
 import logging
 from ws4py.client.threadedclient import WebSocketClient
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
@@ -216,30 +216,29 @@ class sc2tv:
 
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
-
         conf_file = os.path.join(conf_folder, "sc2tv.cfg")
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('config')
-            config.set('config', 'socket/hidden', 'ws://funstream.tv/socket.io/')
-            config.set('config', 'nick', 'adolfra')
-
-            config.write(open(conf_file, 'w'))
-
+        conf_dict = [
+            {'gui_information': {
+                'category': 'chat'}},
+            {'config__gui': {
+                'for': 'config',
+                'hidden': 'socket'}},
+            {'config': {
+                'nick': 'CzT',
+                'socket': 'ws://funstream.tv/socket.io/'}}
+        ]
+        config = self_heal(conf_file, conf_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
-
-        config.read(conf_file)
         # Checking config file for needed variables
         config_tag = 'config'
-        socket = config.get_or_default(config_tag, 'socket', 'ws://funstream.tv/socket.io/')
-        nick = config.get_or_default(config_tag, 'nick', 'adolfra')
+        socket = config.get(config_tag, 'socket')
+        nick = config.get(config_tag, 'nick')
 
         # If any of the value are non-existent then exit the programm with error.
         if (socket is None) or (nick is None):
             log.critical("Config for funstream is not correct!")
-            exit()
 
         # Creating new thread with queue in place for messaging tranfers
         fs = fsThread(queue, socket, nick)

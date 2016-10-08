@@ -2,40 +2,50 @@
 # -*- coding: utf-8 -*-
 import re
 import os
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
 
 
 class df:
     def __init__(self, conf_folder, **kwargs):
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "df.cfg")
-
+        conf_dict = [
+            {'gui_information': {
+                'category': 'messaging'}},
+            {'grep': {
+                'symbol': '#',
+                'file': 'logs/df.txt'
+            }},
+            {'prof__gui': {
+                'for': 'prof',
+                'view': 'list_dual',
+                'addable': True
+            }},
+            {'prof': {
+                'Nothing': '([Нн]икто|[Nn]othing|\w*)'
+            }}
+        ]
+        config = self_heal(conf_file, conf_dict)
         grep_tag = 'grep'
         prof_tag = 'prof'
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('grep')
-            config.set('grep', 'symbol', '#')
-            config.set('grep', 'file', 'df.txt')
 
-            config.add_section('prof')
-            config.set('prof', 'Nothing', '([Нн]икто|[Nn]othing|\w*)')
-            config.write(open(conf_file, 'w'))
-
-        config.read(conf_file)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
-        self.symbol = config.get_or_default(grep_tag, 'symbol', '#')
-        self.file = config.get_or_default(grep_tag, 'file', 'df.txt')
+        self.symbol = config.get(grep_tag, 'symbol')
+        self.file = config.get(grep_tag, 'file')
+
+        dir_name = os.path.dirname(self.file)
+        if not os.path.exists(dir_name):
+            os.makedirs(os.path.dirname(self.file))
 
         if not os.path.isfile(self.file):
             with open(self.file, 'w'):
                 pass
 
         self.prof = []
-        for prof in config.get_items(prof_tag):
-            comp = [prof[0].capitalize(), self.symbol + prof[1].decode('utf-8')]
+        for prof, regex in config.items(prof_tag):
+            comp = [prof.capitalize(), self.symbol + regex.decode('utf-8')]
             self.prof.append(comp)
 
     def write_to_file(self, message):

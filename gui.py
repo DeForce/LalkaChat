@@ -4,7 +4,7 @@ import wx.grid
 import os
 import re
 import logging
-from modules.helpers.parser import FlagConfigParser
+from ConfigParser import ConfigParser
 from cefpython3.wx import chromectrl
 # ToDO: Support customization of borders/spacings
 # ToDO: Exit by cancel button
@@ -69,7 +69,7 @@ def fix_sizes(size1, size2):
 def load_translations(settings, language):
     language = language.lower()
     conf_file = 'translations.cfg'
-    config = FlagConfigParser(allow_no_value=True)
+    config = ConfigParser(allow_no_value=True)
     config.read(os.path.join(settings['folder'], conf_file))
 
     if not config.has_section(language):
@@ -119,7 +119,7 @@ def check_duplicate(item, window):
 def create_categories(loaded_modules):
     cat_dict = {}
     for module_name, module_config in loaded_modules.items():
-        parser = module_config['parser']  # type: FlagConfigParser
+        parser = module_config['parser']  # type: ConfigParser
         if parser.has_section(INFORMATION_TAG) and parser.has_option(INFORMATION_TAG, 'category'):
             tag = parser.get(INFORMATION_TAG, 'category')
             item_dict = {module_name: module_config}
@@ -298,7 +298,7 @@ class SettingsWindow(wx.Frame):
 
     @staticmethod
     def prepare_config_for_window(category_config):
-        parser = FlagConfigParser(allow_no_value=True)  # type: FlagConfigParser
+        parser = ConfigParser(allow_no_value=True)  # type: ConfigParser
         parser.readfp(open(category_config['file']))
         config_dict = {'gui': {}, 'sections': []}
         for section in parser.sections():
@@ -408,7 +408,7 @@ class SettingsWindow(wx.Frame):
                                 list_items.append(item_in_list)
                                 translated_items.append(translate(item_in_list))
             elif section_gui['check_type'] == 'sections':
-                parser = FlagConfigParser(allow_no_value=True)
+                parser = ConfigParser(allow_no_value=True)
                 parser.read(section_gui.get('check', ''))
                 for item in parser.sections():
                     list_items.append(translate(item))

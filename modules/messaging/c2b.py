@@ -4,7 +4,7 @@ import logging
 import os
 import random
 import re
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
 
 DEFAULT_PRIORITY = 10
 log = logging.getLogger('c2b')
@@ -34,23 +34,28 @@ class c2b:
     def __init__(self, conf_folder, **kwargs):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "c2b.cfg")
+        conf_dict = [
+            {'gui_information': {
+                'category': 'messaging',
+                'id': DEFAULT_PRIORITY}},
+            {'config__gui': {
+                'for': 'config',
+                'addable': 'true',
+                'view': 'list_dual'}},
+            {'config': {}}
+        ]
 
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('config')
-            config.write(open(conf_file, 'w'))
-
-        config.read(conf_file)
+        config = self_heal(conf_file, conf_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config,
-                            'id': config.get_or_default('gui_information', 'id', DEFAULT_PRIORITY)}
+                            'id': config.get('gui_information', 'id')}
 
         tag_config = 'config'
         self.f_items = []
-        for param, value in config.get_items(tag_config):
+        for param, value in config.items(tag_config):
             f_item = {'filter': param.decode('utf-8'), 'replace': value.split('/')}
-            f_item['replace'] = map(lambda x: x.strip().decode('utf-8'), f_item['replace'])
+            f_item['replace'] = [item.strip().decode('utf-8') for item in f_item['replace']]
             self.f_items.append(f_item)
 
     def get_message(self, message, queue):
