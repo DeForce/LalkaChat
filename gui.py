@@ -2,17 +2,15 @@ import threading
 import wx
 import wx.grid
 import os
-import re
 import logging
 from ConfigParser import ConfigParser
 from cefpython3.wx import chromectrl
+from modules.helpers.system import MODULE_KEY, translate_key
 # ToDO: Support customization of borders/spacings
 # ToDO: Exit by cancel button
 
-TRANSLATIONS = {}
 IDS = {}
 log = logging.getLogger('chat_gui')
-MODULE_KEY = '.'
 INFORMATION_TAG = 'gui_information'
 SECTION_GUI_TAG = '__gui'
 SKIP_TAGS = [INFORMATION_TAG]
@@ -53,62 +51,6 @@ def get_list_of_ids_from_module_name(name, id_group=1, return_tuple=False):
     return id_array
 
 
-def fix_sizes(size1, size2):
-    if size1[0] > size2[0]:
-        label_x_size = size1[0]
-    else:
-        label_x_size = size2[0]
-
-    if size1[1] > size2[1]:
-        label_y_size = size1[1]
-    else:
-        label_y_size = size2[1]
-    return [label_x_size, label_y_size]
-
-
-def load_translations(settings, language):
-    language = language.lower()
-    conf_file = 'translations.cfg'
-    config = ConfigParser(allow_no_value=True)
-    config.read(os.path.join(settings['folder'], conf_file))
-
-    if not config.has_section(language):
-        log.warning("Warning, have not found language: {0}".format(language))
-        language = 'english'
-
-    for param, value in config.items(language):
-        TRANSLATIONS[param] = value
-
-
-def find_translation(item, length=0, wildcard=1):
-    translation = TRANSLATIONS.get(item, item)
-    if item == translation:
-        if wildcard < length:
-            translation = find_translation(MODULE_KEY.join(['*'] + item.split(MODULE_KEY)[-wildcard:]),
-                                           length=length, wildcard=wildcard+1)
-        else:
-            return translation
-    return translation
-
-
-def get_key_from_translation(translation):
-    for key, value in TRANSLATIONS.items():
-        if value == translation:
-            return key
-    return translation
-
-
-def translate(item):
-    item_no_flags = item.split('/')[0]
-    old_item = item_no_flags
-
-    translation = find_translation(item_no_flags, length=len(item_no_flags.split(MODULE_KEY)))
-
-    if re.match('\*', translation):
-        return old_item
-    return translation.decode('utf-8')
-
-
 def check_duplicate(item, window):
     items = window.GetItems()
     if item in items:
@@ -133,6 +75,15 @@ def create_categories(loaded_modules):
     return cat_dict
 
 
+class KeyListBox(wx.ListBox):
+    def __init__(self, *args, **kwargs):
+        self.keys = kwargs.pop('keys', [])
+        wx.ListBox.__init__(self, *args, **kwargs)
+
+    def get_key_from_id(self, index):
+        return self.keys[index]
+
+
 class MainMenuToolBar(wx.ToolBar):
     def __init__(self, *args, **kwargs):
         self.main_class = kwargs['main_class']
@@ -151,7 +102,7 @@ class MainMenuToolBar(wx.ToolBar):
     def create_tool(self, name, binding=None, style=wx.ITEM_NORMAL, s_help="", l_help=""):
         l_id = id_renew(name)
         IDS[l_id] = name
-        label_text = translate(IDS[l_id])
+        label_text = translate_key(IDS[l_id])
         button = self.AddLabelTool(l_id, label_text, wx.NullBitmap, wx.NullBitmap,
                                    style, s_help, l_help)
         if binding:
@@ -232,7 +183,7 @@ class SettingsWindow(wx.Frame):
         page_list = []
         for category_dict in category_list:
             category_item, category_config = category_dict.iteritems().next()
-            translated_item = translate(category_item)
+            translated_item = translate_key(category_item)
             if translated_item not in self.page_list:
                 panel = wx.Panel(self.notebook)
                 self.fill_page_with_content(panel, setting_category, category_item, category_config)
@@ -245,7 +196,7 @@ class SettingsWindow(wx.Frame):
     def fill_page_with_content(self, panel, setting_category, category_item, category_config):
         def create_button(button_key, function):
             button_id = id_renew(button_key, update=True)
-            c_button = wx.Button(panel, id=button_id, label=translate(button_key))
+            c_button = wx.Button(panel, id=button_id, label=translate_key(button_key))
             self.Bind(wx.EVT_BUTTON, function, id=button_id)
             return c_button
 
@@ -279,7 +230,7 @@ class SettingsWindow(wx.Frame):
                 continue
 
             static_key = MODULE_KEY.join([category_item, section_key])
-            static_box = wx.StaticBox(page_sc_window, label=translate(static_key))
+            static_box = wx.StaticBox(page_sc_window, label=translate_key(static_key))
             static_sizer = wx.StaticBoxSizer(static_box, wx.VERTICAL)
 
             log.debug("Working on {0}".format(static_key))
@@ -340,12 +291,12 @@ class SettingsWindow(wx.Frame):
 
                 item_apply_key = MODULE_KEY.join([key, 'list_add'])
                 item_apply_id = id_renew(item_apply_key, update=True)
-                addable_sizer.Add(wx.Button(parent, id=item_apply_id, label=translate(item_apply_key)), 0, style)
+                addable_sizer.Add(wx.Button(parent, id=item_apply_id, label=translate_key(item_apply_key)), 0, style)
                 self.Bind(wx.EVT_BUTTON, self.button_clicked, id=item_apply_id)
 
                 item_remove_key = MODULE_KEY.join([key, 'list_remove'])
                 item_remove_id = id_renew(item_remove_key, update=True)
-                addable_sizer.Add(wx.Button(parent, id=item_remove_id, label=translate(item_remove_key)), 0, style)
+                addable_sizer.Add(wx.Button(parent, id=item_remove_id, label=translate_key(item_remove_key)), 0, style)
                 self.Bind(wx.EVT_BUTTON, self.button_clicked, id=item_remove_id)
 
                 item_sizer.Add(addable_sizer, 0, wx.EXPAND)
@@ -391,14 +342,14 @@ class SettingsWindow(wx.Frame):
             list_items = []
             translated_items = []
 
-            if section_gui['check_type'] in ['dir', 'files']:
+            if section_gui['check_type'] in ['dir', 'folder', 'files']:
                 check_type = section_gui['check_type']
                 remove_extension = section_gui['file_extension'] if 'file_extension' in section_gui else False
                 for item_in_list in os.listdir(os.path.join(self.main_class.main_config['root_folder'],
                                                             section_gui['check'])):
                     item_path = os.path.join(self.main_class.main_config['root_folder'],
                                              section_gui['check'], item_in_list)
-                    if check_type == 'dir' and os.path.isdir(item_path):
+                    if check_type in ['dir', 'folder'] and os.path.isdir(item_path):
                         list_items.append(item_in_list)
                     elif check_type == 'files' and os.path.isfile(item_path):
                         if remove_extension:
@@ -406,21 +357,23 @@ class SettingsWindow(wx.Frame):
                         if '__init__' not in item_in_list:
                             if item_in_list not in list_items:
                                 list_items.append(item_in_list)
-                                translated_items.append(translate(item_in_list))
+                                translated_items.append(translate_key(item_in_list))
             elif section_gui['check_type'] == 'sections':
                 parser = ConfigParser(allow_no_value=True)
                 parser.read(section_gui.get('check', ''))
                 for item in parser.sections():
-                    list_items.append(translate(item))
+                    list_items.append(translate_key(item))
 
             item_key = MODULE_KEY.join([key, 'list_box'])
-            item_sizer.Add(wx.StaticText(parent, label=translate(item_key), style=wx.ALIGN_RIGHT))
-            item_list_box = wx.ListBox(parent, id=id_renew(item_key, update=True),
+            label_text = translate_key(item_key)
+            if label_text:
+                item_sizer.Add(wx.StaticText(parent, label=label_text, style=wx.ALIGN_RIGHT))
+            item_list_box = KeyListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
                                        choices=translated_items if translated_items else list_items, style=style)
             section_for = section if 'multiple' in view else [section[0]]
             for section_item, section_value in section_for:
                 try:
-                    item_list_box.SetSelection(list_items.index(translate(section_item)))
+                    item_list_box.SetSelection(list_items.index(translate_key(section_item)))
                 except ValueError:
                     try:
                         item_list_box.SetSelection(list_items.index(section_item))
@@ -442,19 +395,19 @@ class SettingsWindow(wx.Frame):
                 style = wx.ALIGN_CENTER_VERTICAL
                 if not value:  # Button
                     button_id = id_renew(item_name, update=True)
-                    item_button = wx.Button(parent, id=button_id, label=translate(item_name))
+                    item_button = wx.Button(parent, id=button_id, label=translate_key(item_name))
                     items_to_add.append((item_button, 0, wx.ALIGN_LEFT))
                     self.main_class.Bind(wx.EVT_BUTTON, self.button_clicked, id=button_id)
                 elif value.lower() in ['true', 'false']:  # Checkbox
                     item_box = wx.CheckBox(parent, id=id_renew(item_name, update=True),
-                                           label=translate(item_name), style=style)
+                                           label=translate_key(item_name), style=style)
                     item_box.SetValue(True if value.lower() == 'true' else False)
                     items_to_add.append((item_box, 0, wx.ALIGN_LEFT))
                 else:  # TextCtrl
                     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
                     item_box = wx.TextCtrl(parent, id=id_renew(item_name, update=True),
                                            value=value.decode('utf-8'))
-                    item_text = wx.StaticText(parent, label=translate(item_name),
+                    item_text = wx.StaticText(parent, label=translate_key(item_name),
                                               style=wx.ALIGN_RIGHT)
                     item_spacer = (10, 0)
                     item_sizer.AddMany([(item_text, 0, wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL),
@@ -513,10 +466,10 @@ class SettingsWindow(wx.Frame):
                 elif isinstance(wx_window, wx.Button):
                     if item_name not in SKIP_BUTTONS:
                         parser.set(section, item_name)
-                elif isinstance(wx_window, wx.ListBox):
+                elif isinstance(wx_window, KeyListBox):
                     item_ids = wx_window.GetSelections()
                     parser_options = parser.options(section)
-                    items_values = [get_key_from_translation(wx_window.GetString(item_id)) for item_id in item_ids]
+                    items_values = [wx_window.get_key_from_id(item_id) for item_id in item_ids]
                     if not items_values:
                         for option in parser_options:
                             parser.remove_option(section, option)
@@ -642,22 +595,22 @@ class ChatGui(wx.Frame):
         if self.settings_window:
             self.settings_window.notebook.Show(False)
             self.settings_window.SetFocus()
-            self.settings_window.SetTitle(translate(MODULE_KEY.join(module_groups[:-1])))
-            self.settings_window.remove_pages(translate(module_groups[-1]))
+            self.settings_window.SetTitle(translate_key(MODULE_KEY.join(module_groups[:-1])))
+            self.settings_window.remove_pages(translate_key(module_groups[-1]))
         else:
             self.settings_window = SettingsWindow(self,
                                                   id=settings_menu_id,
-                                                  title=translate(MODULE_KEY.join(module_groups[:-1])),
+                                                  title=translate_key(MODULE_KEY.join(module_groups[:-1])),
                                                   size=(500, 400),
                                                   main_class=self)
 
         self.settings_window.fill_notebook_with_modules(self.sorted_categories[settings_category], settings_category)
-        self.settings_window.notebook.SetSelection(self.settings_window.page_list.index(translate(module_groups[-1])))
+        self.settings_window.notebook.SetSelection(self.settings_window.page_list.index(translate_key(module_groups[-1])))
         self.settings_window.notebook.Show(True)
         event.Skip()
 
     def create_menu(self, name, modules, menu_named=False):
-        settings_menu = wx.Menu(translate(name)) if menu_named else wx.Menu()
+        settings_menu = wx.Menu(translate_key(name)) if menu_named else wx.Menu()
         # Creating menu items
         for category, category_items in modules.items():
             category_name = MODULE_KEY.join([name, category])
@@ -666,9 +619,9 @@ class ChatGui(wx.Frame):
                 category_item_name, settings = category_dict.iteritems().next()
                 sub_name = MODULE_KEY.join([category_name, category_item_name])
                 category_menu_item = category_sub_menu.Append(id_renew(sub_name, update=True),
-                                                              translate(category_item_name))
+                                                              translate_key(category_item_name))
                 self.Bind(wx.EVT_MENU, self.on_settings_button, id=category_menu_item.GetId())
-            settings_menu.AppendSubMenu(category_sub_menu, translate(category_name))
+            settings_menu.AppendSubMenu(category_sub_menu, translate_key(category_name))
         return settings_menu
 
     def button_clicked(self, event):
@@ -695,7 +648,6 @@ class GuiThread(threading.Thread):
     def run(self):
         chromectrl.Initialize()
         url = ':'.join([self.url, self.port])
-        load_translations(self.main_config, self.gui_settings.get('language', 'default'))
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
         ChatGui(None, "LalkaChat", url, main_config=self.main_config, gui_settings=self.gui_settings,
                 loaded_modules=self.loaded_modules)  # A Frame is a top-level window.
