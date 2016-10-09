@@ -104,7 +104,7 @@ class FsChat(WebSocketClient):
                     elif dict_item == 'id':
                         try:
                             self.duplicates.index(message[dict_item])
-                        except IndexError:
+                        except ValueError:
                             comp = {'source': self.source,
                                     'source_icon': SOURCE_ICON,
                                     'user': message['from']['name'],
