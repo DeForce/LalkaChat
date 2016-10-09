@@ -4,7 +4,7 @@ import wx.grid
 import os
 import re
 import logging
-from modules.helpers.parser import FlagConfigParser
+from ConfigParser import ConfigParser
 from cefpython3.wx import chromectrl
 # ToDO: Support customization of borders/spacings
 # ToDO: Exit by cancel button
@@ -39,14 +39,14 @@ def id_renew(name, update=False):
     return new_id
 
 
-def get_list_of_ids_from_module_name(name, id_group=1, tuple=False):
+def get_list_of_ids_from_module_name(name, id_group=1, return_tuple=False):
     split_key = MODULE_KEY
 
     id_array = []
     for item_key, item in IDS.items():
         item_name = split_key.join(item.split(split_key)[:id_group])
         if item_name == name:
-            if tuple:
+            if return_tuple:
                 id_array.append((item_key, item))
             else:
                 id_array.append(item_key)
@@ -69,7 +69,7 @@ def fix_sizes(size1, size2):
 def load_translations(settings, language):
     language = language.lower()
     conf_file = 'translations.cfg'
-    config = FlagConfigParser(allow_no_value=True)
+    config = ConfigParser(allow_no_value=True)
     config.read(os.path.join(settings['folder'], conf_file))
 
     if not config.has_section(language):
@@ -88,6 +88,13 @@ def find_translation(item, length=0, wildcard=1):
                                            length=length, wildcard=wildcard+1)
         else:
             return translation
+    return translation
+
+
+def get_key_from_translation(translation):
+    for key, value in TRANSLATIONS.items():
+        if value == translation:
+            return key
     return translation
 
 
@@ -112,7 +119,7 @@ def check_duplicate(item, window):
 def create_categories(loaded_modules):
     cat_dict = {}
     for module_name, module_config in loaded_modules.items():
-        parser = module_config['parser']  # type: FlagConfigParser
+        parser = module_config['parser']  # type: ConfigParser
         if parser.has_section(INFORMATION_TAG) and parser.has_option(INFORMATION_TAG, 'category'):
             tag = parser.get(INFORMATION_TAG, 'category')
             item_dict = {module_name: module_config}
@@ -179,6 +186,7 @@ class SettingsWindow(wx.Frame):
         self.create_layout()
 
     def on_exit(self, event):
+        log.debug(event)
         self.Destroy()
 
     def on_close(self, event):
@@ -290,7 +298,7 @@ class SettingsWindow(wx.Frame):
 
     @staticmethod
     def prepare_config_for_window(category_config):
-        parser = FlagConfigParser(allow_no_value=True)  # type: FlagConfigParser
+        parser = ConfigParser(allow_no_value=True)  # type: ConfigParser
         parser.readfp(open(category_config['file']))
         config_dict = {'gui': {}, 'sections': []}
         for section in parser.sections():
@@ -376,6 +384,51 @@ class SettingsWindow(wx.Frame):
             item_sizer.Add(list_box, 1, wx.EXPAND)
 
             sizer.Add(item_sizer)
+        elif 'choose' in view:
+            is_single = True if 'single' in view else False
+            style = wx.LB_SINGLE if is_single else wx.LB_EXTENDED
+            item_sizer = wx.BoxSizer(wx.VERTICAL)
+            list_items = []
+            translated_items = []
+
+            if section_gui['check_type'] in ['dir', 'files']:
+                check_type = section_gui['check_type']
+                remove_extension = section_gui['file_extension'] if 'file_extension' in section_gui else False
+                for item_in_list in os.listdir(os.path.join(self.main_class.main_config['root_folder'],
+                                                            section_gui['check'])):
+                    item_path = os.path.join(self.main_class.main_config['root_folder'],
+                                             section_gui['check'], item_in_list)
+                    if check_type == 'dir' and os.path.isdir(item_path):
+                        list_items.append(item_in_list)
+                    elif check_type == 'files' and os.path.isfile(item_path):
+                        if remove_extension:
+                            item_in_list = ''.join(os.path.basename(item_path).split('.')[:-1])
+                        if '__init__' not in item_in_list:
+                            if item_in_list not in list_items:
+                                list_items.append(item_in_list)
+                                translated_items.append(translate(item_in_list))
+            elif section_gui['check_type'] == 'sections':
+                parser = ConfigParser(allow_no_value=True)
+                parser.read(section_gui.get('check', ''))
+                for item in parser.sections():
+                    list_items.append(translate(item))
+
+            item_key = MODULE_KEY.join([key, 'list_box'])
+            item_sizer.Add(wx.StaticText(parent, label=translate(item_key), style=wx.ALIGN_RIGHT))
+            item_list_box = wx.ListBox(parent, id=id_renew(item_key, update=True),
+                                       choices=translated_items if translated_items else list_items, style=style)
+            section_for = section if 'multiple' in view else [section[0]]
+            for section_item, section_value in section_for:
+                try:
+                    item_list_box.SetSelection(list_items.index(translate(section_item)))
+                except ValueError:
+                    try:
+                        item_list_box.SetSelection(list_items.index(section_item))
+                    except ValueError as exc:
+                        log.debug("[create_items] Unable to find item {0} in list".format(exc.message))
+            item_sizer.Add(item_list_box, 1, wx.EXPAND)
+
+            sizer.Add(item_sizer)
         else:
             items_to_add = []
             if not section:
@@ -420,16 +473,16 @@ class SettingsWindow(wx.Frame):
         if keys[-1] in ['list_add', 'list_remove']:
             self.list_operation(MODULE_KEY.join(keys[:-1]), action=keys[-1])
         elif keys[-1] == 'apply_button':
-            self.save_settings(MODULE_KEY.join(keys[1:-1]), MODULE_KEY.join(keys[:-1]))
+            self.save_settings(MODULE_KEY.join(keys[1:-1]))
         elif keys[-1] == 'cancel_button':
             self.on_close(event)
         event.Skip()
 
-    def save_settings(self, module, key):
+    def save_settings(self, module):
         module_config = self.main_class.loaded_modules.get(module, {})
         if module_config:
             parser = module_config['parser']
-            items = get_list_of_ids_from_module_name(module, tuple=True)
+            items = get_list_of_ids_from_module_name(module, return_tuple=True)
             for item, name in items:
                 module_name, section, item_name = name.split(MODULE_KEY)
                 wx_window = wx.FindWindowById(item)
@@ -460,7 +513,19 @@ class SettingsWindow(wx.Frame):
                 elif isinstance(wx_window, wx.Button):
                     if item_name not in SKIP_BUTTONS:
                         parser.set(section, item_name)
-
+                elif isinstance(wx_window, wx.ListBox):
+                    item_ids = wx_window.GetSelections()
+                    parser_options = parser.options(section)
+                    items_values = [get_key_from_translation(wx_window.GetString(item_id)) for item_id in item_ids]
+                    if not items_values:
+                        for option in parser_options:
+                            parser.remove_option(section, option)
+                    else:
+                        for option in parser_options:
+                            if option not in items_values:
+                                parser.remove_option(section, option)
+                        for value in items_values:
+                            parser.set(section, value)
             with open(module_config['file'], 'w') as config_file:
                 parser.write(config_file)
 
@@ -552,7 +617,7 @@ class ChatGui(wx.Frame):
         event.Skip()
 
     def on_right_down(self, event):
-        log.info("RClick")
+        log.info(event)
         event.Skip()
 
     def on_settings(self, event):
@@ -632,6 +697,6 @@ class GuiThread(threading.Thread):
         url = ':'.join([self.url, self.port])
         load_translations(self.main_config, self.gui_settings.get('language', 'default'))
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
-        frame = ChatGui(None, "LalkaChat", url, main_config=self.main_config, gui_settings=self.gui_settings,
-                        loaded_modules=self.loaded_modules)  # A Frame is a top-level window.
+        ChatGui(None, "LalkaChat", url, main_config=self.main_config, gui_settings=self.gui_settings,
+                loaded_modules=self.loaded_modules)  # A Frame is a top-level window.
         app.MainLoop()

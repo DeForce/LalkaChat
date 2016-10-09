@@ -88,7 +88,7 @@ escapeHtml = (function () {
     'use strict';
     var chr = { '"': '&quot;', '&': '&amp;', '<': '&lt;', '>': '&gt;' };
     return function (text) {
-        return text.replace(/[\\"&<>]/g, function (a) { return chr[a]; });
+        return text.replace(/[\"&<>]/g, function (a) { return chr[a]; });
     };
 }());
 
@@ -106,10 +106,16 @@ function showMessage(message) {
 		
 		elements.message['source'] = document.createElement('div');
 		elements.message.source.setAttribute('class', 'msgSource');
-		
-		elements.message.source['img'] = document.createElement('img');
-		elements.message.source.img.setAttribute('src', '/img/sources/' + messageJSON.source + '.png');
-		
+
+        elements.message.source['img'] = document.createElement('img');
+        if(messageJSON.hasOwnProperty('source_icon')) {
+            elements.message.source.img.setAttribute('src', messageJSON.source_icon);
+        }
+        else{
+            elements.message.source.img.setAttribute('src', '/img/sources/' + messageJSON.source + '.png');
+        }
+        elements.message.source.img.setAttribute('class', 'imgSource');
+
 		elements.message.source.appendChild(elements.message.source.img);
 		elements.message.appendChild(elements.message.source);
 	}
@@ -190,7 +196,10 @@ function showMessage(message) {
 	if(messageJSON.hasOwnProperty('text')) {
 		// console.log("message has text " + messageJSON.text);
 		elements.message['text'] = document.createElement('div');
-		if(messageJSON.hasOwnProperty('pm') && messageJSON.pm == true) {
+        if(messageJSON.source == 'sy') {
+            elements.message.text.setAttribute('class', 'msgTextSystem');
+        }
+		else if(messageJSON.hasOwnProperty('pm') && messageJSON.pm == true) {
 			elements.message.text.setAttribute('class', 'msgTextPriv');
 		}
 		else if(messageJSON.hasOwnProperty('mention') && messageJSON.mention == true){

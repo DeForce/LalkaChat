@@ -4,7 +4,7 @@ setup(
     name='LalkaChat',
     version='0.0.1',
     packages=['', 'modules', 'modules.helpers', 'modules.messaging'],
-    requires=['requests', 'cherrypy', 'ws4py', 'irc', 'wxpython', 'cefpython'],
+    requires=['requests', 'cherrypy', 'ws4py', 'irc', 'wxpython', 'cefpython', 'jinja2'],
     url='https://github.com/DeForce/LalkaChat',
     license='',
     author='CzT/DeForce',

@@ -2,40 +2,39 @@
 # -*- coding: utf-8 -*-
 import os
 import re
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
 
 
 class mentions():
-    def __init__(self, conf_folder):
+    def __init__(self, conf_folder, **kwargs):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "mentions.cfg")
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('config')
-            config.add_section('config_gui')
-            config.set('config_gui', 'for', 'mentions, address')
-            config.set('config_gui', 'view', 'list')
-            config.set('config_gui', 'addable', 'true')
-            config.add_section('mentions')
-            config.add_section('address')
-
-            config.write(open(conf_file, 'w'))
+        conf_dict = [
+            {'gui_information': {
+                'category': 'messaging'}},
+            {'config': {}},
+            {'config__gui': {
+                'addable': 'true',
+                'for': 'mentions, address',
+                'view': 'list'}},
+            {'mentions': {}},
+            {'address': {}}
+        ]
+        config = self_heal(conf_file, conf_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
-
-        config.read(conf_file)
         mention_tag = 'mentions'
         address_tag = 'address'
         if config.has_section(mention_tag):
-            self.mentions = map(lambda x: x[0], config.get_items(mention_tag))
+            self.mentions = [item for item, value in config.items(mention_tag)]
         else:
-            self.mentions = {}
+            self.mentions = []
 
         if config.has_section(address_tag):
-            self.addresses = map(lambda x: x[0], config.get_items(address_tag))
+            self.addresses = [item for item, value in config.items(address_tag)]
         else:
-            self.addresses = {}
+            self.addresses = []
 
     def get_message(self, message, queue):
         # Replacing the message if needed.

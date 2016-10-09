@@ -1,117 +1,120 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
+import logging
+import math
 import os
 import random
 import sqlite3
-import math
 import xml.etree.ElementTree as ElementTree
-import logging
-from modules.helpers.parser import FlagConfigParser
+import jinja2
+from modules.helpers.parser import self_heal
+from modules.helpers.system import system_message, ModuleLoadException
 
 logger = logging.getLogger('levels')
+TEMPLATE = """<?xml version="1.0" encoding="utf-8" ?>
+<levels>
+{% for name, url in levels -%}
+  <level name="{{ name }}" url="{{ url }}" />
+{% endfor -%}
+</levels>
+"""
 
 
-class levels():
-    def __init__(self, conf_folder):
+class levels:
+    @staticmethod
+    def create_db(db_location):
+        if not os.path.exists(db_location):
+            db = sqlite3.connect(db_location)
+            cursor = db.cursor()
+            logger.info("Creating new tables for levels")
+            cursor.execute('CREATE TABLE UserLevels (User, "Experience")')
+            cursor.close()
+            db.commit()
+            db.close()
+
+    def __init__(self, conf_folder, **kwargs):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "levels.cfg")
-
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('config')
-            config.set('config', 'experience', 'static')
-            config.set('config', 'exp_for_level', 100)
-            config.set('config', 'levels', 'levels.xml')
-            config.set('config', 'db', 'levels.db')
-            config.set('config', 'message', '{0} has leveled up, now he is {1}')
-
-            config.write(open(conf_file, 'w'))
+        conf_dict = [
+            {'gui_information': {
+                'category': u'messaging'}},
+            {'config': {
+                'message': u'{0} has leveled up, now he is {1}',
+                'file': u'conf/levels.xml',
+                'db': u'levels.db',
+                'experience': u'geometrical',
+                'exp_for_level': 200}}
+        ]
+        levels_dict = [
+            ("Ghost", "img/levels/default/0.png"),
+            ("Baby", "img/levels/default/1.png"),
+            ("Child", "img/levels/default/2.png"),
+            ("Mystical Person", "img/levels/default/3.png"),
+            ("King", "img/levels/default/4.png"),
+        ]
+        config = self_heal(conf_file, conf_dict)
 
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
-
-        config.read(conf_file)
         tag_config = 'config'
 
         self.conf_folder = conf_folder
-        self.experience = config.get_or_default(tag_config, 'experience', 'static')
-        self.exp_for_level = int(config.get_or_default(tag_config, 'exp_for_level', 100))
-        self.filename = config.get_or_default(tag_config, 'filename', 'levels.xml')
+        self.experience = config.get(tag_config, 'experience')
+        self.exp_for_level = int(config.get(tag_config, 'exp_for_level'))
+        self.exp_for_message = 1
+        self.filename = os.path.abspath(config.get(tag_config, 'file'))
         self.levels = []
-        self.special_levels = []
-        self.db = None
-        self.db_location = config.get_or_default(tag_config, 'db', 'levels.db')
-        self.cursor = None
-        self.message = config.get_or_default(tag_config, 'message', u'{0} has leveled up, now he is {1}').decode('utf-8')
-
-        exists = False
-        if self.experience == 'random':
-                self.db_location += '.random'
-        if os.path.exists(os.path.join(conf_folder, self.db_location)):
-            exists = True
-
-        if not exists:
-            self.db = sqlite3.connect(os.path.join(conf_folder, self.db_location))
-            cursor = self.db.cursor()
-            logger.info("Creating new tables")
-            cursor.execute('CREATE TABLE UserLevels (User, Experience)')
-            cursor.close()
-            self.db.commit()
-            self.db.close()
-            self.db = None
+        self.special_levels = {}
+        self.db_location = os.path.join(conf_folder, config.get(tag_config, 'db'))
+        self.message = config.get(tag_config, 'message').decode('utf-8')
 
         # Load levels
-        if not os.path.exists(os.path.join(conf_folder, self.filename)):
-            logger.error("Levels.xml not found, exiting")
-            exit()
+        if not os.path.exists(self.filename):
+            logger.error("{0} not found, generating from template".format(self.filename))
+            if not os.path.exists(os.path.dirname(self.filename)):
+                os.makedirs(os.path.dirname(self.filename))
+            with open(self.filename, 'w') as levels_file:
+                levels_file.write(jinja2.Template(TEMPLATE).render(levels=levels_dict))
+
+        if self.experience == 'random':
+            self.db_location += '.random'
+        self.create_db(self.db_location)
 
         tree = ElementTree.parse(os.path.join(conf_folder, self.filename))
         lvl_xml = tree.getroot()
 
-        level_c = 1.0
-        level_exp = 0
-        for level in lvl_xml:
-            if 'nick' in level.attrib:
-                self.special_levels.append(level.attrib)
+        for level_data in lvl_xml:
+            level_count = float(len(self.levels))
+            if 'nick' in level_data.attrib:
+                self.special_levels[level_data.attrib['nick']] = level_data.attrib
             else:
-                if self.experience == 'static':
-                    level_exp = eval('self.exp_for_level * level_c')
-                    level_c += 1
-                elif self.experience == 'geometrical':
-                    level_exp = math.floor(eval('self.exp_for_level * (pow(level_c, 1.8)/2.0)'))
-                    level_c += 1
-                elif self.experience == 'random':
-                    level_exp = eval('self.exp_for_level * level_c')
-                    level_c += 1
-                level.attrib['exp'] = level_exp
-                self.levels.append(level.attrib)
+                if self.experience == 'geometrical':
+                    level_exp = math.floor(self.exp_for_level * (pow(level_count, 1.8)/2.0))
+                else:
+                    level_exp = self.exp_for_level * level_count
+                level_data.attrib['exp'] = level_exp
+                self.levels.append(level_data.attrib)
 
     def set_level(self, user, queue):
         if user == 'System':
             return []
-        if self.db is None:
-            self.db = sqlite3.connect(os.path.join(self.conf_folder, self.db_location))
+        db = sqlite3.connect(self.db_location)
 
-        cursor = self.db.cursor()
+        cursor = db.cursor()
         user_select = cursor.execute('SELECT User, Experience FROM UserLevels WHERE User = ?', [user])
         user_select = user_select.fetchall()
 
-        add_exp = 1
+        experience = 1
         if len(user_select) == 1:
             row = user_select[0]
-
-            experience = int(row[1]) + add_exp
-
+            experience = int(row[1]) + self.exp_for_message
             cursor.execute('UPDATE UserLevels SET Experience = ? WHERE User = ? ', [experience, user])
-            self.db.commit()
         elif len(user_select) > 1:
-            logger.error("wtf, this should not happen")
+            logger.error("Select yielded more than one User")
         else:
-            experience = 1
-
             cursor.execute('INSERT INTO UserLevels VALUES (?, ?)', [user, experience])
-            self.db.commit()
+        db.commit()
 
         max_level = 0
         for level in self.levels:
@@ -125,33 +128,22 @@ class levels():
                 max_level = random.randint(0, len(self.levels) - 1)
                 experience = self.levels[max_level]['exp'] - self.exp_for_level
                 cursor.execute('UPDATE UserLevels SET Experience = ? WHERE User = ? ', [experience, user])
-                self.db.commit()
+                db.commit()
             else:
                 max_level += 1
-            lvlup_message = {'source': 'tw',
-                             'user': u'System',
-                             'text':
-                                 self.message.format(user, self.levels[max_level]['name'])}
-            queue.put(lvlup_message)
+            system_message(self.message.format(user, self.levels[max_level]['name']), queue)
         cursor.close()
         return self.levels[max_level]
 
     def get_message(self, message, queue):
-        if message is None:
-            return
-        else:
-            message['s_levels'] = []
+        if message:
+            if 'system_msg' not in message or not message['system_msg']:
+                if 'user' in message and message['user'] in self.special_levels:
+                    level_info = self.special_levels[message['user']]
+                    if 's_levels' in message:
+                        message['s_levels'].append(level_info)
+                    else:
+                        message['s_levels'] = [level_info]
 
-            for user in self.special_levels:
-                if message.get('user') == user['nick']:
-                    level_info = {'name': user['name'], 'url': user['url']}
-                    message['s_levels'].append(level_info)
-
-            message['levels'] = self.set_level(message['user'], queue)
-
-            if not len(message['s_levels']):
-                message.pop('s_levels')
-            if not len(message['levels']):
-                message.pop('levels')
-
+                message['levels'] = self.set_level(message['user'], queue)
             return message
