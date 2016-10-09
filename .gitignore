@@ -1,9 +1,10 @@
 *.pyc
 .idea/*
 /logs
-/conf/levels.db*
+levels.db*
 /build
 /dist
 /libs
+/conf
 *.spec
 *.log

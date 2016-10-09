@@ -19,6 +19,18 @@ emote_bits_url = 'static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
 NOT_FOUND = 'none'
 SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
+CONF_DICT = [
+            {'gui_information': {
+                'category': 'chat'}},
+            {'config__gui': {
+                'for': 'config',
+                'hidden': 'host, port'}},
+            {'config': {
+                'bttv': 'true',
+                'channel': 'CHANGE_ME',
+                'host': 'irc.twitch.tv',
+                'port': '6667'}}
+        ]
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -170,15 +182,23 @@ class twThread(threading.Thread):
                 self.nickname += str(random.randint(0, 9))
 
     def run(self):
-        self.load_config()
-
-        # We are connecting via IRC handler.
-        irc_client = IRC(self.queue, self.channel, **self.kwargs)
-        irc_client.connect(self.host, self.port, self.nickname)
-        irc_client.start()
+        if self.load_config():
+            # We are connecting via IRC handler.
+            irc_client = IRC(self.queue, self.channel, **self.kwargs)
+            irc_client.connect(self.host, self.port, self.nickname)
+            irc_client.start()
 
     def load_config(self):
-        error = False
+        try:
+            request = requests.get("https://api.twitch.tv/kraken/channels/{0}".format(self.channel), headers=headers)
+            if request.status_code == 200:
+                log.info("Channel found, continuing")
+            else:
+                raise Exception("Not successful status code: {0}".format(request.status_code))
+        except Exception as exc:
+            log.error("Unable to get channel ID, error: {0}\nArgs: {1}".format(exc.message, exc.args))
+            return False
+
         try:
             # Getting random IRC server to connect to
             request = requests.get("http://tmi.twitch.tv/servers?channel={0}".format(self.channel))
@@ -188,7 +208,7 @@ class twThread(threading.Thread):
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:
             log.error("Unable to get server list, error: {0}\nArgs: {1}".format(exc.message, exc.args))
-            error = True
+            return False
 
         try:
             # Getting Better Twitch TV smiles
@@ -224,7 +244,7 @@ class twThread(threading.Thread):
             log.warning("Unable to get twitch undocumented api badges, error {0}\n"
                         "Args: {1}".format(exc.message, exc.args))
 
-        return error
+        return True
 
 
 class twitch:
@@ -234,19 +254,8 @@ class twitch:
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
         conf_file = os.path.join(conf_folder, "twitch.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'chat'}},
-            {'config__gui': {
-                'for': 'config',
-                'hidden': 'host, port'}},
-            {'config': {
-                'bttv': 'true',
-                'channel': 'CzT1',
-                'host': 'irc.twitch.tv',
-                'port': '6667'}}
-        ]
-        config = self_heal(conf_file, conf_dict)
+
+        config = self_heal(conf_file, CONF_DICT)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}

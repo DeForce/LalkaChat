@@ -12,17 +12,27 @@ logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
+CONF_DICT = [
+            {'gui_information': {
+                'category': 'chat'}},
+            {'config__gui': {
+                'for': 'config',
+                'hidden': 'socket'}},
+            {'config': {
+                'channel_name': 'CHANGE_ME',
+                'socket': 'ws://funstream.tv/socket.io/'}}
+        ]
 
 
-class fsChat(WebSocketClient):
-    def __init__(self, ws, queue, nick, protocols=None, smiles=None):
-        super(self.__class__, self).__init__(ws, protocols=None)
+class FsChat(WebSocketClient):
+    def __init__(self, ws, queue, channel_name, protocols=None, smiles=None):
+        super(self.__class__, self).__init__(ws, protocols=protocols)
         # Received value setting.
         self.source = SOURCE
         self.queue = queue
-        self.nick = nick
+        self.channel_name = channel_name
 
-        self.channel_id = self.fsGetId()
+        self.channel_id = self.fs_get_id()
 
         self.smiles = smiles
         self.smile_regex = ':(\w+|\d+):'
@@ -30,7 +40,7 @@ class fsChat(WebSocketClient):
         # Because funstream API is fun, we have to iterate the
         #  requests in "proper" format:
         #
-        #			42Iterator["command",{"params":"param"}]
+        #  42Iterator["command",{"params":"param"}]
         # ex: 	420["/chat/join",{'channel':"stream/30000"}
         # ex: 	421["/chat/join",{'channel':"stream/30000"}
         # ex: 	429["/chat/join",{'channel':"stream/30000"}
@@ -51,7 +61,8 @@ class fsChat(WebSocketClient):
     def closed(self, code, reason=None):
         log.info("Websocket Connection Closed Down")
 
-    def allow_smile(self, smile, subscriptions):
+    @staticmethod
+    def allow_smile(smile, subscriptions):
         allow = False
 
         if smile['user']:
@@ -88,12 +99,12 @@ class fsChat(WebSocketClient):
                         # "Funstream" has some interesting infrastructure, so
                         #  we first need to find the channel ID from
                         #  nickname of streamer we need to connect to.
-                        self.fsJoin()
-                        self.fsPing()
+                        self.fs_join()
+                        self.fs_ping()
                     elif dict_item == 'id':
                         try:
                             self.duplicates.index(message[dict_item])
-                        except:
+                        except IndexError:
                             comp = {'source': self.source,
                                     'source_icon': SOURCE_ICON,
                                     'user': message['from']['name'],
@@ -101,7 +112,7 @@ class fsChat(WebSocketClient):
                                     'emotes': []}
                             if message['to'] is not None:
                                 comp['to'] = message['to']['name']
-                                if comp['to'] == self.nick:
+                                if comp['to'] == self.channel_name:
                                     comp['pm'] = True
                             else:
                                 comp['to'] = None
@@ -118,10 +129,10 @@ class fsChat(WebSocketClient):
                             if len(self.duplicates) > self.bufferForDup:
                                 self.duplicates.pop(0)
 
-    def fsGetId(self):
+    def fs_get_id(self):
         # We get ID from POST request to funstream API, and it hopefuly
         #  answers us the correct ID of the channel we need to connect to
-        payload = "{'id': null, 'name': \"" + self.nick + "\"}"
+        payload = "{'id': null, 'name': \"" + self.channel_name + "\"}"
         request = requests.post("http://funstream.tv/api/user", data=payload)
         if request.status_code == 200:
             channel_id = json.loads(re.findall('{.*}', request.text)[0])['id']
@@ -134,19 +145,20 @@ class fsChat(WebSocketClient):
             channel_id = None
         return channel_id
 
-    def fsJoin(self):
+    def fs_join(self):
         # Because we need to iterate each message we iterate it!
-        iter = "42"+str(self.iter)
+        iter_sio = "42"+str(self.iter)
         self.iter += 1
 
         # Then we send the message acording to needed format and
         #  hope it joins us
         if self.channel_id:
-            join = str(iter) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channel_id)}, sort_keys=False) + "]"
+            join = str(iter_sio) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channel_id)},
+                                                                    sort_keys=False) + "]"
             self.send(join)
             log.info("Joined channel {0}".format(self.channel_id))
 
-    def fsPing(self):
+    def fs_ping(self):
         # Because funstream is not your normal websocket they
         #  have own "ping/pong" algorithm, and WE have to send ping.
         #  Yes, I don't know why.
@@ -154,11 +166,11 @@ class fsChat(WebSocketClient):
         #  disconnect us. So we have to create separate thread for it.
         # Dont understand why server is not sending his own pings, it
         #  would be sooooo easier.
-        pingThr = pingThread(self)
-        pingThr.start()
+        ping_thread = FsPingThread(self)
+        ping_thread.start()
 
 
-class pingThread(threading.Thread):
+class FsPingThread(threading.Thread):
     def __init__(self, ws):
         threading.Thread.__init__(self)
         self.daemon = "True"
@@ -181,8 +193,8 @@ class pingThread(threading.Thread):
             time.sleep(30)
 
 
-class fsThread(threading.Thread):
-    def __init__(self, queue, socket, nick):
+class FsThread(threading.Thread):
+    def __init__(self, queue, socket, channel_name):
         threading.Thread.__init__(self)
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -190,7 +202,7 @@ class fsThread(threading.Thread):
         self.daemon = "True"
         self.queue = queue
         self.socket = socket
-        self.nick = nick
+        self.channel_name = channel_name
         self.smiles = []
 
     def run(self):
@@ -201,11 +213,11 @@ class fsThread(threading.Thread):
                 smiles_answer = smiles.json()
                 for smile in smiles_answer:
                     self.smiles.append(smile)
-        except:
+        except requests.ConnectionError:
             log.error("Unable to get smiles")
 
         # Connecting to funstream websocket
-        ws = fsChat(self.socket, self.queue, self.nick, protocols=['websocket'], smiles=self.smiles,)
+        ws = FsChat(self.socket, self.queue, self.channel_name, protocols=['websocket'], smiles=self.smiles)
         ws.connect()
         ws.run_forever()
 
@@ -217,29 +229,19 @@ class sc2tv:
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
         conf_file = os.path.join(conf_folder, "sc2tv.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'chat'}},
-            {'config__gui': {
-                'for': 'config',
-                'hidden': 'socket'}},
-            {'config': {
-                'nick': 'CzT',
-                'socket': 'ws://funstream.tv/socket.io/'}}
-        ]
-        config = self_heal(conf_file, conf_dict)
+        config = self_heal(conf_file, CONF_DICT)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
         # Checking config file for needed variables
         config_tag = 'config'
         socket = config.get(config_tag, 'socket')
-        nick = config.get(config_tag, 'nick')
+        channel_name = config.get(config_tag, 'channel_name')
 
         # If any of the value are non-existent then exit the programm with error.
-        if (socket is None) or (nick is None):
+        if (socket is None) or (channel_name is None):
             log.critical("Config for funstream is not correct!")
 
         # Creating new thread with queue in place for messaging tranfers
-        fs = fsThread(queue, socket, nick)
+        fs = FsThread(queue, socket, channel_name)
         fs.start()

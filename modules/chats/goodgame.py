@@ -12,11 +12,22 @@ logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('goodgame')
 SOURCE = 'gg'
 SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
+CONF_DICT = [
+            {'gui_information': {
+                'category': 'chat'}},
+            {'config__gui': {
+                'for': 'config',
+                'hidden': 'socket'}},
+            {'config': {
+                'channel_name': 'CHANGE_ME',
+                'socket': 'ws://chat.goodgame.ru:8081/chat/websocket'}}
+        ]
 
 
 class GoodgameMessageHandler(threading.Thread):
-    def __init__(self, queue, gg_queue, **kwargs):
+    def __init__(self, ws_class, queue, gg_queue, **kwargs):
         super(self.__class__, self).__init__()
+        self.ws_class = ws_class  # type: GGChat
         self.daemon = True
         self.message_queue = queue
         self.gg_queue = gg_queue
@@ -77,16 +88,21 @@ class GoodgameMessageHandler(threading.Thread):
             if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):
                 comp['pm'] = True
             self.message_queue.put(comp)
+        elif msg['type'] == 'error':
+            log.info("Received error message: {0}".format(msg))
+            if msg['data']['errorMsg'] == 'Invalid channel id':
+                self.ws_class.close(reason='INV_CH_ID')
+                log.error("Failed to find channel on GoodGame, please check channel name")
 
 
-class ggChat(WebSocketClient):
+class GGChat(WebSocketClient):
     def __init__(self, ws, protocols=None, queue=None, ch_id=None, nick=None, **kwargs):
         super(self.__class__, self).__init__(ws, protocols=protocols)
         # Received value setting.
         self.ch_id = ch_id
         self.gg_queue = Queue.Queue()
 
-        message_handler = GoodgameMessageHandler(queue, self.gg_queue, nick=nick, **kwargs)
+        message_handler = GoodgameMessageHandler(self, queue, self.gg_queue, nick=nick, **kwargs)
         message_handler.start()
 
     def opened(self):
@@ -99,7 +115,10 @@ class ggChat(WebSocketClient):
         
     def closed(self, code, reason=None):
         log.info("Connection Closed Down")
-        self.connect()
+        if 'INV_CH_ID' in reason:
+            pass
+        else:
+            self.connect()
         
     def received_message(self, mes):
         # Deserialize message to json for easier parsing
@@ -107,7 +126,7 @@ class ggChat(WebSocketClient):
         self.gg_queue.put(message)
 
 
-class ggThread(threading.Thread):
+class GGThread(threading.Thread):
     def __init__(self, queue, address, nick):
         threading.Thread.__init__(self)
         # Basic value setting.
@@ -121,7 +140,6 @@ class ggThread(threading.Thread):
         self.kwargs = {}
 
     def load_config(self):
-        error = False
         try:
             self.kwargs['smiles'] = {}
             smile_request = requests.get("http://api2.goodgame.ru/smiles")
@@ -155,12 +173,12 @@ class ggThread(threading.Thread):
         except Exception as exc:
             log.warning("Unable to get channel name, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
-        return error
+        return True
         
     def run(self):
-        if not self.load_config():
+        if self.load_config():
             # Connecting to goodgame websocket
-            ws = ggChat(self.address, protocols=['websocket'], queue=self.queue, ch_id=self.ch_id, nick=self.nick,
+            ws = GGChat(self.address, protocols=['websocket'], queue=self.queue, ch_id=self.ch_id, nick=self.nick,
                         **self.kwargs)
             ws.connect()
             ws.run_forever()
@@ -173,17 +191,7 @@ class goodgame:
 
         log.info("Initializing goodgame chat")
         conf_file = os.path.join(conf_folder, "goodgame.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'chat'}},
-            {'config__gui': {
-                'for': 'config',
-                'hidden': 'socket'}},
-            {'config': {
-                'channel_name': 'CzT',
-                'socket': 'ws://chat.goodgame.ru:8081/chat/websocket'}}
-        ]
-        config = self_heal(conf_file, conf_dict)
+        config = self_heal(conf_file, CONF_DICT)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                             'parser': config}
@@ -195,5 +203,5 @@ class goodgame:
         # ch_id
 
         # Creating new thread with queue in place for messaging transfers
-        gg = ggThread(queue, address, channel_name)
+        gg = GGThread(queue, address, channel_name)
         gg.start()

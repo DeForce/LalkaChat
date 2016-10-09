@@ -1,13 +1,13 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 import os
-import ConfigParser
 import threading
 import imp
 import operator
 import logging
 
 from modules.helpers.system import ModuleLoadException
+from modules.helpers.parser import self_heal
 
 log = logging.getLogger('messaging')
 MODULE_PRI_DEFAULT = '100'
@@ -23,18 +23,27 @@ class Message(threading.Thread):
         self.queue = queue
         self.module_tag = "modules.messaging"
 
-    def load_modules(self, config_dict):
+    def load_modules(self, config_dict, settings):
         log.info("Loading configuration file for messaging")
         modules_list = {}
 
         conf_file = os.path.join(config_dict['conf_folder'], "messaging.cfg")
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
-
+        conf_dict = [
+            {'gui_information': {
+                'category': 'main'}},
+            {'messaging__gui': {'check': 'modules/messaging',
+                                'check_type': 'files',
+                                'file_extension': False,
+                                'for': 'messaging',
+                                'view': 'choose_multiple'}},
+            {'messaging': {
+                'webchat': None}}
+        ]
+        config = self_heal(conf_file, conf_dict)
         modules_list['messaging_modules'] = {'folder': config_dict['conf_folder'], 'file': conf_file,
                                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                                              'parser': config}
 
-        config.read(conf_file)
         modules = {}
         # Loading modules from cfg.
         if config.items("messaging") > 0:
@@ -49,7 +58,8 @@ class Message(threading.Thread):
                 try:
                     tmp = imp.load_source(module, file_path)
                     class_init = getattr(tmp, module)
-                    class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'])
+                    class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'],
+                                              main_settings=settings)
 
                     if 'id' in class_module.conf_params:
                         priority = class_module.conf_params['id']
