@@ -14,16 +14,17 @@ from modules.helpers.system import load_translations_keys
 
 
 if hasattr(sys, 'frozen'):
-    python_folder = os.path.dirname(sys.executable)
+    PYTHON_FOLDER = os.path.dirname(sys.executable)
 else:
-    python_folder = os.path.dirname(os.path.abspath('__file__'))
-TRANSLATION_FOLDER = os.path.join(python_folder, "translations")
-CONF_FOLDER = os.path.join(python_folder, "conf")
-MODULE_FOLDER = os.path.join(python_folder, "modules")
+    PYTHON_FOLDER = os.path.dirname(os.path.abspath('__file__'))
+TRANSLATION_FOLDER = os.path.join(PYTHON_FOLDER, "translations")
+CONF_FOLDER = os.path.join(PYTHON_FOLDER, "conf")
+MODULE_FOLDER = os.path.join(PYTHON_FOLDER, "modules")
 MAIN_CONF_FILE = os.path.join(CONF_FOLDER, "config.cfg")
+HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 GUI_TAG = 'gui'
 
-LOG_FOLDER = os.path.join(python_folder, "logs")
+LOG_FOLDER = os.path.join(PYTHON_FOLDER, "logs")
 LOG_FILE = os.path.join(LOG_FOLDER, 'chat_log.log')
 LOG_FORMAT = logging.Formatter("%(asctime)s [%(name)s] [%(levelname)s]  %(message)s")
 
@@ -46,7 +47,7 @@ def init():
     gui_settings = {}
 
     # Creating dict with folder settings
-    main_config = {'root_folder': python_folder,
+    main_config = {'root_folder': PYTHON_FOLDER,
                    'conf_folder': CONF_FOLDER,
                    'main_conf_file': MAIN_CONF_FILE,
                    'main_conf_file_loc': MAIN_CONF_FILE,
@@ -68,21 +69,27 @@ def init():
 
     logger.info("Loading basic configuration")
     main_config_dict = [
-            {'gui_information': {
-                'category': 'main'}},
-            {'language__gui': {
-                'for': 'language',
-                'view': 'choose_single',
-                'check_type': 'dir',
-                'check': 'translations'
-            }},
-            {'gui': {
-                'show_hidden': True,
-                'gui': True,
-                'on_top': True,
-                'reload': None
-            }},
-            {'language': 'english'}
+        {'gui_information': {
+            'category': 'main'}},
+        {'language__gui': {
+            'for': 'language',
+            'view': 'choose_single',
+            'check_type': 'dir',
+            'check': 'translations'
+        }},
+        {'gui': {
+            'show_hidden': True,
+            'gui': True,
+            'on_top': True,
+            'reload': None
+        }},
+        {'style__gui': {
+            'check': 'http',
+            'check_type': 'dir',
+            'for': 'style',
+            'view': 'choose_single'}},
+        {'style': 'czt'},
+        {'language': 'en'}
     ]
     config = self_heal(MAIN_CONF_FILE, main_config_dict)
     # Adding config for main module
@@ -97,6 +104,18 @@ def init():
     gui_settings['on_top'] = config.get(GUI_TAG, 'gui')
     gui_settings['language'],  null_element = config.items('language')[0]
     gui_settings['show_hidden'] = config.get(GUI_TAG, 'show_hidden')
+    # Fallback if style folder not found
+    fallback_style = 'czt'
+    if len(config.items('style')) > 0:
+        style, null_element = config.items('style')[0]
+        path = os.path.abspath(os.path.join(HTTP_FOLDER, style))
+        if os.path.exists(path):
+            gui_settings['style'] = style
+        else:
+            gui_settings['style'] = fallback_style
+    else:
+        gui_settings['style'] = fallback_style
+    loaded_modules['config']['http_folder'] = os.path.join(HTTP_FOLDER, gui_settings['style'])
 
     logger.info("Loading Messaging Handler")
     logger.info("Loading Queue for message handling")
@@ -105,7 +124,7 @@ def init():
     queue = Queue.Queue()
     # Loading module for message processing...
     msg = messaging.Message(queue)
-    loaded_modules.update(msg.load_modules(main_config))
+    loaded_modules.update(msg.load_modules(main_config, loaded_modules['config']))
     msg.start()
 
     logger.info("Loading Chats")
@@ -142,7 +161,7 @@ def init():
 
             tmp = imp.load_source(module, module_location)
             chat_init = getattr(tmp, module)
-            class_module = chat_init(queue, python_folder)
+            class_module = chat_init(queue, PYTHON_FOLDER)
             loaded_modules[module] = class_module.conf_params
             loaded_modules[module]['class'] = class_module
         else:

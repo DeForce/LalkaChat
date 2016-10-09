@@ -128,7 +128,7 @@ class SocketThread(threading.Thread):
         cherrypy.tools.websocket = WebSocketTool()
 
     def run(self):
-        http_folder = os.path.join(self.root_folder, '..', 'http', self.style)
+        http_folder = self.style
         cherrypy.log.access_file = ''
         cherrypy.log.error_file = ''
         cherrypy.log.screen = False
@@ -150,22 +150,15 @@ class SocketThread(threading.Thread):
 
 class webchat():
     def __init__(self, conf_folder, **kwargs):
+        main_settings = kwargs.get('main_settings')
         conf_file = os.path.join(conf_folder, "webchat.cfg")
         conf_dict = [
             {'gui_information': {
                 'category': 'main',
                 'id': DEFAULT_PRIORITY}},
-            {'style__gui': {
-                'check': 'http',
-                'check_type': 'dir',
-                'for': 'style',
-                'view': 'choose_single'}},
-            {'style': 'czt'},
             {'server': {
                 'host': '127.0.0.1',
                 'port': '8080'}}]
-        root_folder = kwargs.get('root_folder')
-        http_folder = 'http'
 
         config = self_heal(conf_file, conf_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
@@ -176,16 +169,7 @@ class webchat():
         tag_server = 'server'
         host = config.get(tag_server, 'host')
         port = config.get(tag_server, 'port')
-
-        # Fallback if style folder not found
-        fallback_style = 'czt'
-        if len(config.items('style')) > 0:
-            style, null_element = config.items('style')[0]
-            path = os.path.abspath(os.path.join(root_folder, http_folder, style))
-            if not os.path.exists(path):
-                style = fallback_style
-        else:
-            style = fallback_style
+        style = main_settings['http_folder']
 
         self.conf_params['port'] = port
 

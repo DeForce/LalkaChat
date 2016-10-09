@@ -11,13 +11,6 @@ from modules.helpers.parser import self_heal
 from modules.helpers.system import system_message, ModuleLoadException
 
 logger = logging.getLogger('levels')
-TEMPLATE = """<?xml version="1.0" encoding="utf-8" ?>
-<levels>
-{% for name, url in levels -%}
-  <level name="{{ name }}" url="{{ url }}" />
-{% endfor -%}
-</levels>
-"""
 
 
 class levels:
@@ -34,23 +27,17 @@ class levels:
 
     def __init__(self, conf_folder, **kwargs):
         # Creating filter and replace strings.
+        main_settings = kwargs.get('main_settings')
+
         conf_file = os.path.join(conf_folder, "levels.cfg")
         conf_dict = [
             {'gui_information': {
                 'category': u'messaging'}},
             {'config': {
                 'message': u'{0} has leveled up, now he is {1}',
-                'file': u'conf/levels.xml',
                 'db': u'levels.db',
                 'experience': u'geometrical',
                 'exp_for_level': 200}}
-        ]
-        levels_dict = [
-            ("Ghost", "img/levels/default/0.png"),
-            ("Baby", "img/levels/default/1.png"),
-            ("Child", "img/levels/default/2.png"),
-            ("Mystical Person", "img/levels/default/3.png"),
-            ("King", "img/levels/default/4.png"),
         ]
         config = self_heal(conf_file, conf_dict)
 
@@ -63,7 +50,7 @@ class levels:
         self.experience = config.get(tag_config, 'experience')
         self.exp_for_level = int(config.get(tag_config, 'exp_for_level'))
         self.exp_for_message = 1
-        self.filename = os.path.abspath(config.get(tag_config, 'file'))
+        self.filename = os.path.abspath(os.path.join(main_settings['http_folder'], 'levels.xml'))
         self.levels = []
         self.special_levels = {}
         self.db_location = os.path.join(conf_folder, config.get(tag_config, 'db'))
@@ -72,10 +59,7 @@ class levels:
         # Load levels
         if not os.path.exists(self.filename):
             logger.error("{0} not found, generating from template".format(self.filename))
-            if not os.path.exists(os.path.dirname(self.filename)):
-                os.makedirs(os.path.dirname(self.filename))
-            with open(self.filename, 'w') as levels_file:
-                levels_file.write(jinja2.Template(TEMPLATE).render(levels=levels_dict))
+            raise ModuleLoadException("{0} not found, generating from template".format(self.filename))
 
         if self.experience == 'random':
             self.db_location += '.random'
