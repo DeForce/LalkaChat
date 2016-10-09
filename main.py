@@ -25,6 +25,8 @@ HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 GUI_TAG = 'gui'
 
 LOG_FOLDER = os.path.join(PYTHON_FOLDER, "logs")
+if not os.path.exists(LOG_FOLDER):
+    os.makedirs(LOG_FOLDER)
 LOG_FILE = os.path.join(LOG_FOLDER, 'chat_log.log')
 LOG_FORMAT = logging.Formatter("%(asctime)s [%(name)s] [%(levelname)s]  %(message)s")
 
