@@ -8,10 +8,12 @@ from cherrypy.lib.static import serve_file
 from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
 
+DEFAULT_PRIORITY = 9001
 s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
+log = logging.getLogger('webchat')
 
 
 class MessagingThread(threading.Thread):
@@ -93,12 +95,16 @@ class WebChatPlugin(WebSocketPlugin):
 
 
 class HttpRoot(object):
+    def __init__(self, http_folder):
+        object.__init__(self)
+        self.http_folder = http_folder
+
     @cherrypy.expose
     def index(self):
         cherrypy.response.headers["Expires"] = -1
         cherrypy.response.headers["Pragma"] = "no-cache"
         cherrypy.response.headers["Cache-Control"] = "private, max-age=0, no-cache, no-store, must-revalidate"
-        return serve_file(os.path.join(os.getcwd(), 'http', 'index.html'), 'text/html')
+        return serve_file(os.path.join(self.http_folder, 'index.html'), 'text/html')
 
     @cherrypy.expose
     def ws(self):
@@ -113,6 +119,7 @@ class SocketThread(threading.Thread):
         self.host = host
         self.port = port
         self.root_folder = root_folder
+        self.style = kwargs.pop('style')
 
         cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host,
                                 'engine.autoreload.on': False
@@ -121,7 +128,7 @@ class SocketThread(threading.Thread):
         cherrypy.tools.websocket = WebSocketTool()
 
     def run(self):
-        http_folder = os.path.join(self.root_folder, '..', 'http')
+        http_folder = self.style
         cherrypy.log.access_file = ''
         cherrypy.log.error_file = ''
         cherrypy.log.screen = False
@@ -130,41 +137,43 @@ class SocketThread(threading.Thread):
         cherrypy.log.access_log.propagate = False
         cherrypy.log.error_log.setLevel(logging.ERROR)
 
-        cherrypy.quickstart(HttpRoot(), '/', config={'/ws': {'tools.websocket.on': True,
-                                                             'tools.websocket.handler_cls': WebChatSocketServer},
-                                                     '/js': {'tools.staticdir.on': True,
-                                                             'tools.staticdir.dir': os.path.join(http_folder, 'js')},
-                                                     '/css': {'tools.staticdir.on': True,
-                                                              'tools.staticdir.dir': os.path.join(http_folder, 'css')},
-                                                     '/img': {'tools.staticdir.on': True,
-                                                              'tools.staticdir.dir': os.path.join(http_folder, 'img')}})
+        cherrypy.quickstart(HttpRoot(http_folder), '/',
+                            config={'/ws': {'tools.websocket.on': True,
+                                            'tools.websocket.handler_cls': WebChatSocketServer},
+                                    '/js': {'tools.staticdir.on': True,
+                                            'tools.staticdir.dir': os.path.join(http_folder, 'js')},
+                                    '/css': {'tools.staticdir.on': True,
+                                             'tools.staticdir.dir': os.path.join(http_folder, 'css')},
+                                    '/img': {'tools.staticdir.on': True,
+                                             'tools.staticdir.dir': os.path.join(http_folder, 'img')}})
 
 
 class webchat():
-    def __init__(self, conf_folder):
+    def __init__(self, conf_folder, **kwargs):
+        main_settings = kwargs.get('main_settings')
         conf_file = os.path.join(conf_folder, "webchat.cfg")
+        conf_dict = [
+            {'gui_information': {
+                'category': 'main',
+                'id': DEFAULT_PRIORITY}},
+            {'server': {
+                'host': '127.0.0.1',
+                'port': '8080'}}]
 
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('server')
-            config.set('server', 'host', '127.0.0.1')
-            config.set('server', 'port', '8080')
-
-            config.write(open(conf_file, 'w'))
-
+        config = self_heal(conf_file, conf_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
-
-        config.read(conf_file)
+                            'parser': config,
+                            'id': config.get('gui_information', 'id')}
 
         tag_server = 'server'
-        self.host = config.get_or_default(tag_server, 'host', '127.0.0.1')
-        self.port = config.get_or_default(tag_server, 'port', '8080')
+        host = config.get(tag_server, 'host')
+        port = config.get(tag_server, 'port')
+        style = main_settings['http_folder']
 
-        self.conf_params['port'] = self.port
+        self.conf_params['port'] = port
 
-        s_thread = SocketThread(self.host, self.port, conf_folder)
+        s_thread = SocketThread(host, port, conf_folder, style=style)
         s_thread.start()
 
         m_thread = MessagingThread()

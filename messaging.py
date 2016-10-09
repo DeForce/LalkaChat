@@ -1,14 +1,16 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 import os
-import ConfigParser
 import threading
 import imp
-import codecs
-import sys
+import operator
 import logging
 
+from modules.helpers.system import ModuleLoadException
+from modules.helpers.parser import self_heal
+
 log = logging.getLogger('messaging')
+MODULE_PRI_DEFAULT = '100'
 
 
 class Message(threading.Thread):
@@ -21,29 +23,62 @@ class Message(threading.Thread):
         self.queue = queue
         self.module_tag = "modules.messaging"
 
-    def load_modules(self, config_dict):
+    def load_modules(self, config_dict, settings):
         log.info("Loading configuration file for messaging")
         modules_list = {}
 
         conf_file = os.path.join(config_dict['conf_folder'], "messaging.cfg")
-        config = ConfigParser.RawConfigParser(allow_no_value=True)
-        config.read(conf_file)
-        # Dynamically loading the modules from cfg.
+        conf_dict = [
+            {'gui_information': {
+                'category': 'main'}},
+            {'messaging__gui': {'check': 'modules/messaging',
+                                'check_type': 'files',
+                                'file_extension': False,
+                                'for': 'messaging',
+                                'view': 'choose_multiple'}},
+            {'messaging': {
+                'webchat': None}}
+        ]
+        config = self_heal(conf_file, conf_dict)
+        modules_list['messaging_modules'] = {'folder': config_dict['conf_folder'], 'file': conf_file,
+                                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                                             'parser': config}
+
+        modules = {}
+        # Loading modules from cfg.
         if config.items("messaging") > 0:
-            for module in config.items("messaging"):
-                log.info("Loading %s" % module[0])
+            for module, item in config.items("messaging"):
+                log.info("Loading %s" % module)
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
                 #  same name as module name
-                join_path = [config_dict['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(module[0])]
+                join_path = [config_dict['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(module)]
                 file_path = os.path.join(*join_path)
 
-                tmp = imp.load_source(module[0], file_path)
-                class_init = getattr(tmp, module[0])
-                class_module = class_init(config_dict['conf_folder'])
-                self.modules.append(class_module)
-                modules_list[module[0]] = class_module.conf_params
-                modules_list[module[0]]['class'] = class_module
+                try:
+                    tmp = imp.load_source(module, file_path)
+                    class_init = getattr(tmp, module)
+                    class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'],
+                                              main_settings=settings)
+
+                    if 'id' in class_module.conf_params:
+                        priority = class_module.conf_params['id']
+                    else:
+                        priority = MODULE_PRI_DEFAULT
+
+                    if int(priority) in modules:
+                        modules[int(priority)].append(class_module)
+                    else:
+                        modules[int(priority)] = [class_module]
+
+                    modules_list[module] = class_module.conf_params
+                    modules_list[module]['class'] = class_module
+                except ModuleLoadException as exc:
+                    log.error("Unable to load module {0}".format(module))
+        sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
+        for sorted_priority, sorted_list in sorted_module:
+            for sorted_list_item in sorted_list:
+                self.modules.append(sorted_list_item)
         return modules_list
 
     def msg_process(self, message):
@@ -59,10 +94,6 @@ class Message(threading.Thread):
 
         for module in self.modules:
             message = module.get_message(message, self.queue)
-            try:
-                pass
-            except Exception as exc:
-                log.error(exc)
 
     def run(self):
         while True:
