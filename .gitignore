@@ -1,2 +1,10 @@
 *.pyc
 .idea/*
+/logs
+levels.db*
+/build
+/dist
+/libs
+/conf
+*.spec
+*.log

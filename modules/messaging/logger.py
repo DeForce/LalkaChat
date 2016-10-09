@@ -2,32 +2,37 @@
 # -*- coding: utf-8 -*-
 import os
 import datetime
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
+
+DEFAULT_PRIORITY = 20
 
 
 class logger():
-    def __init__(self, conf_folder):
+    def __init__(self, conf_folder, **kwargs):
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "logger.cfg")
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('config')
-            config.set('config', 'logging', 'true')
-            config.set('config', 'rotation', 'daily')
-            config.set('config', 'file_format', '%Y-%m-%d')
-            config.set('config', 'message_date_format', '%Y-%m-%d %H:%M:%S')
-            config.write(open(conf_file, 'w'))
+        conf_dict = [
+            {'gui_information': {
+                'category': u'messaging',
+                'id': DEFAULT_PRIORITY}},
+            {'config': {
+                'file_format': u'%Y-%m-%d',
+                'logging': u'true',
+                'message_date_format': u'%Y-%m-%d %H:%M:%S',
+                'rotation': u'daily'}}
+        ]
+        config = self_heal(conf_file, conf_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+                            'parser': config,
+                            'id': config.get('gui_information', 'id')}
 
-        config.read(conf_file)
         tag_config = 'config'
 
-        self.format = config.get_or_default(tag_config, 'file_format', '%Y-%m-%d')
-        self.ts_format = config.get_or_default(tag_config, 'message_date_format', '%Y-%m-%d %H:%M')
-        self.logging = config.get_or_default(tag_config, 'logging', True)
-        self.rotation = config.get_or_default(tag_config, 'logging', 'daily')
+        self.format = config.get(tag_config, 'file_format')
+        self.ts_format = config.get(tag_config, 'message_date_format')
+        self.logging = config.get(tag_config, 'logging')
+        self.rotation = config.get(tag_config, 'logging')
 
         self.folder = 'logs'
 

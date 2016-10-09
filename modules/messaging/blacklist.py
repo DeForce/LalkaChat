@@ -2,46 +2,45 @@
 # -*- coding: utf-8 -*-
 import re
 import os
-from modules.helpers.parser import FlagConfigParser
+from modules.helpers.parser import self_heal
+
+DEFAULT_PRIORITY = 30
 
 
 class blacklist:
     users = {}
     words = {}
 
-    def __init__(self, conf_folder):
+    def __init__(self, conf_folder, **kwargs):
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "blacklist.cfg")
+        config_dict = [
+            {'gui_information': {
+                'category': 'messaging',
+                'id': DEFAULT_PRIORITY}},
+            {'main': {
+                'message': u'ignored message'}},
+            {'users__gui': {
+                'for': 'users_hide, users_block',
+                'view': 'list',
+                'addable': 'true'}},
+            {'users_hide': {}},
+            {'users_block': {
+                'announce': None}},
+            {'words__gui': {
+                'for': 'words_hide, words_block',
+                'addable': True,
+                'view': 'list'}}
+        ]
 
-        config = FlagConfigParser(allow_no_value=True)
-        if not os.path.exists(conf_file):
-            config.add_section('main')
-            config.set('main', 'message', 'Trying to say something but has a trout in his mouth')
-            config.add_section('users_gui')
-            config.set('users_gui', 'for', 'users_hide, users_block')
-            config.set('users_gui', 'view', 'list')
-            config.set('users_gui', 'addable', 'true')
-
-            config.add_section('users_hide')
-            config.add_section('users_block')
-
-            config.add_section('words_gui')
-            config.set('words_gui', 'for', 'users_hide, users_block')
-            config.set('words_gui', 'view', 'list')
-            config.set('words_gui', 'addable', 'true')
-
-            config.add_section('words_hide')
-            config.add_section('words_block')
-            config.write(open(conf_file, 'w'))
-
+        config = self_heal(conf_file, config_dict)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+                            'parser': config,
+                            'id': config.get('gui_information', 'id')}
 
-        config.read(conf_file)
-        sections = config._sections
-        for item in sections:
-            for param, value in config.get_items(item):
+        for item in config.sections():
+            for param, value in config.items(item):
                 if item == 'main':
                     if param == 'message':
                         self.message = value.decode('utf-8')
@@ -55,20 +54,18 @@ class blacklist:
                     self.words[param] = 'b'
 
     def get_message(self, message, queue):
-        if message is None:
-            return
-        else:
+        if message:
             user = self.process_user(message)
             # True = Hide, False = Del, None = Do Nothing
             if user:
                 message['text'] = self.message
-            elif user == False:
+            elif user is False:
                 return
 
             words = self.process_message(message)
             if words:
                 message['text'] = self.message
-            elif words == False:
+            elif words is False:
                 return
 
             return message
