@@ -85,7 +85,7 @@ class levels:
         lvl_xml = tree.getroot()
 
         for level_data in lvl_xml:
-            level_count = float(len(self.levels))
+            level_count = float(len(self.levels) + 1)
             if 'nick' in level_data.attrib:
                 self.special_levels[level_data.attrib['nick']] = level_data.attrib
             else:
