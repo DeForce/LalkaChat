@@ -122,6 +122,8 @@ class SettingsWindow(wx.Frame):
 
         wx.Frame.__init__(self, *args, **kwargs)
 
+        self.settings_saved = True
+
         # Setting up the window
         self.SetBackgroundColour('cream')
         self.show_hidden = self.main_class.gui_settings.get('show_hidden')
@@ -153,22 +155,27 @@ class SettingsWindow(wx.Frame):
             event.StopPropagation()
 
     def on_close_save(self, event):
-        dialog = wx.MessageDialog(self, message="Are you sure you want to quit?\n"
-                                                "Warning, your settings will not be saved.",
-                                  caption="Caption",
-                                  style=wx.YES_NO,
-                                  pos=wx.DefaultPosition)
-        response = dialog.ShowModal()
+        if not self.settings_saved:
+            dialog = wx.MessageDialog(self, message="Are you sure you want to quit?\n"
+                                                    "Warning, your settings will not be saved.",
+                                      caption="Caption",
+                                      style=wx.YES_NO,
+                                      pos=wx.DefaultPosition)
+            response = dialog.ShowModal()
 
-        if response == wx.ID_YES:
-            self.on_exit(event)
+            if response == wx.ID_YES:
+                self.on_exit(event)
+            else:
+                event.StopPropagation()
         else:
-            event.StopPropagation()
+            self.on_exit(event)
 
     def create_layout(self):
         self.main_grid = wx.BoxSizer(wx.VERTICAL)
         style = wx.NB_TOP
-        self.notebook = wx.Notebook(self, id=wx.ID_ANY, style=style)
+        notebook_id = id_renew('settings.notebook', update=True)
+        self.notebook = wx.Notebook(self, id=notebook_id, style=style)
+        self.notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.notebook_changed, id=notebook_id)
         self.main_grid.Add(self.notebook, 1, wx.EXPAND)
         self.SetSizer(self.main_grid)
         self.Show(True)
@@ -181,6 +188,7 @@ class SettingsWindow(wx.Frame):
 
     def fill_notebook_with_modules(self, category_list, setting_category):
         page_list = []
+        self.settings_saved = False
         for category_dict in category_list:
             category_item, category_config = category_dict.iteritems().next()
             translated_item = translate_key(category_item)
@@ -427,8 +435,13 @@ class SettingsWindow(wx.Frame):
             self.list_operation(MODULE_KEY.join(keys[:-1]), action=keys[-1])
         elif keys[-1] == 'apply_button':
             self.save_settings(MODULE_KEY.join(keys[1:-1]))
+            self.settings_saved = True
         elif keys[-1] == 'cancel_button':
             self.on_close(event)
+        event.Skip()
+
+    def notebook_changed(self, event):
+        self.settings_saved = False
         event.Skip()
 
     def save_settings(self, module):
