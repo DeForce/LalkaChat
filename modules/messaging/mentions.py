@@ -12,7 +12,6 @@ class mentions():
         conf_dict = [
             {'gui_information': {
                 'category': 'messaging'}},
-            {'config': {}},
             {'config__gui': {
                 'addable': 'true',
                 'for': 'mentions, address',

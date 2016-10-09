@@ -10,6 +10,34 @@ import sys
 import logging
 import logging.config
 from modules.helpers.parser import self_heal
+from modules.helpers.system import load_translations_keys
+
+
+if hasattr(sys, 'frozen'):
+    python_folder = os.path.dirname(sys.executable)
+else:
+    python_folder = os.path.dirname(os.path.abspath('__file__'))
+TRANSLATION_FOLDER = os.path.join(python_folder, "translations")
+CONF_FOLDER = os.path.join(python_folder, "conf")
+MODULE_FOLDER = os.path.join(python_folder, "modules")
+MAIN_CONF_FILE = os.path.join(CONF_FOLDER, "config.cfg")
+GUI_TAG = 'gui'
+
+LOG_FOLDER = os.path.join(python_folder, "logs")
+LOG_FILE = os.path.join(LOG_FOLDER, 'chat_log.log')
+LOG_FORMAT = logging.Formatter("%(asctime)s [%(name)s] [%(levelname)s]  %(message)s")
+
+root_logger = logging.getLogger()
+root_logger.setLevel(level=logging.INFO)
+file_handler = logging.FileHandler(LOG_FILE)
+file_handler.setFormatter(LOG_FORMAT)
+root_logger.addHandler(file_handler)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(LOG_FORMAT)
+root_logger.addHandler(console_handler)
+
+logger = logging.getLogger('main')
 
 
 def init():
@@ -17,42 +45,25 @@ def init():
     loaded_modules = {}
     gui_settings = {}
 
-    # Setting folder settings
-    if hasattr(sys, 'frozen'):
-        python_folder = os.path.dirname(sys.executable)
-    else:
-        python_folder = os.path.dirname(os.path.abspath('__file__'))
-    conf_folder = os.path.join(python_folder, "conf")
-    module_folder = os.path.join(python_folder, "modules")
-    main_conf_file = os.path.join(conf_folder, "config.cfg")
-    log_folder = os.path.join(python_folder, "logs")
-    gui_tag = 'gui'
-
-    # Set up logging
-    log_file = os.path.join(log_folder, 'chat_log.log')
-    # debug level
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('main')
-
     # Creating dict with folder settings
     main_config = {'root_folder': python_folder,
-                   'conf_folder': conf_folder,
-                   'main_conf_file': main_conf_file,
-                   'main_conf_file_loc': main_conf_file,
-                   'main_conf_file_name': ''.join(os.path.basename(main_conf_file).split('.')[:-1])}
+                   'conf_folder': CONF_FOLDER,
+                   'main_conf_file': MAIN_CONF_FILE,
+                   'main_conf_file_loc': MAIN_CONF_FILE,
+                   'main_conf_file_name': ''.join(os.path.basename(MAIN_CONF_FILE).split('.')[:-1])}
 
-    if not os.path.isdir(module_folder):
+    if not os.path.isdir(MODULE_FOLDER):
         logging.error("Was not able to find modules folder, check you installation")
         exit()
 
     # Trying to load config file.
     # Create folder if doesn't exist
-    if not os.path.isdir(conf_folder):
-        logger.error("Could not find {0} folder".format(conf_folder))
+    if not os.path.isdir(CONF_FOLDER):
+        logger.error("Could not find {0} folder".format(CONF_FOLDER))
         try:
-            os.mkdir(conf_folder)
+            os.mkdir(CONF_FOLDER)
         except:
-            logger.error("Was unable to create {0} folder.".format(conf_folder))
+            logger.error("Was unable to create {0} folder.".format(CONF_FOLDER))
             exit()
 
     logger.info("Loading basic configuration")
@@ -62,8 +73,8 @@ def init():
             {'language__gui': {
                 'for': 'language',
                 'view': 'choose_single',
-                'check_type': 'sections',
-                'check': 'conf/translations.cfg'
+                'check_type': 'dir',
+                'check': 'translations'
             }},
             {'gui': {
                 'show_hidden': True,
@@ -73,19 +84,19 @@ def init():
             }},
             {'language': 'english'}
     ]
-    config = self_heal(main_conf_file, main_config_dict)
+    config = self_heal(MAIN_CONF_FILE, main_config_dict)
     # Adding config for main module
-    loaded_modules['config'] = {'folder': conf_folder,
+    loaded_modules['config'] = {'folder': CONF_FOLDER,
                                 'file': main_config['main_conf_file_loc'],
                                 'filename': main_config['main_conf_file_name'],
                                 'parser': config,
                                 'root_folder': main_config['root_folder'],
-                                'logs_folder': log_folder}
+                                'logs_folder': LOG_FOLDER}
 
-    gui_settings['gui'] = config.get(gui_tag, 'gui')
-    gui_settings['on_top'] = config.get(gui_tag, 'gui')
+    gui_settings['gui'] = config.get(GUI_TAG, 'gui')
+    gui_settings['on_top'] = config.get(GUI_TAG, 'gui')
     gui_settings['language'],  null_element = config.items('language')[0]
-    gui_settings['show_hidden'] = config.get(gui_tag, 'show_hidden')
+    gui_settings['show_hidden'] = config.get(GUI_TAG, 'show_hidden')
 
     logger.info("Loading Messaging Handler")
     logger.info("Loading Queue for message handling")
@@ -99,9 +110,9 @@ def init():
 
     logger.info("Loading Chats")
     # Trying to dynamically load chats that are in config file.
-    chat_modules = os.path.join(conf_folder, "chat_modules.cfg")
+    chat_modules = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_tag = "chats"
-    chat_location = os.path.join(module_folder, "chats")
+    chat_location = os.path.join(MODULE_FOLDER, "chats")
     chat_conf_dict = [
         {'gui_information': {
             'category': 'main'}},
@@ -115,7 +126,7 @@ def init():
     ]
 
     chat_config = self_heal(chat_modules, chat_conf_dict)
-    loaded_modules['chat_modules'] = {'folder': conf_folder, 'file': chat_modules,
+    loaded_modules['chat_modules'] = {'folder': CONF_FOLDER, 'file': chat_modules,
                                       'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
                                       'parser': chat_config}
 
@@ -136,6 +147,11 @@ def init():
             loaded_modules[module]['class'] = class_module
         else:
             logger.error("Unable to find {0} module")
+    try:
+        load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
+    except:
+        logger.exception("Failed loading translations")
+
     if gui_settings['gui']:
         logger.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,

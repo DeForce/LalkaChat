@@ -19,7 +19,7 @@ class blacklist:
                 'category': 'messaging',
                 'id': DEFAULT_PRIORITY}},
             {'main': {
-                'message': u'message ignored'}},
+                'message': u'ignored message'}},
             {'users__gui': {
                 'for': 'users_hide, users_block',
                 'view': 'list',
