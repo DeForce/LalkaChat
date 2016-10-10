@@ -61,6 +61,8 @@ def check_duplicate(item, window):
 def create_categories(loaded_modules):
     cat_dict = {}
     for module_name, module_config in loaded_modules.items():
+        if 'parser' not in module_config:
+            continue
         parser = module_config['parser']  # type: ConfigParser
         if parser.has_section(INFORMATION_TAG) and parser.has_option(INFORMATION_TAG, 'category'):
             tag = parser.get(INFORMATION_TAG, 'category')
