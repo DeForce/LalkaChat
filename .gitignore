@@ -8,3 +8,4 @@ levels.db*
 /conf
 *.spec
 *.log
+govno_rutony.py

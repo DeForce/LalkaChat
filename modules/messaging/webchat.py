@@ -9,6 +9,7 @@ from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from modules.helpers.parser import self_heal
+from modules.helpers.system import THREADS
 
 DEFAULT_PRIORITY = 9001
 s_queue = Queue.Queue()
@@ -24,8 +25,8 @@ class MessagingThread(threading.Thread):
     def run(self):
         while True:
             message = s_queue.get()
-            cherrypy.engine.publish('add-history', message)
             cherrypy.engine.publish('websocket-broadcast', json.dumps(message))
+            cherrypy.engine.publish('add-history', message)
 
 
 class FireFirstMessages(threading.Thread):
@@ -86,6 +87,7 @@ class WebChatPlugin(WebSocketPlugin):
             pass
 
     def add_history(self, message):
+        message['history'] = True
         self.history.append(message)
         if len(self.history) > self.history_size:
             self.history.pop(0)
@@ -176,8 +178,10 @@ class webchat():
         s_thread = SocketThread(host, port, conf_folder, style=style)
         s_thread.start()
 
-        m_thread = MessagingThread()
-        m_thread.start()
+        self.message_threads = []
+        for thread in range(THREADS+5):
+            self.message_threads.append(MessagingThread())
+            self.message_threads[thread].start()
 
     def get_message(self, message, queue):
         if message:

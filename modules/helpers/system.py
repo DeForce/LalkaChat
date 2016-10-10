@@ -4,6 +4,8 @@ import os
 
 log = logging.getLogger('system')
 
+THREADS = 2
+
 SOURCE = 'sy'
 SOURCE_USER = 'System'
 SOURCE_ICON = '/img/sources/lalka_cup.png'

@@ -6,11 +6,22 @@ import imp
 import operator
 import logging
 
-from modules.helpers.system import ModuleLoadException
+from modules.helpers.system import ModuleLoadException, THREADS
 from modules.helpers.parser import self_heal
 
 log = logging.getLogger('messaging')
 MODULE_PRI_DEFAULT = '100'
+
+
+class MessageHandler(threading.Thread):
+    def __init__(self, queue, process):
+        self.queue = queue
+        self.process = process
+        threading.Thread.__init__(self)
+
+    def run(self):
+        while True:
+            self.process(self.queue.get())
 
 
 class Message(threading.Thread):
@@ -22,6 +33,7 @@ class Message(threading.Thread):
         self.msg_counter = 0
         self.queue = queue
         self.module_tag = "modules.messaging"
+        self.threads = []
 
     def load_modules(self, config_dict, settings):
         log.info("Loading configuration file for messaging")
@@ -96,5 +108,7 @@ class Message(threading.Thread):
             message = module.get_message(message, self.queue)
 
     def run(self):
-        while True:
-            self.msg_process(self.queue.get())
+        for thread in range(THREADS):
+            self.threads.append(MessageHandler(self.queue, self.msg_process))
+            self.threads[thread].start()
+
