@@ -3,10 +3,12 @@
 import os
 import re
 from modules.helpers.parser import self_heal
+from modules.helpers.modules import MessagingModule
 
 
-class mentions():
+class mentions(MessagingModule):
     def __init__(self, conf_folder, **kwargs):
+        MessagingModule.__init__(self)
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "mentions.cfg")
         conf_dict = [
@@ -20,9 +22,9 @@ class mentions():
             {'address': {}}
         ]
         config = self_heal(conf_file, conf_dict)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config}
         mention_tag = 'mentions'
         address_tag = 'address'
         if config.has_section(mention_tag):
@@ -35,12 +37,12 @@ class mentions():
         else:
             self.addresses = []
 
-    def get_message(self, message, queue):
+    def process_message(self, message, queue, **kwargs):
         # Replacing the message if needed.
         # Please do the needful
-        if message is None:
-            return
-        else:
+        if message:
+            if 'command' in message:
+                return message
             for mention in self.mentions:
                 if re.search(mention, message['text'].lower()):
                     message['mention'] = True

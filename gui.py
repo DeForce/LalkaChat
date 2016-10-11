@@ -88,7 +88,7 @@ class KeyListBox(wx.ListBox):
 
 class MainMenuToolBar(wx.ToolBar):
     def __init__(self, *args, **kwargs):
-        self.main_class = kwargs['main_class']
+        self.main_class = kwargs['main_class']  # type: ChatGui
         kwargs.pop('main_class')
 
         kwargs["style"] = wx.TB_NOICONS | wx.TB_TEXT
@@ -97,7 +97,7 @@ class MainMenuToolBar(wx.ToolBar):
         self.SetToolBitmapSize((0, 0))
 
         self.create_tool('menu.settings', self.main_class.on_settings)
-        self.create_tool('menu.reload', self.main_class.on_about)
+        self.create_tool('menu.reload', self.main_class.on_toolbar_button)
 
         self.Realize()
 
@@ -544,6 +544,7 @@ class ChatGui(wx.Frame):
         self.main_config = kwargs.get('main_config')
         self.gui_settings = kwargs.get('gui_settings')
         self.loaded_modules = kwargs.get('loaded_modules')
+        self.queue = kwargs.get('queue')
 
         wx.Frame.__init__(self, parent, title=title, size=self.gui_settings.get('size'))
         # Set window style
@@ -573,10 +574,6 @@ class ChatGui(wx.Frame):
         # Show window after creation
         self.SetSizer(vbox)
         self.Show(True)
-
-    def on_about(self, event):
-        self.browser_window.Refresh()
-        event.Skip()
 
     def on_exit(self, event):
         log.info("Exiting...")
@@ -645,9 +642,21 @@ class ChatGui(wx.Frame):
         return settings_menu
 
     def button_clicked(self, event):
-        log.debug("[ChatGui] Button clicked: {0}".format(IDS[event.GetId()]))
         button_id = event.GetId()
         keys = IDS[event.GetId()].split(MODULE_KEY)
+        log.debug("[ChatGui] Button clicked: {0}, {1}".format(keys, button_id))
+        event.Skip()
+
+    def on_toolbar_button(self, event):
+        button_id = event.GetId()
+        list_keys = IDS[event.GetId()].split(MODULE_KEY)
+        log.debug("[ChatGui] Toolbar clicked: {0}, {1}".format(list_keys, button_id))
+        if list_keys[0] in self.loaded_modules:
+            self.loaded_modules[list_keys[0]]['class'].gui_button_press(self, event, list_keys)
+        else:
+            for module, settings in self.loaded_modules.items():
+                if 'class' in settings:
+                    settings['class'].gui_button_press(self, event, list_keys)
         event.Skip()
 
 
@@ -656,12 +665,13 @@ class GuiThread(threading.Thread):
     url = 'http://localhost'
     port = '8080'
 
-    def __init__(self, **kwds):
+    def __init__(self, **kwargs):
         threading.Thread.__init__(self)
         self.daemon = True
-        self.gui_settings = kwds.get('gui_settings', {})
-        self.loaded_modules = kwds.get('loaded_modules', {})
-        self.main_config = kwds.get('main_config', {})
+        self.gui_settings = kwargs.get('gui_settings', {})
+        self.loaded_modules = kwargs.get('loaded_modules', {})
+        self.main_config = kwargs.get('main_config', {})
+        self.queue = kwargs.get('queue')
         if 'webchat' in self.loaded_modules:
             self.port = self.loaded_modules['webchat']['port']
 
@@ -670,5 +680,5 @@ class GuiThread(threading.Thread):
         url = ':'.join([self.url, self.port])
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
         ChatGui(None, "LalkaChat", url, main_config=self.main_config, gui_settings=self.gui_settings,
-                loaded_modules=self.loaded_modules)  # A Frame is a top-level window.
+                loaded_modules=self.loaded_modules, queue=self.queue)  # A Frame is a top-level window.
         app.MainLoop()

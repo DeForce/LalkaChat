@@ -6,14 +6,14 @@ import os
 import random
 import sqlite3
 import xml.etree.ElementTree as ElementTree
-import jinja2
 from modules.helpers.parser import self_heal
 from modules.helpers.system import system_message, ModuleLoadException
+from modules.helpers.modules import MessagingModule
 
 logger = logging.getLogger('levels')
 
 
-class levels:
+class levels(MessagingModule):
     @staticmethod
     def create_db(db_location):
         if not os.path.exists(db_location):
@@ -26,6 +26,7 @@ class levels:
             db.close()
 
     def __init__(self, conf_folder, **kwargs):
+        MessagingModule.__init__(self)
         # Creating filter and replace strings.
         main_settings = kwargs.get('main_settings')
 
@@ -41,9 +42,9 @@ class levels:
         ]
         config = self_heal(conf_file, conf_dict)
 
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config}
         tag_config = 'config'
 
         self.conf_folder = conf_folder
@@ -119,8 +120,10 @@ class levels:
         cursor.close()
         return self.levels[max_level]
 
-    def get_message(self, message, queue):
+    def process_message(self, message, queue, **kwargs):
         if message:
+            if 'command' in message:
+                return message
             if 'system_msg' not in message or not message['system_msg']:
                 if 'user' in message and message['user'] in self.special_levels:
                     level_info = self.special_levels[message['user']]

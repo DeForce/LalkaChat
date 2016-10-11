@@ -3,12 +3,14 @@
 import os
 import datetime
 from modules.helpers.parser import self_heal
+from modules.helpers.modules import MessagingModule
 
 DEFAULT_PRIORITY = 20
 
 
-class logger():
+class logger(MessagingModule):
     def __init__(self, conf_folder, **kwargs):
+        MessagingModule.__init__(self)
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "logger.cfg")
         conf_dict = [
@@ -22,10 +24,10 @@ class logger():
                 'rotation': u'daily'}}
         ]
         config = self_heal(conf_file, conf_dict)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config,
-                            'id': config.get('gui_information', 'id')}
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'id': config.get('gui_information', 'id')}
 
         tag_config = 'config'
 
@@ -40,8 +42,10 @@ class logger():
         if not os.path.exists(self.destination):
             os.makedirs(self.destination)
 
-    def get_message(self, message, queue):
+    def process_message(self, message, queue, **kwargs):
         if message:
+            if 'command' in message:
+                return message
             with open('{0}.txt'.format(
                     os.path.join(self.destination, datetime.datetime.now().strftime(self.format))), 'a') as f:
                 f.write('[{3}] [{0}] {1}: {2}\n'.format(message['source'].encode('utf-8'),

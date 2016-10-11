@@ -3,15 +3,17 @@
 import re
 import os
 from modules.helpers.parser import self_heal
+from modules.helpers.modules import MessagingModule
 
 DEFAULT_PRIORITY = 30
 
 
-class blacklist:
+class blacklist(MessagingModule):
     users = {}
     words = {}
 
     def __init__(self, conf_folder, **kwargs):
+        MessagingModule.__init__(self)
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "blacklist.cfg")
         config_dict = [
@@ -34,10 +36,10 @@ class blacklist:
         ]
 
         config = self_heal(conf_file, config_dict)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config,
-                            'id': config.get('gui_information', 'id')}
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'id': config.get('gui_information', 'id')}
 
         for item in config.sections():
             for param, value in config.items(item):
@@ -53,16 +55,18 @@ class blacklist:
                 elif item == 'words_block':
                     self.words[param] = 'b'
 
-    def get_message(self, message, queue):
+    def process_message(self, message, queue, **kwargs):
         if message:
-            user = self.process_user(message)
+            if 'command' in message:
+                return message
+            user = self.blacklist_user_handler(message)
             # True = Hide, False = Del, None = Do Nothing
             if user:
                 message['text'] = self.message
             elif user is False:
                 return
 
-            words = self.process_message(message)
+            words = self.blacklist_message_handler(message)
             if words:
                 message['text'] = self.message
             elif words is False:
@@ -70,7 +74,7 @@ class blacklist:
 
             return message
 
-    def process_user(self, message):
+    def blacklist_user_handler(self, message):
         user = message.get('user').lower()
         if user in self.users:
             if self.users[user] == 'h':
@@ -79,7 +83,7 @@ class blacklist:
                 return False
         return None
 
-    def process_message(self, message):
+    def blacklist_message_handler(self, message):
         for word in self.words:
             if re.search(word, message['text'].encode('utf-8')):
                 if self.words[word] == 'h':

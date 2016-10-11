@@ -6,6 +6,7 @@ import requests
 import os
 import logging
 from ws4py.client.threadedclient import WebSocketClient
+from modules.helpers.modules import ChatModule
 from modules.helpers.parser import self_heal
 
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -222,8 +223,9 @@ class FsThread(threading.Thread):
         ws.run_forever()
 
 
-class sc2tv:
+class sc2tv(ChatModule):
     def __init__(self, queue, python_folder, **kwargs):
+        ChatModule.__init__(self)
         log.info("Initializing funstream chat")
 
         # Reading config from main directory.
