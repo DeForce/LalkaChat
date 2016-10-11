@@ -540,13 +540,12 @@ class ChatGui(wx.Frame):
     settings_window = None
 
     def __init__(self, parent, title, url, **kwargs):
-        wx.Frame.__init__(self, parent, title=title, size=(450, 500))
-
         # Setting the settings
         self.main_config = kwargs.get('main_config')
         self.gui_settings = kwargs.get('gui_settings')
         self.loaded_modules = kwargs.get('loaded_modules')
 
+        wx.Frame.__init__(self, parent, title=title, size=self.gui_settings.get('size'))
         # Set window style
         styles = wx.DEFAULT_FRAME_STYLE
         if self.gui_settings.get('on_top', False):
@@ -581,6 +580,12 @@ class ChatGui(wx.Frame):
 
     def on_exit(self, event):
         log.info("Exiting...")
+        # Saving last window size
+        parser = self.loaded_modules['config']['parser']  # type: ConfigParser
+        size = self.Size
+        parser.set('gui_information', 'width', size[0])
+        parser.set('gui_information', 'height', size[1])
+        parser.write(open(self.loaded_modules['config']['file'], 'w'))
         self.Destroy()
         event.Skip()
 
