@@ -1,5 +1,5 @@
 import os
-from ConfigParser import RawConfigParser
+from ConfigParser import ConfigParser
 
 
 def self_heal(conf_file, heal_dict):
@@ -27,7 +27,7 @@ def get_config(conf_file):
     if not os.path.exists(dir_name):
         os.makedirs(os.path.dirname(conf_file))
 
-    heal_config = RawConfigParser(allow_no_value=True)
+    heal_config = ConfigParser(allow_no_value=True)
     if os.path.exists(conf_file):
         heal_config.read(conf_file)
     return heal_config

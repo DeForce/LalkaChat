@@ -72,7 +72,9 @@ def init():
     logger.info("Loading basic configuration")
     main_config_dict = [
         {'gui_information': {
-            'category': 'main'}},
+            'category': 'main',
+            'width': 450,
+            'height': 500}},
         {'language__gui': {
             'for': 'language',
             'view': 'choose_single',
@@ -102,10 +104,12 @@ def init():
                                 'root_folder': main_config['root_folder'],
                                 'logs_folder': LOG_FOLDER}
 
-    gui_settings['gui'] = config.get(GUI_TAG, 'gui')
-    gui_settings['on_top'] = config.get(GUI_TAG, 'gui')
+    gui_settings['gui'] = config.getboolean(GUI_TAG, 'gui')
+    gui_settings['on_top'] = config.getboolean(GUI_TAG, 'gui')
     gui_settings['language'],  null_element = config.items('language')[0]
-    gui_settings['show_hidden'] = config.get(GUI_TAG, 'show_hidden')
+    gui_settings['show_hidden'] = config.getboolean(GUI_TAG, 'show_hidden')
+    gui_settings['size'] = (config.getint('gui_information', 'width'),
+                            config.getint('gui_information', 'height'))
     # Fallback if style folder not found
     fallback_style = 'czt'
     if len(config.items('style')) > 0:
