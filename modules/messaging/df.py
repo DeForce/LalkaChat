@@ -3,10 +3,12 @@
 import re
 import os
 from modules.helpers.parser import self_heal
+from modules.helpers.modules import MessagingModule
 
 
-class df:
+class df(MessagingModule):
     def __init__(self, conf_folder, **kwargs):
+        MessagingModule.__init__(self)
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "df.cfg")
         conf_dict = [
@@ -29,9 +31,9 @@ class df:
         grep_tag = 'grep'
         prof_tag = 'prof'
 
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config}
         self.symbol = config.get(grep_tag, 'symbol')
         self.file = config.get(grep_tag, 'file')
 
@@ -56,8 +58,10 @@ class df:
             with open(self.file, 'a') as a_file:
                 a_file.write("{0},{1}\n".format(message['user'], message['text']))
 
-    def get_message(self, message, queue):
+    def process_message(self, message, queue, **kwargs):
         if message:
+            if 'command' in message:
+                return message
             for regexp in self.prof:
                 if re.search(regexp[1], message['text']):
                     comp = {'user': message['user'], 'text': regexp[0]}

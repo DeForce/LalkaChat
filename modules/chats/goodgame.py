@@ -5,7 +5,9 @@ import requests
 import Queue
 import re
 import logging
+import time
 from modules.helpers.parser import self_heal
+from modules.helpers.modules import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -118,6 +120,7 @@ class GGChat(WebSocketClient):
         if 'INV_CH_ID' in reason:
             pass
         else:
+            time.sleep(5)
             self.connect()
         
     def received_message(self, mes):
@@ -184,8 +187,9 @@ class GGThread(threading.Thread):
             ws.run_forever()
 
 
-class goodgame:
+class goodgame(ChatModule):
     def __init__(self, queue, python_folder, **kwargs):
+        ChatModule.__init__(self)
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
 

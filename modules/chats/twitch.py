@@ -8,6 +8,7 @@ import logging
 import logging.config
 import Queue
 from modules.helpers.parser import self_heal
+from modules.helpers.modules import ChatModule
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -247,8 +248,9 @@ class twThread(threading.Thread):
         return True
 
 
-class twitch:
+class twitch(ChatModule):
     def __init__(self, queue, python_folder, **kwargs):
+        ChatModule.__init__(self)
         log.info("Initializing twitch chat")
 
         # Reading config from main directory.

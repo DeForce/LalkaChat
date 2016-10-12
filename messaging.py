@@ -73,8 +73,9 @@ class Message(threading.Thread):
                     class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'],
                                               main_settings=settings)
 
-                    if 'id' in class_module.conf_params:
-                        priority = class_module.conf_params['id']
+                    params = class_module.conf_params()
+                    if 'id' in params:
+                        priority = params['id']
                     else:
                         priority = MODULE_PRI_DEFAULT
 
@@ -83,8 +84,7 @@ class Message(threading.Thread):
                     else:
                         modules[int(priority)] = [class_module]
 
-                    modules_list[module] = class_module.conf_params
-                    modules_list[module]['class'] = class_module
+                    modules_list[module] = params
                 except ModuleLoadException as exc:
                     log.error("Unable to load module {0}".format(module))
         sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
@@ -105,7 +105,7 @@ class Message(threading.Thread):
         #  content so it can be passed to new module, or to pass to CLI
 
         for module in self.modules:
-            message = module.get_message(message, self.queue)
+            message = module.process_message(message, self.queue)
 
     def run(self):
         for thread in range(THREADS):

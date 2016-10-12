@@ -31,7 +31,8 @@ LOG_FILE = os.path.join(LOG_FOLDER, 'chat_log.log')
 LOG_FORMAT = logging.Formatter("%(asctime)s [%(name)s] [%(levelname)s]  %(message)s")
 
 root_logger = logging.getLogger()
-root_logger.setLevel(level=logging.INFO)
+# Logging level
+root_logger.setLevel(level=logging.DEBUG)
 file_handler = logging.FileHandler(LOG_FILE)
 file_handler.setFormatter(LOG_FORMAT)
 root_logger.addHandler(file_handler)
@@ -181,7 +182,8 @@ def init():
         logger.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,
                                main_config=loaded_modules['config'],
-                               loaded_modules=loaded_modules)
+                               loaded_modules=loaded_modules,
+                               queue=queue)
         window.start()
     try:
         while True:

@@ -10,6 +10,8 @@ from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from modules.helpers.parser import self_heal
 from modules.helpers.system import THREADS
+from modules.helpers.modules import MessagingModule
+from gui import MODULE_KEY
 
 DEFAULT_PRIORITY = 9001
 s_queue = Queue.Queue()
@@ -26,7 +28,8 @@ class MessagingThread(threading.Thread):
         while True:
             message = s_queue.get()
             cherrypy.engine.publish('websocket-broadcast', json.dumps(message))
-            cherrypy.engine.publish('add-history', message)
+            if 'command' not in message:
+                cherrypy.engine.publish('add-history', message)
 
 
 class FireFirstMessages(threading.Thread):
@@ -44,7 +47,7 @@ class FireFirstMessages(threading.Thread):
 
 class WebChatSocketServer(WebSocket):
     def __init__(self, sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None):
-        super(self.__class__, self).__init__(sock)
+        WebSocket.__init__(self, sock)
         self.clients = []
 
     def opened(self):
@@ -150,8 +153,9 @@ class SocketThread(threading.Thread):
                                              'tools.staticdir.dir': os.path.join(http_folder, 'img')}})
 
 
-class webchat():
+class webchat(MessagingModule):
     def __init__(self, conf_folder, **kwargs):
+        MessagingModule.__init__(self)
         main_settings = kwargs.get('main_settings')
         conf_file = os.path.join(conf_folder, "webchat.cfg")
         conf_dict = [
@@ -163,17 +167,17 @@ class webchat():
                 'port': '8080'}}]
 
         config = self_heal(conf_file, conf_dict)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config,
-                            'id': config.get('gui_information', 'id')}
 
         tag_server = 'server'
         host = config.get(tag_server, 'host')
         port = config.get(tag_server, 'port')
         style = main_settings['http_folder']
 
-        self.conf_params['port'] = port
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'id': config.get('gui_information', 'id'),
+                             'port': port}
 
         s_thread = SocketThread(host, port, conf_folder, style=style)
         s_thread.start()
@@ -183,7 +187,14 @@ class webchat():
             self.message_threads.append(MessagingThread())
             self.message_threads[thread].start()
 
-    def get_message(self, message, queue):
+    def gui_button_press(self, gui_module, event, list_keys):
+        log.debug("Received button press for id {0}".format(event.GetId()))
+        keys = MODULE_KEY.join(list_keys)
+        if keys == 'menu.reload':
+            gui_module.queue.put({'command': 'reload'})
+        event.Skip()
+
+    def process_message(self, message, queue, **kwargs):
         if message:
             if 'flags' in message:
                 if message['flags'] == 'hidden':

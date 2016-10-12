@@ -5,6 +5,7 @@ import time
 import logging
 import queue
 from modules.helpers.system import SOURCE, SOURCE_ICON, THREADS
+from modules.helpers.modules import ChatModule
 
 log = logging.getLogger('govno_rutony')
 
@@ -43,8 +44,9 @@ class MessageThread(threading.Thread):
                                         'size': u'1'}]})
 
 
-class govno_rutony:
+class govno_rutony(ChatModule):
     def __init__(self, queue, python_folder, **kwargs):
+        ChatModule.__init__(self)
         self.conf_params = {}
         user_count = 10
         digit_count = 10
