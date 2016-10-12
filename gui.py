@@ -460,12 +460,12 @@ class SettingsWindow(wx.Frame):
                     parser.set(section, item_name, wx_window.IsChecked())
                 elif isinstance(wx_window, wx.TextCtrl):
                     if item_name not in SKIP_TXT_CONTROLS:
-                        parser.set(section, item_name, wx_window.GetValue().encode('utf-8'))
+                        parser.set(section, item_name, wx_window.GetValue().encode('utf-8').strip())
                 elif isinstance(wx_window, wx.grid.Grid):
                     col_count = wx_window.GetNumberCols()
                     row_count = wx_window.GetNumberRows()
                     parser_options = parser.options(section)
-                    grid_elements = [[wx_window.GetCellValue(row, col).encode('utf-8')
+                    grid_elements = [[wx_window.GetCellValue(row, col).encode('utf-8').strip()
                                       for col in range(col_count)]
                                      for row in range(row_count)]
                     if not grid_elements:
@@ -514,9 +514,9 @@ class SettingsWindow(wx.Frame):
             list_box = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
             list_box.AppendRows(1)
             row_count = list_box.GetNumberRows() - 1
-            list_box.SetCellValue(row_count, 0, list_input_value)
+            list_box.SetCellValue(row_count, 0, list_input_value.strip())
             if list_input2_value:
-                list_box.SetCellValue(row_count, 1, list_input2_value)
+                list_box.SetCellValue(row_count, 1, list_input2_value.strip())
 
         elif action == 'list_remove':
             list_box = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
