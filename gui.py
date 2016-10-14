@@ -537,14 +537,13 @@ class SettingsWindow(wx.Frame):
 
 
 class ChatGui(wx.Frame):
-    settings_window = None
-
     def __init__(self, parent, title, url, **kwargs):
         # Setting the settings
         self.main_config = kwargs.get('main_config')
         self.gui_settings = kwargs.get('gui_settings')
         self.loaded_modules = kwargs.get('loaded_modules')
         self.queue = kwargs.get('queue')
+        self.settings_window = None
 
         wx.Frame.__init__(self, parent, title=title, size=self.gui_settings.get('size'))
         # Set window style
@@ -569,13 +568,13 @@ class ChatGui(wx.Frame):
         vbox.Add(self.browser_window, 1, wx.EXPAND)
 
         # Set events
-        self.Bind(wx.EVT_CLOSE, self.on_exit)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
 
         # Show window after creation
         self.SetSizer(vbox)
         self.Show(True)
 
-    def on_exit(self, event):
+    def on_close(self, event):
         log.info("Exiting...")
         # Saving last window size
         parser = self.loaded_modules['config']['parser']  # type: ConfigParser
@@ -584,7 +583,6 @@ class ChatGui(wx.Frame):
         parser.set('gui_information', 'height', size[1])
         parser.write(open(self.loaded_modules['config']['file'], 'w'))
         self.Destroy()
-        event.Skip()
 
     def on_right_down(self, event):
         log.info(event)
@@ -668,17 +666,22 @@ class GuiThread(threading.Thread):
     def __init__(self, **kwargs):
         threading.Thread.__init__(self)
         self.daemon = True
-        self.gui_settings = kwargs.get('gui_settings', {})
-        self.loaded_modules = kwargs.get('loaded_modules', {})
-        self.main_config = kwargs.get('main_config', {})
-        self.queue = kwargs.get('queue')
-        if 'webchat' in self.loaded_modules:
-            self.port = self.loaded_modules['webchat']['port']
+        self.gui = None
+        self.kwargs = kwargs
+        if 'webchat' in self.kwargs.get('loaded_modules'):
+            self.port = self.kwargs['loaded_modules']['webchat']['port']
 
     def run(self):
         chromectrl.Initialize()
         url = ':'.join([self.url, self.port])
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
-        ChatGui(None, "LalkaChat", url, main_config=self.main_config, gui_settings=self.gui_settings,
-                loaded_modules=self.loaded_modules, queue=self.queue)  # A Frame is a top-level window.
+        self.gui = ChatGui(None, "LalkaChat", url, **self.kwargs)  # A Frame is a top-level window.
         app.MainLoop()
+        self.quit()
+
+    def quit(self):
+        try:
+            self.gui.on_close('event')
+        except wx.PyDeadObjectError:
+            pass
+        os._exit(0)

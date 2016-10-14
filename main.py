@@ -5,7 +5,6 @@ import imp
 import Queue
 import messaging
 import gui
-import thread
 import sys
 import logging
 import logging.config
@@ -45,9 +44,15 @@ logger = logging.getLogger('main')
 
 
 def init():
+    def close():
+        if window:
+            window.gui.on_close('Closing Program from console')
+        else:
+            os._exit(0)
     # For system compatibility, loading chats
     loaded_modules = {}
     gui_settings = {}
+    window = None
 
     # Creating dict with folder settings
     main_config = {'root_folder': PYTHON_FOLDER,
@@ -191,15 +196,14 @@ def init():
             logger.info(console)
             if console == "exit":
                 logger.info("Exiting now!")
-                thread.interrupt_main()
+                close()
             else:
                 logger.info("Incorrect Command")
     except (KeyboardInterrupt, SystemExit):
         logger.info("Exiting now!")
-        thread.interrupt_main()
+        close()
     except Exception as exc:
         logger.info(exc)
-
 
 if __name__ == '__main__':
     init()
