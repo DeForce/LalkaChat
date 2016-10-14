@@ -8,11 +8,13 @@ import logging
 from ws4py.client.threadedclient import WebSocketClient
 from modules.helpers.modules import ChatModule
 from modules.helpers.parser import self_heal
+from modules.helpers.system import system_message
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
+SYSTEM_USER = 'Funstream'
 CONF_DICT = [
             {'gui_information': {
                 'category': 'chat'}},
@@ -102,6 +104,9 @@ class FsChat(WebSocketClient):
                         #  nickname of streamer we need to connect to.
                         self.fs_join()
                         self.fs_ping()
+                    elif dict_item == 'status':
+                        system_message('Joined channel {0}'.format(self.channel_name), self.queue,
+                                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
                     elif dict_item == 'id':
                         try:
                             self.duplicates.index(message[dict_item])
@@ -157,6 +162,8 @@ class FsChat(WebSocketClient):
             join = str(iter_sio) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channel_id)},
                                                                     sort_keys=False) + "]"
             self.send(join)
+            system_message('Joining channel {0}'.format(self.channel_name), self.queue,
+                           source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
             log.info("Joined channel {0}".format(self.channel_id))
 
     def fs_ping(self):
