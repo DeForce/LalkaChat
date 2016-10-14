@@ -9,6 +9,7 @@ import logging.config
 import Queue
 from modules.helpers.parser import self_heal
 from modules.helpers.modules import ChatModule
+from modules.helpers.system import system_message
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -20,6 +21,7 @@ emote_bits_url = 'static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
 NOT_FOUND = 'none'
 SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
+SYSTEM_USER = 'Twitch.TV'
 CONF_DICT = [
             {'gui_information': {
                 'category': 'chat'}},
@@ -123,6 +125,7 @@ class IRC(irc.client.SimpleIRCClient):
         # Basic variables, twitch channel are IRC so #channel
         self.channel = "#" + channel.lower()
         self.nick = channel.lower()
+        self.queue = queue
         self.twitch_queue = Queue.Queue()
 
         msg_handler = TwitchMessageHandler(queue, self.twitch_queue,
@@ -137,6 +140,8 @@ class IRC(irc.client.SimpleIRCClient):
 
     def on_welcome(self, connection, event):
         log.info("Welcome Received, joining {0} channel".format(self.channel))
+        system_message('Joining channel {0}'.format(self.channel), self.queue,
+                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilites (Twitch color, Display Name,
         #  Subscriber, etc)
@@ -145,6 +150,8 @@ class IRC(irc.client.SimpleIRCClient):
 
     def on_join(self, connection, event):
         log.info("Joined {0} channel".format(self.channel))
+        system_message('Joined channel {0}'.format(self.channel), self.queue,
+                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
 
     def on_pubmsg(self, connection, event):
         self.twitch_queue.put(event)

@@ -7,6 +7,7 @@ import re
 import logging
 import time
 from modules.helpers.parser import self_heal
+from modules.helpers.system import system_message
 from modules.helpers.modules import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 
@@ -14,6 +15,7 @@ logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('goodgame')
 SOURCE = 'gg'
 SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
+SYSTEM_USER = 'GoodGame'
 CONF_DICT = [
             {'gui_information': {
                 'category': 'chat'}},
@@ -90,6 +92,9 @@ class GoodgameMessageHandler(threading.Thread):
             if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):
                 comp['pm'] = True
             self.message_queue.put(comp)
+        elif msg['type'] == 'welcome':
+            system_message('Successfully joined channel {0}'.format(self.nick), self.message_queue, SOURCE,
+                           icon=SOURCE_ICON, from_user=SYSTEM_USER)
         elif msg['type'] == 'error':
             log.info("Received error message: {0}".format(msg))
             if msg['data']['errorMsg'] == 'Invalid channel id':
@@ -102,13 +107,16 @@ class GGChat(WebSocketClient):
         super(self.__class__, self).__init__(ws, protocols=protocols)
         # Received value setting.
         self.ch_id = ch_id
+        self.queue = queue
         self.gg_queue = Queue.Queue()
 
         message_handler = GoodgameMessageHandler(self, queue, self.gg_queue, nick=nick, **kwargs)
         message_handler.start()
 
     def opened(self):
-        log.info("Connection Succesfull")
+        suc_msg = "Connection Successful"
+        log.info(suc_msg)
+        system_message(suc_msg, self.queue, SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
