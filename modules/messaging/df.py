@@ -19,8 +19,7 @@ class df(MessagingModule):
         conf_dict['grep'] = OrderedDict()
         conf_dict['grep']['symbol'] = '#'
         conf_dict['grep']['file'] = 'logs/df.txt'
-        conf_dict['prof'] = OrderedDict()
-        conf_dict['prof']['Nothing'] = '([Нн]икто|[Nn]othing|\w*)'
+        conf_dict['prof'] = {'nothing': '([Нн]икто|[Nn]othing|\w*)'}
 
         conf_gui = {
             'prof': {

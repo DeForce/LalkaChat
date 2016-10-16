@@ -5,6 +5,7 @@ import re
 import requests
 import os
 import logging
+from collections import OrderedDict
 from ws4py.client.threadedclient import WebSocketClient
 from modules.helpers.modules import ChatModule
 from modules.helpers.parser import self_heal
@@ -15,12 +16,12 @@ log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
 SYSTEM_USER = 'Funstream'
-CONF_DICT = {
-    'gui_information': {
-        'category': 'chat'},
-    'config': {
-        'channel_name': 'CHANGE_ME',
-        'socket': 'ws://funstream.tv/socket.io/'}}
+CONF_DICT = OrderedDict()
+CONF_DICT['gui_information'] = {'category': 'chat'}
+CONF_DICT['config'] = OrderedDict()
+CONF_DICT['config']['channel_name'] = 'CHANGE_ME'
+CONF_DICT['config']['socket'] = 'ws://funstream.tv/socket.io/'
+
 CONF_GUI = {
     'config': {
         'hidden': ['socket']}}

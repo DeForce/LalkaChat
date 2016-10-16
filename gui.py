@@ -1,4 +1,6 @@
 import threading
+from collections import OrderedDict
+
 import wx
 import wx.grid
 import os
@@ -16,6 +18,8 @@ SECTION_GUI_TAG = '__gui'
 SKIP_TAGS = [INFORMATION_TAG]
 SKIP_TXT_CONTROLS = ['list_input', 'list_input2']
 SKIP_BUTTONS = ['list_add', 'list_remove']
+ITEM_SPACING_VERT = 6
+ITEM_SPACING_HORZ = 30
 
 
 def get_id_from_name(name, error=False):
@@ -59,7 +63,7 @@ def check_duplicate(item, window):
 
 
 def create_categories(loaded_modules):
-    cat_dict = {}
+    cat_dict = OrderedDict()
     for module_name, module_config in loaded_modules.items():
         if 'config' not in module_config:
             continue
@@ -225,7 +229,6 @@ class SettingsWindow(wx.Frame):
         sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT)
         panel.SetSizer(sizer)
         panel.Layout()
-        pass
 
     def fill_sc_with_config(self, page_sc_window, category_config, category_item):
         border_all = 5
@@ -246,12 +249,6 @@ class SettingsWindow(wx.Frame):
 
             sizer.Add(static_sizer, 0, wx.EXPAND)
         page_sc_window.SetSizer(sizer)
-
-    @staticmethod
-    def prepare_config_for_window(category_config):
-        config_dict = {'gui': category_config.get('gui', {}),
-                       'sections': category_config.get('config', {})}
-        return config_dict
 
     def create_items(self, parent, key, section, section_gui):
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -323,7 +320,7 @@ class SettingsWindow(wx.Frame):
 
             if section_gui['check_type'] in ['dir', 'folder', 'files']:
                 check_type = section_gui['check_type']
-                remove_extension = section_gui['file_extension'] if 'file_extension' in section_gui else False
+                keep_extension = section_gui['file_extension'] if 'file_extension' in section_gui else False
                 for item_in_list in os.listdir(os.path.join(self.main_class.main_config['root_folder'],
                                                             section_gui['check'])):
                     item_path = os.path.join(self.main_class.main_config['root_folder'],
@@ -331,7 +328,7 @@ class SettingsWindow(wx.Frame):
                     if check_type in ['dir', 'folder'] and os.path.isdir(item_path):
                         list_items.append(item_in_list)
                     elif check_type == 'files' and os.path.isfile(item_path):
-                        if remove_extension:
+                        if not keep_extension:
                             item_in_list = ''.join(os.path.basename(item_path).split('.')[:-1])
                         if '__init__' not in item_in_list:
                             if item_in_list not in list_items:
@@ -349,8 +346,8 @@ class SettingsWindow(wx.Frame):
                 item_sizer.Add(wx.StaticText(parent, label=label_text, style=wx.ALIGN_RIGHT))
             item_list_box = KeyListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
                                        choices=translated_items if translated_items else list_items, style=style)
-            section_for = section if 'multiple' in view else [section[0]]
-            for section_item, section_value in section_for:
+            section_for = section if 'multiple' in view else {section: None}
+            for section_item, section_value in section_for.items():
                 try:
                     item_list_box.SetSelection(list_items.index(translate_key(section_item)))
                 except ValueError:
@@ -362,9 +359,9 @@ class SettingsWindow(wx.Frame):
 
             sizer.Add(item_sizer)
         else:
-            items_to_add = []
             if not section:
                 return sizer
+            flex_grid = wx.FlexGridSizer(0, 2, ITEM_SPACING_VERT, ITEM_SPACING_HORZ)
             for item, value in section.items():
                 if not self.show_hidden and item in section_gui.get('hidden', []):
                     continue
@@ -374,25 +371,23 @@ class SettingsWindow(wx.Frame):
                 if not value:  # Button
                     button_id = id_renew(item_name, update=True)
                     item_button = wx.Button(parent, id=button_id, label=translate_key(item_name))
-                    items_to_add.append((item_button, 0, wx.ALIGN_LEFT))
+                    flex_grid.Add(item_button, 0, wx.ALIGN_LEFT)
+                    flex_grid.AddSpacer(wx.Size(0, 0))
                     self.main_class.Bind(wx.EVT_BUTTON, self.button_clicked, id=button_id)
-                elif value.lower() in ['true', 'false']:  # Checkbox
+                elif isinstance(value, bool):  # Checkbox
                     item_box = wx.CheckBox(parent, id=id_renew(item_name, update=True),
                                            label=translate_key(item_name), style=style)
-                    item_box.SetValue(True if value.lower() == 'true' else False)
-                    items_to_add.append((item_box, 0, wx.ALIGN_LEFT))
+                    item_box.SetValue(value)
+                    flex_grid.Add(item_box, 0, wx.ALIGN_LEFT)
+                    flex_grid.AddSpacer(wx.Size(0, 0))
                 else:  # TextCtrl
-                    item_sizer = wx.BoxSizer(wx.HORIZONTAL)
                     item_box = wx.TextCtrl(parent, id=id_renew(item_name, update=True),
-                                           value=value.decode('utf-8'))
+                                           value=str(value).decode('utf-8'))
                     item_text = wx.StaticText(parent, label=translate_key(item_name),
                                               style=wx.ALIGN_RIGHT)
-                    item_spacer = (10, 0)
-                    item_sizer.AddMany([(item_text, 0, wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL),
-                                        (item_spacer, 0, 0),
-                                        (item_box, 0)])
-                    items_to_add.append(item_sizer)
-            sizer.AddMany(items_to_add)
+                    flex_grid.Add(item_text)
+                    flex_grid.Add(item_box)
+            sizer.Add(flex_grid)
         return sizer
 
     def button_clicked(self, event):
