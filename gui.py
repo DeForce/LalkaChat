@@ -7,7 +7,7 @@ import os
 import logging
 from ConfigParser import ConfigParser
 from cefpython3.wx import chromectrl
-from modules.helpers.system import MODULE_KEY, translate_key
+from modules.helper.system import MODULE_KEY, translate_key
 # ToDO: Support customization of borders/spacings
 # ToDO: Exit by cancel button
 

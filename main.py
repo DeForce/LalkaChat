@@ -9,8 +9,8 @@ import sys
 import logging
 import logging.config
 from collections import OrderedDict
-from modules.helpers.parser import self_heal
-from modules.helpers.system import load_translations_keys
+from modules.helper.parser import self_heal
+from modules.helper.system import load_translations_keys
 
 
 if hasattr(sys, 'frozen'):
@@ -147,17 +147,16 @@ def init():
     # Trying to dynamically load chats that are in config file.
     chat_modules = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_tag = "chats"
-    chat_location = os.path.join(MODULE_FOLDER, "chats")
+    chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
     chat_conf_dict['gui_information'] = {'category': 'chat'}
     chat_conf_dict['chats'] = {}
 
     chat_conf_gui = {
         'chats': {
-            'for': 'chats',
             'view': 'choose_multiple',
             'check_type': 'files',
-            'check': 'modules/chats',
+            'check': os.path.sep.join(['modules', 'chat']),
             'file_extension': False},
         'non_dynamic': ['chats.list_box']}
     chat_config = self_heal(chat_modules, chat_conf_dict)

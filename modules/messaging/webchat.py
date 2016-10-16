@@ -10,9 +10,9 @@ from cherrypy.lib.static import serve_file
 from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
-from modules.helpers.parser import self_heal
-from modules.helpers.system import THREADS
-from modules.helpers.modules import MessagingModule
+from modules.helper.parser import self_heal
+from modules.helper.system import THREADS
+from modules.helper.modules import MessagingModule
 from gui import MODULE_KEY
 
 DEFAULT_PRIORITY = 9001

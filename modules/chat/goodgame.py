@@ -7,9 +7,9 @@ import re
 import logging
 import time
 from collections import OrderedDict
-from modules.helpers.parser import self_heal
-from modules.helpers.system import system_message
-from modules.helpers.modules import ChatModule
+from modules.helper.parser import self_heal
+from modules.helper.system import system_message
+from modules.helper.modules import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 
 logging.getLogger('requests').setLevel(logging.ERROR)
