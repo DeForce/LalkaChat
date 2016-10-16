@@ -51,7 +51,7 @@ def init():
         else:
             os._exit(0)
     # For system compatibility, loading chats
-    loaded_modules = {}
+    loaded_modules = OrderedDict()
     gui_settings = {}
     window = None
 
@@ -77,20 +77,19 @@ def init():
             exit()
 
     logger.info("Loading basic configuration")
-    main_config_dict = {
-        'gui_information': {
-            'category': 'main',
-            'width': '450',
-            'height': '500'},
-        'gui': {
-            'show_hidden': 'True',
-            'gui': 'True',
-            'on_top': 'True',
-            'reload': 'None'
-        },
-        'style': 'czt',
-        'language': 'en'
-    }
+    main_config_dict = OrderedDict()
+    main_config_dict['gui_information'] = OrderedDict()
+    main_config_dict['gui_information']['category'] = 'main'
+    main_config_dict['gui_information']['width'] = 450
+    main_config_dict['gui_information']['height'] = 500
+    main_config_dict['gui'] = OrderedDict()
+    main_config_dict['gui']['show_hidden'] = False
+    main_config_dict['gui']['gui'] = True
+    main_config_dict['gui']['on_top'] = True
+    main_config_dict['gui']['reload'] = None
+    main_config_dict['style'] = 'czt'
+    main_config_dict['language'] = 'en'
+
     main_config_gui = {
         'style': {
             'check': 'http',
@@ -110,15 +109,16 @@ def init():
                                 'parser': config,
                                 'root_folder': main_config['root_folder'],
                                 'logs_folder': LOG_FOLDER,
-                                'config': OrderedDict(main_config_dict),
+                                'config': main_config_dict,
                                 'gui': main_config_gui}
 
-    gui_settings['gui'] = config.getboolean(GUI_TAG, 'gui')
-    gui_settings['on_top'] = config.getboolean(GUI_TAG, 'gui')
-    gui_settings['language'],  null_element = config.items('language')[0]
-    gui_settings['show_hidden'] = config.getboolean(GUI_TAG, 'show_hidden')
-    gui_settings['size'] = (config.getint('gui_information', 'width'),
-                            config.getint('gui_information', 'height'))
+    gui_settings['gui'] = main_config_dict[GUI_TAG].get('gui')
+    gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
+    gui_settings['language'] = main_config_dict.get('language')
+    gui_settings['show_hidden'] = main_config_dict[GUI_TAG].get('show_hidden')
+    gui_settings['size'] = (main_config_dict['gui_information'].get('width'),
+                            main_config_dict['gui_information'].get('height'))
+
     # Fallback if style folder not found
     fallback_style = 'czt'
     if len(config.items('style')) > 0:
@@ -147,19 +147,17 @@ def init():
     chat_modules = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_tag = "chats"
     chat_location = os.path.join(MODULE_FOLDER, "chats")
-    chat_conf_dict = {
-        'gui_information': {
-            'category': 'main'},
-        'chats': {}
-    }
+    chat_conf_dict = OrderedDict()
+    chat_conf_dict['gui_information'] = {'category': 'chat'}
+    chat_conf_dict['chats'] = {}
+
     chat_conf_gui = {
-        'chats__gui': {
+        'chats': {
             'for': 'chats',
             'view': 'choose_multiple',
             'check_type': 'files',
             'check': 'modules/chats',
-            'file_extension': False}
-    }
+            'file_extension': False}}
     chat_config = self_heal(chat_modules, chat_conf_dict)
     loaded_modules['chat_modules'] = {'folder': CONF_FOLDER, 'file': chat_modules,
                                       'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),

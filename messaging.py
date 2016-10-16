@@ -5,6 +5,7 @@ import threading
 import imp
 import operator
 import logging
+from collections import OrderedDict
 
 from modules.helpers.system import ModuleLoadException, THREADS
 from modules.helpers.parser import self_heal
@@ -35,27 +36,25 @@ class Message(threading.Thread):
         self.module_tag = "modules.messaging"
         self.threads = []
 
-    def load_modules(self, config_dict, settings):
+    def load_modules(self, main_config, settings):
         log.info("Loading configuration file for messaging")
-        modules_list = {}
+        modules_list = OrderedDict()
 
-        conf_file = os.path.join(config_dict['conf_folder'], "messaging.cfg")
-        conf_dict = {
-            'gui_information': {
-                'category': 'main'},
-            'messaging': {
-                'webchat': None}}
+        conf_file = os.path.join(main_config['conf_folder'], "messaging_modules.cfg")
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {'category': 'messaging'}
+        conf_dict['messaging'] = {'webchat': None}
+
         conf_dict_gui = {
-            'messaging__gui': {'check': 'modules/messaging',
-                               'check_type': 'files',
-                               'file_extension': False,
-                               'for': 'messaging',
-                               'view': 'choose_multiple'},
-        }
+            'messaging': {'check': 'modules/messaging',
+                          'check_type': 'files',
+                          'file_extension': False,
+                          'view': 'choose_multiple'}}
         config = self_heal(conf_file, conf_dict)
-        modules_list['messaging_modules'] = {'folder': config_dict['conf_folder'], 'file': conf_file,
+        modules_list['messaging_modules'] = {'folder': main_config['conf_folder'], 'file': conf_file,
                                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                                              'parser': config,
+                                             'config': conf_dict,
                                              'gui': conf_dict_gui}
 
         modules = {}
@@ -66,13 +65,13 @@ class Message(threading.Thread):
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
                 #  same name as module name
-                join_path = [config_dict['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(module)]
+                join_path = [main_config['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(module)]
                 file_path = os.path.join(*join_path)
 
                 try:
                     tmp = imp.load_source(module, file_path)
                     class_init = getattr(tmp, module)
-                    class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'],
+                    class_module = class_init(main_config['conf_folder'], root_folder=main_config['root_folder'],
                                               main_settings=settings)
 
                     params = class_module.conf_params()

@@ -1,3 +1,4 @@
+
 import irc.client
 import threading
 import os
@@ -7,6 +8,7 @@ import requests
 import logging
 import logging.config
 import Queue
+from collections import OrderedDict
 from modules.helpers.parser import self_heal
 from modules.helpers.modules import ChatModule
 from modules.helpers.system import system_message
@@ -22,14 +24,13 @@ NOT_FOUND = 'none'
 SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 SYSTEM_USER = 'Twitch.TV'
-CONF_DICT = {
-    'gui_information': {
-        'category': 'chat'},
-    'config': {
-        'bttv': 'true',
-        'channel': 'CHANGE_ME',
-        'host': 'irc.twitch.tv',
-        'port': '6667'}}
+CONF_DICT = OrderedDict()
+CONF_DICT['gui_information'] = {'category': 'chat'}
+CONF_DICT['config'] = OrderedDict()
+CONF_DICT['config']['channel'] = 'CHANGE_ME'
+CONF_DICT['config']['bttv'] = True
+CONF_DICT['config']['host'] = 'irc.twitch.tv'
+CONF_DICT['config']['port'] = 6667
 CONF_GUI = {
     'config': {
         'hidden': ['host', 'port']}}
@@ -112,7 +113,7 @@ class TwitchMessageHandler(threading.Thread):
                 comp['bttv_emotes'].append({'emote_id': bttv_smile['regex'],
                                             'emote_url': 'http:{0}'.format(bttv_smile['url'])})
 
-        if re.match('^@?{0}( |,)'.format(self.nick), comp['text'].lower()):
+        if re.match('^@?{0}[ ,]?'.format(self.nick), comp['text'].lower()):
             comp['pm'] = True
 
         self.message_queue.put(comp)

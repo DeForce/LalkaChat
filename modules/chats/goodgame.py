@@ -6,6 +6,7 @@ import Queue
 import re
 import logging
 import time
+from collections import OrderedDict
 from modules.helpers.parser import self_heal
 from modules.helpers.system import system_message
 from modules.helpers.modules import ChatModule
@@ -16,12 +17,12 @@ log = logging.getLogger('goodgame')
 SOURCE = 'gg'
 SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
 SYSTEM_USER = 'GoodGame'
-CONF_DICT = {
-    'gui_information': {
-        'category': 'chat'},
-    'config': {
-        'channel_name': 'CHANGE_ME',
-        'socket': 'ws://chat.goodgame.ru:8081/chat/websocket'}}
+CONF_DICT = OrderedDict()
+CONF_DICT['gui_information'] = {'category': 'chat'}
+CONF_DICT['config'] = OrderedDict()
+CONF_DICT['config']['channel_name'] = 'CHANGE_ME'
+CONF_DICT['config']['socket'] = 'ws://chat.goodgame.ru:8081/chat/websocket'
+
 CONF_GUI = {
     'config': {
         'hidden': ['socket']}}

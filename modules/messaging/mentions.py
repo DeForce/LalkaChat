@@ -39,7 +39,7 @@ class mentions(MessagingModule):
             self.mentions = []
 
         if config.has_section(address_tag):
-            self.addresses = [item for item, value in config.items(address_tag)]
+            self.addresses = [item.decode('utf-8').lower() for item, value in config.items(address_tag)]
         else:
             self.addresses = []
 
@@ -54,7 +54,7 @@ class mentions(MessagingModule):
                     message['mention'] = True
 
             for address in self.addresses:
-                if re.match('^{0}(,| )'.format(address), message['text'].lower().encode('utf-8')):
+                if re.match(address, message['text'].lower()):
                     message['pm'] = True
 
             if 'mention' in message and 'pm' in message:

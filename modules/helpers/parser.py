@@ -9,11 +9,16 @@ def self_heal(conf_file, heal_dict):
         if not heal_config.has_section(section):
             heal_config.add_section(section)
         if type(section_value) in [OrderedDict, dict]:
-            for item, value in section_value.items():
-                if not heal_config.has_option(section, item):
-                    heal_config.set(section, item, value)
-                else:
-                    heal_dict[section][item] = heal_config.get(section, item)
+            if section_value:
+                for item, value in section_value.items():
+                    if not heal_config.has_option(section, item):
+                        heal_config.set(section, item, value)
+                for item, value in heal_config.items(section):
+                    heal_dict[section][item] = return_type(value)
+            else:
+                heal_dict[section] = OrderedDict()
+                for item, value in heal_config.items(section):
+                    heal_dict[section][item] = value
         else:
             if len(heal_config.items(section)) != 1:
                 for r_item, r_value in heal_config.items(section):
@@ -24,6 +29,18 @@ def self_heal(conf_file, heal_dict):
 
     heal_config.write(open(conf_file, 'w'))
     return heal_config
+
+
+def return_type(item):
+    if item:
+        try:
+            return int(item)
+        except:
+            if item.lower() == 'true':
+                return True
+            elif item.lower() == 'false':
+                return False
+    return item
 
 
 def get_config(conf_file):
