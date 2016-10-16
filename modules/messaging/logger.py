@@ -4,8 +4,8 @@ import os
 import datetime
 from collections import OrderedDict
 
-from modules.helpers.parser import self_heal
-from modules.helpers.modules import MessagingModule
+from modules.helper.parser import self_heal
+from modules.helper.modules import MessagingModule
 
 DEFAULT_PRIORITY = 20
 

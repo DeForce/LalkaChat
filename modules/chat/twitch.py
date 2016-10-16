@@ -9,9 +9,9 @@ import logging
 import logging.config
 import Queue
 from collections import OrderedDict
-from modules.helpers.parser import self_heal
-from modules.helpers.modules import ChatModule
-from modules.helpers.system import system_message
+from modules.helper.parser import self_heal
+from modules.helper.modules import ChatModule
+from modules.helper.system import system_message
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)

@@ -7,9 +7,9 @@ import os
 import logging
 from collections import OrderedDict
 from ws4py.client.threadedclient import WebSocketClient
-from modules.helpers.modules import ChatModule
-from modules.helpers.parser import self_heal
-from modules.helpers.system import system_message
+from modules.helper.modules import ChatModule
+from modules.helper.parser import self_heal
+from modules.helper.system import system_message
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')

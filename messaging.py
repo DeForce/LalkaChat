@@ -7,8 +7,8 @@ import operator
 import logging
 from collections import OrderedDict
 
-from modules.helpers.system import ModuleLoadException, THREADS
-from modules.helpers.parser import self_heal
+from modules.helper.system import ModuleLoadException, THREADS
+from modules.helper.parser import self_heal
 
 log = logging.getLogger('messaging')
 MODULE_PRI_DEFAULT = '100'

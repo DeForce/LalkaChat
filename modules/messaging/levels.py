@@ -8,9 +8,9 @@ import sqlite3
 import xml.etree.ElementTree as ElementTree
 from collections import OrderedDict
 
-from modules.helpers.parser import self_heal
-from modules.helpers.system import system_message, ModuleLoadException
-from modules.helpers.modules import MessagingModule
+from modules.helper.parser import self_heal
+from modules.helper.system import system_message, ModuleLoadException
+from modules.helper.modules import MessagingModule
 
 logger = logging.getLogger('levels')
 
