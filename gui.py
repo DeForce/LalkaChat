@@ -88,6 +88,15 @@ class KeyListBox(wx.ListBox):
         return self.keys[index]
 
 
+class KeyCheckListBox(wx.CheckListBox):
+    def __init__(self, *args, **kwargs):
+        self.keys = kwargs.pop('keys', [])
+        wx.CheckListBox.__init__(self, *args, **kwargs)
+
+    def get_key_from_id(self, index):
+        return self.keys[index]
+
+
 class MainMenuToolBar(wx.ToolBar):
     def __init__(self, *args, **kwargs):
         self.main_class = kwargs['main_class']  # type: ChatGui
@@ -344,17 +353,19 @@ class SettingsWindow(wx.Frame):
             label_text = translate_key(item_key)
             if label_text:
                 item_sizer.Add(wx.StaticText(parent, label=label_text, style=wx.ALIGN_RIGHT))
-            item_list_box = KeyListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
-                                       choices=translated_items if translated_items else list_items, style=style)
-            section_for = section if 'multiple' in view else {section: None}
-            for section_item, section_value in section_for.items():
-                try:
-                    item_list_box.SetSelection(list_items.index(translate_key(section_item)))
-                except ValueError:
-                    try:
-                        item_list_box.SetSelection(list_items.index(section_item))
-                    except ValueError as exc:
-                        log.debug("[create_items] Unable to find item {0} in list".format(exc.message))
+            if is_single:
+                item_list_box = KeyListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
+                                           choices=translated_items if translated_items else list_items, style=style)
+            else:
+                item_list_box = KeyCheckListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
+                                                choices=translated_items if translated_items else list_items)
+
+            section_for = section if not is_single else {section: None}
+            if is_single:
+                [item_list_box.SetSelection(list_items.index(item)) for item, value in section_for.items()]
+            else:
+                check_items = [list_items.index(item) for item, value in section_for.items()]
+                item_list_box.SetChecked(check_items)
             item_sizer.Add(item_list_box, 1, wx.EXPAND)
 
             sizer.Add(item_sizer)
@@ -399,7 +410,7 @@ class SettingsWindow(wx.Frame):
         elif keys[-1] == 'apply_button':
             module_name = MODULE_KEY.join(keys[1:-1])
             if self.save_settings(module_name):
-                log.info('Got non-dynamic changes')
+                log.debug('Got non-dynamic changes')
                 dialog = wx.MessageDialog(self, message="Warning, you have saved setting that are not dynamic, "
                                                         "please restart program to apply changes",
                                           caption="Caption",
@@ -467,6 +478,19 @@ class SettingsWindow(wx.Frame):
                         parser.set(section, item_name)
                 elif isinstance(wx_window, KeyListBox):
                     item_ids = wx_window.GetSelections()
+                    parser_options = parser.options(section)
+                    items_values = [wx_window.get_key_from_id(item_id) for item_id in item_ids]
+                    if not items_values:
+                        for option in parser_options:
+                            parser.remove_option(section, option)
+                    else:
+                        for option in parser_options:
+                            if option not in items_values:
+                                parser.remove_option(section, option)
+                        for value in items_values:
+                            parser.set(section, value)
+                elif isinstance(wx_window, KeyCheckListBox):
+                    item_ids = wx_window.GetChecked()
                     parser_options = parser.options(section)
                     items_values = [wx_window.get_key_from_id(item_id) for item_id in item_ids]
                     if not items_values:
