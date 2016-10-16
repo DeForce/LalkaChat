@@ -15,16 +15,15 @@ log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
 SYSTEM_USER = 'Funstream'
-CONF_DICT = [
-            {'gui_information': {
-                'category': 'chat'}},
-            {'config__gui': {
-                'for': 'config',
-                'hidden': 'socket'}},
-            {'config': {
-                'channel_name': 'CHANGE_ME',
-                'socket': 'ws://funstream.tv/socket.io/'}}
-        ]
+CONF_DICT = {
+    'gui_information': {
+        'category': 'chat'},
+    'config': {
+        'channel_name': 'CHANGE_ME',
+        'socket': 'ws://funstream.tv/socket.io/'}}
+CONF_GUI = {
+    'config': {
+        'hidden': ['socket']}}
 
 
 class FsChat(WebSocketClient):
@@ -241,7 +240,9 @@ class sc2tv(ChatModule):
         config = self_heal(conf_file, CONF_DICT)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+                            'parser': config,
+                            'config': CONF_DICT,
+                            'gui': CONF_GUI}
         # Checking config file for needed variables
         config_tag = 'config'
         socket = config.get(config_tag, 'socket')

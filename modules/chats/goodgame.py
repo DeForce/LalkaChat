@@ -16,16 +16,15 @@ log = logging.getLogger('goodgame')
 SOURCE = 'gg'
 SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
 SYSTEM_USER = 'GoodGame'
-CONF_DICT = [
-            {'gui_information': {
-                'category': 'chat'}},
-            {'config__gui': {
-                'for': 'config',
-                'hidden': 'socket'}},
-            {'config': {
-                'channel_name': 'CHANGE_ME',
-                'socket': 'ws://chat.goodgame.ru:8081/chat/websocket'}}
-        ]
+CONF_DICT = {
+    'gui_information': {
+        'category': 'chat'},
+    'config': {
+        'channel_name': 'CHANGE_ME',
+        'socket': 'ws://chat.goodgame.ru:8081/chat/websocket'}}
+CONF_GUI = {
+    'config': {
+        'hidden': ['socket']}}
 
 
 class GoodgameMessageHandler(threading.Thread):
@@ -92,7 +91,7 @@ class GoodgameMessageHandler(threading.Thread):
             if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):
                 comp['pm'] = True
             self.message_queue.put(comp)
-        elif msg['type'] == 'welcome':
+        elif msg['type'] == 'success_join':
             system_message('Successfully joined channel {0}'.format(self.nick), self.message_queue, SOURCE,
                            icon=SOURCE_ICON, from_user=SYSTEM_USER)
         elif msg['type'] == 'error':
@@ -206,7 +205,9 @@ class goodgame(ChatModule):
         config = self_heal(conf_file, CONF_DICT)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+                            'parser': config,
+                            'config': CONF_DICT,
+                            'gui': CONF_GUI}
 
         # Checking config file for needed variables
         conf_tag = 'config'

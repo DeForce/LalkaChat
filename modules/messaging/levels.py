@@ -6,6 +6,8 @@ import os
 import random
 import sqlite3
 import xml.etree.ElementTree as ElementTree
+from collections import OrderedDict
+
 from modules.helpers.parser import self_heal
 from modules.helpers.system import system_message, ModuleLoadException
 from modules.helpers.modules import MessagingModule
@@ -31,20 +33,19 @@ class levels(MessagingModule):
         main_settings = kwargs.get('main_settings')
 
         conf_file = os.path.join(conf_folder, "levels.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': u'messaging'}},
-            {'config': {
-                'message': u'{0} has leveled up, now he is {1}',
-                'db': u'levels.db',
-                'experience': u'geometrical',
-                'exp_for_level': 200}}
-        ]
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {'category': 'messaging'}
+        conf_dict['config'] = OrderedDict()
+        conf_dict['config']['message'] = u'{0} has leveled up, now he is {1}'
+        conf_dict['config']['db'] = u'levels.db'
+        conf_dict['config']['experience'] = u'geometrical'
+        conf_dict['config']['exp_for_level'] = 200
         config = self_heal(conf_file, conf_dict)
 
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config}
+                             'parser': config,
+                             'config': conf_dict}
         tag_config = 'config'
 
         self.conf_folder = conf_folder

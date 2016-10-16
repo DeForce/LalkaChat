@@ -61,15 +61,13 @@ def check_duplicate(item, window):
 def create_categories(loaded_modules):
     cat_dict = {}
     for module_name, module_config in loaded_modules.items():
-        if 'parser' not in module_config:
+        if 'config' not in module_config:
             continue
-        parser = module_config['parser']  # type: ConfigParser
-        if parser.has_section(INFORMATION_TAG) and parser.has_option(INFORMATION_TAG, 'category'):
-            tag = parser.get(INFORMATION_TAG, 'category')
+
+        config = module_config.get('config')
+        if INFORMATION_TAG in config:
+            tag = config[INFORMATION_TAG].get('category', 'undefined')
             item_dict = {module_name: module_config}
-            for key, value in parser.items(INFORMATION_TAG):
-                if key == 'hidden':
-                    item_dict[module_name][key] = [h_item.strip() for h_item in value.split(',')]
             if tag in cat_dict:
                 cat_dict[tag].append(item_dict)
             else:
@@ -216,9 +214,7 @@ class SettingsWindow(wx.Frame):
         page_sc_window = wx.ScrolledWindow(panel, id=id_renew(category_item), style=wx.VSCROLL)
         page_sc_window.SetScrollbars(5, 5, 10, 10)
 
-        config = self.prepare_config_for_window(category_config)
-
-        self.fill_sc_with_config(page_sc_window, config, category_item)
+        self.fill_sc_with_config(page_sc_window, category_config, category_item)
 
         sizer.Add(page_sc_window, 1, wx.EXPAND)
         # Buttons
@@ -231,11 +227,10 @@ class SettingsWindow(wx.Frame):
         panel.Layout()
         pass
 
-    def fill_sc_with_config(self, page_sc_window, config, category_item):
+    def fill_sc_with_config(self, page_sc_window, category_config, category_item):
         border_all = 5
         sizer = wx.BoxSizer(wx.VERTICAL)
-        for section in config['sections']:
-            section_key, section_tuple = section
+        for section_key, section_items in category_config['config'].items():
             if section_key in SKIP_TAGS:
                 continue
 
@@ -245,13 +240,8 @@ class SettingsWindow(wx.Frame):
 
             log.debug("Working on {0}".format(static_key))
 
-            view = 'normal'
-            if section_key in config['gui']:  # type: dict
-                log.debug('{0} has gui settings'.format(static_key))
-                view = config['gui'][section_key].get('view', 'normal')
-
             static_sizer.Add(self.create_items(static_box, static_key,
-                                               view, section_tuple, config['gui'].get(section_key, {})),
+                                               section_items, category_config.get('gui', {}).get(section_key, {})),
                              0, wx.EXPAND | wx.ALL, border_all)
 
             sizer.Add(static_sizer, 0, wx.EXPAND)
@@ -259,34 +249,14 @@ class SettingsWindow(wx.Frame):
 
     @staticmethod
     def prepare_config_for_window(category_config):
-        parser = ConfigParser(allow_no_value=True)  # type: ConfigParser
-        parser.readfp(open(category_config['file']))
-        config_dict = {'gui': {}, 'sections': []}
-        for section in parser.sections():
-            if SECTION_GUI_TAG in section:
-                gui_dict = {}
-                section_items = None
-                for item, value in parser.items(section):
-                    if item == 'for':
-                        section_items = [value_item.strip() for value_item in value.split(',')]
-                    elif item == 'hidden':
-                        gui_dict[item] = [value_item.strip() for value_item in value.split(',')]
-                    else:
-                        gui_dict[item] = value
-
-                if section_items:
-                    for section_item in section_items:
-                        config_dict['gui'][section_item] = gui_dict
-            else:
-                tag_values = []
-                for item, value in parser.items(section):
-                    tag_values.append((item, value))
-                config_dict['sections'].append((section, tag_values))
+        config_dict = {'gui': category_config.get('gui', {}),
+                       'sections': category_config.get('config', {})}
         return config_dict
 
-    def create_items(self, parent, key, view, section, section_gui):
+    def create_items(self, parent, key, section, section_gui):
         sizer = wx.BoxSizer(wx.VERTICAL)
         addable_sizer = None
+        view = section_gui.get('view', 'normal')
         if 'list' in view:
             is_dual = True if 'dual' in view else False
             style = wx.ALIGN_CENTER_VERTICAL
@@ -316,8 +286,7 @@ class SettingsWindow(wx.Frame):
             list_box.DisableDragRowSize()
             list_box.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.select_cell)
 
-            for index, items in enumerate(section):
-                item, value = items
+            for index, (item, value) in enumerate(section.items()):
                 list_box.AppendRows(1)
                 if is_dual:
                     list_box.SetCellValue(index, 0, item.decode('utf-8'))
@@ -396,9 +365,8 @@ class SettingsWindow(wx.Frame):
             items_to_add = []
             if not section:
                 return sizer
-            last_item = section[-1][0]
-            for item, value in section:
-                if not self.show_hidden and 'hidden' in section_gui and item in section_gui.get('hidden'):
+            for item, value in section.items():
+                if not self.show_hidden and item in section_gui.get('hidden', []):
                     continue
                 item_name = MODULE_KEY.join([key, item])
                 # Checking type of an item
@@ -424,8 +392,6 @@ class SettingsWindow(wx.Frame):
                                         (item_spacer, 0, 0),
                                         (item_box, 0)])
                     items_to_add.append(item_sizer)
-                if not item == last_item:
-                    items_to_add.append((self.spacer_size, 0, 0))
             sizer.AddMany(items_to_add)
         return sizer
 

@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import re
 import os
+from collections import OrderedDict
+
 from modules.helpers.parser import self_heal
 from modules.helpers.modules import MessagingModule
 
@@ -11,29 +13,28 @@ class df(MessagingModule):
         MessagingModule.__init__(self)
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "df.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'messaging'}},
-            {'grep': {
-                'symbol': '#',
-                'file': 'logs/df.txt'
-            }},
-            {'prof__gui': {
-                'for': 'prof',
+
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {'category': 'messaging'}
+        conf_dict['grep'] = OrderedDict()
+        conf_dict['grep']['symbol'] = '#'
+        conf_dict['grep']['file'] = 'logs/df.txt'
+        conf_dict['prof'] = OrderedDict()
+        conf_dict['prof']['Nothing'] = '([Нн]икто|[Nn]othing|\w*)'
+
+        conf_gui = {
+            'prof': {
                 'view': 'list_dual',
-                'addable': True
-            }},
-            {'prof': {
-                'Nothing': '([Нн]икто|[Nn]othing|\w*)'
-            }}
-        ]
+                'addable': True}}
         config = self_heal(conf_file, conf_dict)
         grep_tag = 'grep'
         prof_tag = 'prof'
 
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config}
+                             'parser': config,
+                             'config': conf_dict,
+                             'gui': conf_gui}
         self.symbol = config.get(grep_tag, 'symbol')
         self.file = config.get(grep_tag, 'file')
 

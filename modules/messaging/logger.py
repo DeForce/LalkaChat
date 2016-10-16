@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import os
 import datetime
+from collections import OrderedDict
+
 from modules.helpers.parser import self_heal
 from modules.helpers.modules import MessagingModule
 
@@ -13,21 +15,23 @@ class logger(MessagingModule):
         MessagingModule.__init__(self)
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "logger.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': u'messaging',
-                'id': DEFAULT_PRIORITY}},
-            {'config': {
-                'file_format': u'%Y-%m-%d',
-                'logging': u'true',
-                'message_date_format': u'%Y-%m-%d %H:%M:%S',
-                'rotation': u'daily'}}
-        ]
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {
+            'category': 'messaging',
+            'id': DEFAULT_PRIORITY
+        }
+        conf_dict['config'] = OrderedDict()
+        conf_dict['config']['logging'] = True
+        conf_dict['config']['file_format'] = '%Y-%m-%d'
+        conf_dict['config']['message_date_format'] = '%Y-%m-%d %H:%M:%S'
+        conf_dict['config']['rotation'] = 'daily'
+
         config = self_heal(conf_file, conf_dict)
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                              'parser': config,
-                             'id': config.get('gui_information', 'id')}
+                             'id': config.get('gui_information', 'id'),
+                             'config': conf_dict}
 
         tag_config = 'config'
 

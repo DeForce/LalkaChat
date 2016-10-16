@@ -8,6 +8,7 @@ import gui
 import sys
 import logging
 import logging.config
+from collections import OrderedDict
 from modules.helpers.parser import self_heal
 from modules.helpers.system import load_translations_keys
 
@@ -76,31 +77,31 @@ def init():
             exit()
 
     logger.info("Loading basic configuration")
-    main_config_dict = [
-        {'gui_information': {
+    main_config_dict = {
+        'gui_information': {
             'category': 'main',
-            'width': 450,
-            'height': 500}},
-        {'language__gui': {
-            'for': 'language',
+            'width': '450',
+            'height': '500'},
+        'gui': {
+            'show_hidden': 'True',
+            'gui': 'True',
+            'on_top': 'True',
+            'reload': 'None'
+        },
+        'style': 'czt',
+        'language': 'en'
+    }
+    main_config_gui = {
+        'style': {
+            'check': 'http',
+            'check_type': 'dir',
+            'view': 'choose_single'},
+        'language': {
             'view': 'choose_single',
             'check_type': 'dir',
             'check': 'translations'
-        }},
-        {'gui': {
-            'show_hidden': True,
-            'gui': True,
-            'on_top': True,
-            'reload': None
-        }},
-        {'style__gui': {
-            'check': 'http',
-            'check_type': 'dir',
-            'for': 'style',
-            'view': 'choose_single'}},
-        {'style': 'czt'},
-        {'language': 'en'}
-    ]
+        }
+    }
     config = self_heal(MAIN_CONF_FILE, main_config_dict)
     # Adding config for main module
     loaded_modules['config'] = {'folder': CONF_FOLDER,
@@ -108,7 +109,9 @@ def init():
                                 'filename': main_config['main_conf_file_name'],
                                 'parser': config,
                                 'root_folder': main_config['root_folder'],
-                                'logs_folder': LOG_FOLDER}
+                                'logs_folder': LOG_FOLDER,
+                                'config': OrderedDict(main_config_dict),
+                                'gui': main_config_gui}
 
     gui_settings['gui'] = config.getboolean(GUI_TAG, 'gui')
     gui_settings['on_top'] = config.getboolean(GUI_TAG, 'gui')
@@ -144,22 +147,25 @@ def init():
     chat_modules = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_tag = "chats"
     chat_location = os.path.join(MODULE_FOLDER, "chats")
-    chat_conf_dict = [
-        {'gui_information': {
-            'category': 'main'}},
-        {'chats__gui': {
+    chat_conf_dict = {
+        'gui_information': {
+            'category': 'main'},
+        'chats': {}
+    }
+    chat_conf_gui = {
+        'chats__gui': {
             'for': 'chats',
             'view': 'choose_multiple',
             'check_type': 'files',
             'check': 'modules/chats',
-            'file_extension': False}},
-        {'chats': {}}
-    ]
-
+            'file_extension': False}
+    }
     chat_config = self_heal(chat_modules, chat_conf_dict)
     loaded_modules['chat_modules'] = {'folder': CONF_FOLDER, 'file': chat_modules,
                                       'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
-                                      'parser': chat_config}
+                                      'parser': chat_config,
+                                      'config': chat_conf_dict,
+                                      'gui': chat_conf_gui}
 
     for module, settings in chat_config.items(chat_tag):
         logger.info("Loading chat module: {0}".format(module))
