@@ -40,12 +40,14 @@ class levels(MessagingModule):
         conf_dict['config']['db'] = u'levels.db'
         conf_dict['config']['experience'] = u'geometrical'
         conf_dict['config']['exp_for_level'] = 200
+        conf_gui = {'non_dynamic': ['config.*']}
         config = self_heal(conf_file, conf_dict)
 
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                              'parser': config,
-                             'config': conf_dict}
+                             'config': conf_dict,
+                             'gui': conf_gui}
         tag_config = 'config'
 
         self.conf_folder = conf_folder

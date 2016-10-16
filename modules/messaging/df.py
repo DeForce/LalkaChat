@@ -24,7 +24,8 @@ class df(MessagingModule):
         conf_gui = {
             'prof': {
                 'view': 'list_dual',
-                'addable': True}}
+                'addable': True},
+            'non_dynamic': ['grep.*']}
         config = self_heal(conf_file, conf_dict)
         grep_tag = 'grep'
         prof_tag = 'prof'

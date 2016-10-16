@@ -149,7 +149,7 @@ class SettingsWindow(wx.Frame):
     def on_close(self, event):
         dialog = wx.MessageDialog(self, message="Are you sure you want to quit?",
                                   caption="Caption",
-                                  style=wx.YES_NO,
+                                  style=wx.YES_NO | wx.CANCEL,
                                   pos=wx.DefaultPosition)
         response = dialog.ShowModal()
 
@@ -397,7 +397,20 @@ class SettingsWindow(wx.Frame):
         if keys[-1] in ['list_add', 'list_remove']:
             self.list_operation(MODULE_KEY.join(keys[:-1]), action=keys[-1])
         elif keys[-1] == 'apply_button':
-            self.save_settings(MODULE_KEY.join(keys[1:-1]))
+            module_name = MODULE_KEY.join(keys[1:-1])
+            if self.save_settings(module_name):
+                log.info('Got non-dynamic changes')
+                dialog = wx.MessageDialog(self, message="Warning, you have saved setting that are not dynamic, "
+                                                        "please restart program to apply changes",
+                                          caption="Caption",
+                                          style=wx.OK_DEFAULT,
+                                          pos=wx.DefaultPosition)
+                response = dialog.ShowModal()
+
+                if response == wx.ID_YES:
+                    self.on_exit(event)
+                else:
+                    event.StopPropagation()
             self.settings_saved = True
         elif keys[-1] == 'cancel_button':
             self.on_close(event)
@@ -409,11 +422,21 @@ class SettingsWindow(wx.Frame):
 
     def save_settings(self, module):
         module_config = self.main_class.loaded_modules.get(module, {})
+        non_dynamic = module_config.get('gui', {}).get('non_dynamic', [])
+        non_dynamic_check = False
         if module_config:
             parser = module_config['parser']
             items = get_list_of_ids_from_module_name(module, return_tuple=True)
             for item, name in items:
                 module_name, section, item_name = name.split(MODULE_KEY)
+                for d_item in non_dynamic:
+                    if section in d_item:
+                        if MODULE_KEY.join([section, '*']) in d_item:
+                            non_dynamic_check = True
+                            break
+                        elif MODULE_KEY.join([section, item_name]) in d_item:
+                            non_dynamic_check = True
+                            break
                 wx_window = wx.FindWindowById(item)
                 if isinstance(wx_window, wx.CheckBox):
                     if name == MODULE_KEY.join(['config', 'gui', 'show_hidden']):
@@ -457,6 +480,7 @@ class SettingsWindow(wx.Frame):
                             parser.set(section, value)
             with open(module_config['file'], 'w') as config_file:
                 parser.write(config_file)
+        return non_dynamic_check
 
     def select_cell(self, event):
         self.selected_cell = (event.GetRow(), event.GetCol())

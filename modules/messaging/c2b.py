@@ -47,7 +47,8 @@ class c2b(MessagingModule):
         conf_gui = {
             'config': {
                 'addable': 'true',
-                'view': 'list_dual'}}
+                'view': 'list_dual'},
+            'non_dynamic': ['config.*']}
         config = self_heal(conf_file, conf_dict)
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),

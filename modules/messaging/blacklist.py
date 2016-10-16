@@ -41,7 +41,8 @@ class blacklist(MessagingModule):
                 'addable': 'true'},
             'users_block': {
                 'view': 'list',
-                'addable': 'true'}}
+                'addable': 'true'},
+            'non_dynamic': ['main.*']}
         config = self_heal(conf_file, conf_dict)
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),

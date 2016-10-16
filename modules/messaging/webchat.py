@@ -168,6 +168,7 @@ class webchat(MessagingModule):
         conf_dict['server'] = OrderedDict()
         conf_dict['server']['host'] = '127.0.0.1'
         conf_dict['server']['port'] = '8080'
+        conf_gui = {'non_dynamic': ['server.*']}
 
         config = self_heal(conf_file, conf_dict)
 
@@ -181,6 +182,7 @@ class webchat(MessagingModule):
                              'parser': config,
                              'id': config.get('gui_information', 'id'),
                              'config': conf_dict,
+                             'gui': conf_gui,
                              'port': port}
 
         s_thread = SocketThread(host, port, conf_folder, style=style)

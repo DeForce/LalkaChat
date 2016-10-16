@@ -99,7 +99,8 @@ def init():
             'view': 'choose_single',
             'check_type': 'dir',
             'check': 'translations'
-        }
+        },
+        'non_dynamic': ['style.list_box', 'language.list_box', 'gui.*']
     }
     config = self_heal(MAIN_CONF_FILE, main_config_dict)
     # Adding config for main module
@@ -157,7 +158,8 @@ def init():
             'view': 'choose_multiple',
             'check_type': 'files',
             'check': 'modules/chats',
-            'file_extension': False}}
+            'file_extension': False},
+        'non_dynamic': ['chats.list_box']}
     chat_config = self_heal(chat_modules, chat_conf_dict)
     loaded_modules['chat_modules'] = {'folder': CONF_FOLDER, 'file': chat_modules,
                                       'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
