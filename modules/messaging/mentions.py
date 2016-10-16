@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+from collections import OrderedDict
+
 from modules.helpers.parser import self_heal
 from modules.helpers.modules import MessagingModule
 
@@ -11,20 +13,24 @@ class mentions(MessagingModule):
         MessagingModule.__init__(self)
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "mentions.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'messaging'}},
-            {'config__gui': {
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {'category': 'messaging'}
+        conf_dict['mentions'] = {}
+        conf_dict['address'] = {}
+
+        conf_gui = {
+            'mentions': {
                 'addable': 'true',
-                'for': 'mentions, address',
-                'view': 'list'}},
-            {'mentions': {}},
-            {'address': {}}
-        ]
+                'view': 'list'},
+            'address': {
+                'addable': 'true',
+                'view': 'list'}}
         config = self_heal(conf_file, conf_dict)
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config}
+                             'parser': config,
+                             'config': conf_dict,
+                             'gui': conf_gui}
         mention_tag = 'mentions'
         address_tag = 'address'
         if config.has_section(mention_tag):

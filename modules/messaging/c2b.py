@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import re
+from collections import OrderedDict
 from modules.helpers.parser import self_heal
 from modules.helpers.modules import MessagingModule
 
@@ -36,22 +37,24 @@ class c2b(MessagingModule):
         MessagingModule.__init__(self)
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "c2b.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'messaging',
-                'id': DEFAULT_PRIORITY}},
-            {'config__gui': {
-                'for': 'config',
-                'addable': 'true',
-                'view': 'list_dual'}},
-            {'config': {}}
-        ]
 
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {
+            'category': 'messaging',
+            'id': DEFAULT_PRIORITY}
+        conf_dict['config'] = {}
+
+        conf_gui = {
+            'config': {
+                'addable': 'true',
+                'view': 'list_dual'}}
         config = self_heal(conf_file, conf_dict)
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                              'parser': config,
-                             'id': config.get('gui_information', 'id')}
+                             'id': config.get('gui_information', 'id'),
+                             'config': conf_dict,
+                             'gui': conf_gui}
 
         tag_config = 'config'
         self.f_items = []

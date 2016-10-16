@@ -40,21 +40,23 @@ class Message(threading.Thread):
         modules_list = {}
 
         conf_file = os.path.join(config_dict['conf_folder'], "messaging.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'main'}},
-            {'messaging__gui': {'check': 'modules/messaging',
-                                'check_type': 'files',
-                                'file_extension': False,
-                                'for': 'messaging',
-                                'view': 'choose_multiple'}},
-            {'messaging': {
+        conf_dict = {
+            'gui_information': {
+                'category': 'main'},
+            'messaging': {
                 'webchat': None}}
-        ]
+        conf_dict_gui = {
+            'messaging__gui': {'check': 'modules/messaging',
+                               'check_type': 'files',
+                               'file_extension': False,
+                               'for': 'messaging',
+                               'view': 'choose_multiple'},
+        }
         config = self_heal(conf_file, conf_dict)
         modules_list['messaging_modules'] = {'folder': config_dict['conf_folder'], 'file': conf_file,
                                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                                             'parser': config}
+                                             'parser': config,
+                                             'gui': conf_dict_gui}
 
         modules = {}
         # Loading modules from cfg.

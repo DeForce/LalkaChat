@@ -22,18 +22,17 @@ NOT_FOUND = 'none'
 SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 SYSTEM_USER = 'Twitch.TV'
-CONF_DICT = [
-            {'gui_information': {
-                'category': 'chat'}},
-            {'config__gui': {
-                'for': 'config',
-                'hidden': 'host, port'}},
-            {'config': {
-                'bttv': 'true',
-                'channel': 'CHANGE_ME',
-                'host': 'irc.twitch.tv',
-                'port': '6667'}}
-        ]
+CONF_DICT = {
+    'gui_information': {
+        'category': 'chat'},
+    'config': {
+        'bttv': 'true',
+        'channel': 'CHANGE_ME',
+        'host': 'irc.twitch.tv',
+        'port': '6667'}}
+CONF_GUI = {
+    'config': {
+        'hidden': ['host', 'port']}}
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -267,7 +266,9 @@ class twitch(ChatModule):
         config = self_heal(conf_file, CONF_DICT)
         self.conf_params = {'folder': conf_folder, 'file': conf_file,
                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+                            'parser': config,
+                            'config': CONF_DICT,
+                            'gui': CONF_GUI}
 
         config.read(conf_file)
         # Checking config file for needed variables

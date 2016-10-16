@@ -2,6 +2,8 @@ import os
 import threading
 import json
 import Queue
+from collections import OrderedDict
+
 import cherrypy
 import logging
 from cherrypy.lib.static import serve_file
@@ -158,13 +160,14 @@ class webchat(MessagingModule):
         MessagingModule.__init__(self)
         main_settings = kwargs.get('main_settings')
         conf_file = os.path.join(conf_folder, "webchat.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'main',
-                'id': DEFAULT_PRIORITY}},
-            {'server': {
-                'host': '127.0.0.1',
-                'port': '8080'}}]
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {
+            'category': 'main',
+            'id': DEFAULT_PRIORITY
+        }
+        conf_dict['server'] = OrderedDict()
+        conf_dict['server']['host'] = '127.0.0.1'
+        conf_dict['server']['port'] = '8080'
 
         config = self_heal(conf_file, conf_dict)
 
@@ -177,6 +180,7 @@ class webchat(MessagingModule):
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                              'parser': config,
                              'id': config.get('gui_information', 'id'),
+                             'config': conf_dict,
                              'port': port}
 
         s_thread = SocketThread(host, port, conf_folder, style=style)

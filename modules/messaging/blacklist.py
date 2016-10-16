@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import re
 import os
+from collections import OrderedDict
 from modules.helpers.parser import self_heal
 from modules.helpers.modules import MessagingModule
 
@@ -16,30 +17,38 @@ class blacklist(MessagingModule):
         MessagingModule.__init__(self)
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "blacklist.cfg")
-        config_dict = [
-            {'gui_information': {
-                'category': 'messaging',
-                'id': DEFAULT_PRIORITY}},
-            {'main': {
-                'message': u'ignored message'}},
-            {'users__gui': {
-                'for': 'users_hide, users_block',
-                'view': 'list',
-                'addable': 'true'}},
-            {'users_hide': {}},
-            {'users_block': {
-                'announce': None}},
-            {'words__gui': {
-                'for': 'words_hide, words_block',
-                'addable': True,
-                'view': 'list'}}
-        ]
 
-        config = self_heal(conf_file, config_dict)
+        # Ordered because order matters
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {
+            'category': 'messaging',
+            'id': DEFAULT_PRIORITY}
+        conf_dict['main'] = {'message': u'ignored message'}
+        conf_dict['users_hide'] = {}
+        conf_dict['users_block'] = {}
+        conf_dict['words_hide'] = {}
+        conf_dict['words_block'] = {}
+
+        conf_gui = {
+            'words_hide': {
+                'addable': True,
+                'view': 'list'},
+            'words_block': {
+                'addable': True,
+                'view': 'list'},
+            'users_hide': {
+                'view': 'list',
+                'addable': 'true'},
+            'users_block': {
+                'view': 'list',
+                'addable': 'true'}}
+        config = self_heal(conf_file, conf_dict)
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                              'parser': config,
-                             'id': config.get('gui_information', 'id')}
+                             'id': config.get('gui_information', 'id'),
+                             'config': OrderedDict(conf_dict),
+                             'gui': conf_gui}
 
         for item in config.sections():
             for param, value in config.items(item):
