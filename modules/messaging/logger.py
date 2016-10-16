@@ -25,13 +25,15 @@ class logger(MessagingModule):
         conf_dict['config']['file_format'] = '%Y-%m-%d'
         conf_dict['config']['message_date_format'] = '%Y-%m-%d %H:%M:%S'
         conf_dict['config']['rotation'] = 'daily'
+        conf_gui = {'non_dynamic': ['config.*']}
 
         config = self_heal(conf_file, conf_dict)
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                              'parser': config,
                              'id': config.get('gui_information', 'id'),
-                             'config': conf_dict}
+                             'config': conf_dict,
+                             'gui': conf_gui}
 
         tag_config = 'config'
 

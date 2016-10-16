@@ -24,7 +24,8 @@ class mentions(MessagingModule):
                 'view': 'list'},
             'address': {
                 'addable': 'true',
-                'view': 'list'}}
+                'view': 'list'},
+            'non_dynamic': ['mentions.*', 'address.*']}
         config = self_heal(conf_file, conf_dict)
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),

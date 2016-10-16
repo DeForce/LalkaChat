@@ -45,17 +45,18 @@ class Message(threading.Thread):
         conf_dict['gui_information'] = {'category': 'messaging'}
         conf_dict['messaging'] = {'webchat': None}
 
-        conf_dict_gui = {
+        conf_gui = {
             'messaging': {'check': 'modules/messaging',
                           'check_type': 'files',
                           'file_extension': False,
-                          'view': 'choose_multiple'}}
+                          'view': 'choose_multiple'},
+            'non_dynamic': ['messaging.*']}
         config = self_heal(conf_file, conf_dict)
         modules_list['messaging_modules'] = {'folder': main_config['conf_folder'], 'file': conf_file,
                                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                                              'parser': config,
                                              'config': conf_dict,
-                                             'gui': conf_dict_gui}
+                                             'gui': conf_gui}
 
         modules = {}
         # Loading modules from cfg.
