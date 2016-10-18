@@ -16,6 +16,7 @@ from modules.helper.modules import MessagingModule
 from gui import MODULE_KEY
 
 DEFAULT_PRIORITY = 9001
+HISTORY_SIZE = 20
 s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 log = logging.getLogger('webchat')
@@ -66,7 +67,7 @@ class WebChatPlugin(WebSocketPlugin):
         WebSocketPlugin.__init__(self, bus)
         self.clients = []
         self.history = []
-        self.history_size = 10
+        self.history_size = HISTORY_SIZE
 
     def start(self):
         WebSocketPlugin.start(self)

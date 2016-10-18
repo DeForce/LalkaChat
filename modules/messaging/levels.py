@@ -40,7 +40,11 @@ class levels(MessagingModule):
         conf_dict['config']['db'] = u'levels.db'
         conf_dict['config']['experience'] = u'geometrical'
         conf_dict['config']['exp_for_level'] = 200
-        conf_gui = {'non_dynamic': ['config.*']}
+        conf_gui = {'non_dynamic': ['config.*'],
+                    'config': {
+                        'experience': {
+                            'view': 'dropdown',
+                            'choices': ['static', 'geometrical', 'random']}}}
         config = self_heal(conf_file, conf_dict)
 
         self._conf_params = {'folder': conf_folder, 'file': conf_file,

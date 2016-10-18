@@ -97,6 +97,15 @@ class KeyCheckListBox(wx.CheckListBox):
         return self.keys[index]
 
 
+class KeyChoice(wx.Choice):
+    def __init__(self, *args, **kwargs):
+        self.keys = kwargs.pop('keys', [])
+        wx.Choice.__init__(self, *args, **kwargs)
+
+    def get_key_from_id(self, index):
+        return self.keys[index]
+
+
 class MainMenuToolBar(wx.ToolBar):
     def __init__(self, *args, **kwargs):
         self.main_class = kwargs['main_class']  # type: ChatGui
@@ -261,125 +270,159 @@ class SettingsWindow(wx.Frame):
 
     def create_items(self, parent, key, section, section_gui):
         sizer = wx.BoxSizer(wx.VERTICAL)
-        addable_sizer = None
         view = section_gui.get('view', 'normal')
         if 'list' in view:
-            is_dual = True if 'dual' in view else False
-            style = wx.ALIGN_CENTER_VERTICAL
-            item_sizer = wx.BoxSizer(wx.VERTICAL)
-            if section_gui.get('addable', False):
-                addable_sizer = wx.BoxSizer(wx.HORIZONTAL)
-                item_input_key = MODULE_KEY.join([key, 'list_input'])
-                addable_sizer.Add(wx.TextCtrl(parent, id=id_renew(item_input_key, update=True)), 0, style)
-                if is_dual:
-                    item_input2_key = MODULE_KEY.join([key, 'list_input2'])
-                    addable_sizer.Add(wx.TextCtrl(parent, id=id_renew(item_input2_key, update=True)), 0, style)
-
-                item_apply_key = MODULE_KEY.join([key, 'list_add'])
-                item_apply_id = id_renew(item_apply_key, update=True)
-                addable_sizer.Add(wx.Button(parent, id=item_apply_id, label=translate_key(item_apply_key)), 0, style)
-                self.Bind(wx.EVT_BUTTON, self.button_clicked, id=item_apply_id)
-
-                item_remove_key = MODULE_KEY.join([key, 'list_remove'])
-                item_remove_id = id_renew(item_remove_key, update=True)
-                addable_sizer.Add(wx.Button(parent, id=item_remove_id, label=translate_key(item_remove_key)), 0, style)
-                self.Bind(wx.EVT_BUTTON, self.button_clicked, id=item_remove_id)
-
-                item_sizer.Add(addable_sizer, 0, wx.EXPAND)
-            list_box = wx.grid.Grid(parent, id=id_renew(MODULE_KEY.join([key, 'list_box']), update=True))
-            list_box.CreateGrid(0, 2 if is_dual else 1)
-            list_box.DisableDragColSize()
-            list_box.DisableDragRowSize()
-            list_box.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.select_cell)
-
-            for index, (item, value) in enumerate(section.items()):
-                list_box.AppendRows(1)
-                if is_dual:
-                    list_box.SetCellValue(index, 0, item.decode('utf-8'))
-                    list_box.SetCellValue(index, 1, value.decode('utf-8'))
-                else:
-                    list_box.SetCellValue(index, 0, item.decode('utf-8'))
-            list_box.SetColLabelSize(1)
-            list_box.SetRowLabelSize(1)
-            if addable_sizer:
-                col_size = addable_sizer.GetMinSize()[0] - 2
-                if is_dual:
-                    first_col_size = list_box.GetColSize(0)
-                    second_col_size = col_size - first_col_size if first_col_size < col_size else -1
-                    list_box.SetColSize(1, second_col_size)
-                else:
-                    list_box.SetDefaultColSize(col_size, resizeExistingCols=True)
-            else:
-                list_box.AutoSize()
-
-            # Adding size of scrollbars
-            size = list_box.GetEffectiveMinSize()
-            size[0] += 18
-            size[1] += 18
-            list_box.SetMinSize(size)
-            item_sizer.Add(list_box, 1, wx.EXPAND)
-
-            sizer.Add(item_sizer)
+            sizer.Add(self.create_list(parent, view, key, section, section_gui))
         elif 'choose' in view:
-            is_single = True if 'single' in view else False
-            style = wx.LB_SINGLE if is_single else wx.LB_EXTENDED
-            item_sizer = wx.BoxSizer(wx.VERTICAL)
-            list_items = []
-            translated_items = []
-
-            if section_gui['check_type'] in ['dir', 'folder', 'files']:
-                check_type = section_gui['check_type']
-                keep_extension = section_gui['file_extension'] if 'file_extension' in section_gui else False
-                for item_in_list in os.listdir(os.path.join(self.main_class.main_config['root_folder'],
-                                                            section_gui['check'])):
-                    item_path = os.path.join(self.main_class.main_config['root_folder'],
-                                             section_gui['check'], item_in_list)
-                    if check_type in ['dir', 'folder'] and os.path.isdir(item_path):
-                        list_items.append(item_in_list)
-                    elif check_type == 'files' and os.path.isfile(item_path):
-                        if not keep_extension:
-                            item_in_list = ''.join(os.path.basename(item_path).split('.')[:-1])
-                        if '__init__' not in item_in_list:
-                            if item_in_list not in list_items:
-                                list_items.append(item_in_list)
-                                translated_items.append(translate_key(item_in_list))
-            elif section_gui['check_type'] == 'sections':
-                parser = ConfigParser(allow_no_value=True)
-                parser.read(section_gui.get('check', ''))
-                for item in parser.sections():
-                    list_items.append(translate_key(item))
-
-            item_key = MODULE_KEY.join([key, 'list_box'])
-            label_text = translate_key(item_key)
-            if label_text:
-                item_sizer.Add(wx.StaticText(parent, label=label_text, style=wx.ALIGN_RIGHT))
-            if is_single:
-                item_list_box = KeyListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
-                                           choices=translated_items if translated_items else list_items, style=style)
-            else:
-                item_list_box = KeyCheckListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
-                                                choices=translated_items if translated_items else list_items)
-
-            section_for = section if not is_single else {section: None}
-            if is_single:
-                [item_list_box.SetSelection(list_items.index(item)) for item, value in section_for.items()]
-            else:
-                check_items = [list_items.index(item) for item, value in section_for.items()]
-                item_list_box.SetChecked(check_items)
-            item_sizer.Add(item_list_box, 1, wx.EXPAND)
-
-            sizer.Add(item_sizer)
+            sizer.Add(self.create_choose(parent, view, key, section, section_gui))
         else:
-            if not section:
-                return sizer
-            flex_grid = wx.FlexGridSizer(0, 2, ITEM_SPACING_VERT, ITEM_SPACING_HORZ)
-            for item, value in section.items():
-                if not self.show_hidden and item in section_gui.get('hidden', []):
-                    continue
-                item_name = MODULE_KEY.join([key, item])
+            sizer.Add(self.create_item(parent, view, key, section, section_gui))
+        return sizer
+
+    def create_list(self, parent, view, key, section, section_gui):
+        is_dual = True if 'dual' in view else False
+        style = wx.ALIGN_CENTER_VERTICAL
+        item_sizer = wx.BoxSizer(wx.VERTICAL)
+        addable_sizer = None
+        if section_gui.get('addable', False):
+            addable_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            item_input_key = MODULE_KEY.join([key, 'list_input'])
+            addable_sizer.Add(wx.TextCtrl(parent, id=id_renew(item_input_key, update=True)), 0, style)
+            if is_dual:
+                item_input2_key = MODULE_KEY.join([key, 'list_input2'])
+                addable_sizer.Add(wx.TextCtrl(parent, id=id_renew(item_input2_key, update=True)), 0, style)
+
+            item_apply_key = MODULE_KEY.join([key, 'list_add'])
+            item_apply_id = id_renew(item_apply_key, update=True)
+            addable_sizer.Add(wx.Button(parent, id=item_apply_id, label=translate_key(item_apply_key)), 0, style)
+            self.Bind(wx.EVT_BUTTON, self.button_clicked, id=item_apply_id)
+
+            item_remove_key = MODULE_KEY.join([key, 'list_remove'])
+            item_remove_id = id_renew(item_remove_key, update=True)
+            addable_sizer.Add(wx.Button(parent, id=item_remove_id, label=translate_key(item_remove_key)), 0, style)
+            self.Bind(wx.EVT_BUTTON, self.button_clicked, id=item_remove_id)
+
+            item_sizer.Add(addable_sizer, 0, wx.EXPAND)
+        list_box = wx.grid.Grid(parent, id=id_renew(MODULE_KEY.join([key, 'list_box']), update=True))
+        list_box.CreateGrid(0, 2 if is_dual else 1)
+        list_box.DisableDragColSize()
+        list_box.DisableDragRowSize()
+        list_box.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.select_cell)
+
+        for index, (item, value) in enumerate(section.items()):
+            list_box.AppendRows(1)
+            if is_dual:
+                list_box.SetCellValue(index, 0, item.decode('utf-8'))
+                list_box.SetCellValue(index, 1, value.decode('utf-8'))
+            else:
+                list_box.SetCellValue(index, 0, item.decode('utf-8'))
+        list_box.SetColLabelSize(1)
+        list_box.SetRowLabelSize(1)
+        if addable_sizer:
+            col_size = addable_sizer.GetMinSize()[0] - 2
+            if is_dual:
+                first_col_size = list_box.GetColSize(0)
+                second_col_size = col_size - first_col_size if first_col_size < col_size else -1
+                list_box.SetColSize(1, second_col_size)
+            else:
+                list_box.SetDefaultColSize(col_size, resizeExistingCols=True)
+        else:
+            list_box.AutoSize()
+
+        # Adding size of scrollbars
+        size = list_box.GetEffectiveMinSize()
+        size[0] += 18
+        size[1] += 18
+        list_box.SetMinSize(size)
+        item_sizer.Add(list_box, 1, wx.EXPAND)
+        return item_sizer
+
+    def create_choose(self, parent, view, key, section, section_gui):
+        is_single = True if 'single' in view else False
+        style = wx.LB_SINGLE if is_single else wx.LB_EXTENDED
+        item_sizer = wx.BoxSizer(wx.VERTICAL)
+        list_items = []
+        translated_items = []
+
+        if section_gui['check_type'] in ['dir', 'folder', 'files']:
+            check_type = section_gui['check_type']
+            keep_extension = section_gui['file_extension'] if 'file_extension' in section_gui else False
+            for item_in_list in os.listdir(os.path.join(self.main_class.main_config['root_folder'],
+                                                        section_gui['check'])):
+                item_path = os.path.join(self.main_class.main_config['root_folder'],
+                                         section_gui['check'], item_in_list)
+                if check_type in ['dir', 'folder'] and os.path.isdir(item_path):
+                    list_items.append(item_in_list)
+                elif check_type == 'files' and os.path.isfile(item_path):
+                    if not keep_extension:
+                        item_in_list = ''.join(os.path.basename(item_path).split('.')[:-1])
+                    if '__init__' not in item_in_list:
+                        if item_in_list not in list_items:
+                            list_items.append(item_in_list)
+                            translated_items.append(translate_key(item_in_list))
+        elif section_gui['check_type'] == 'sections':
+            parser = ConfigParser(allow_no_value=True)
+            parser.read(section_gui.get('check', ''))
+            for item in parser.sections():
+                list_items.append(translate_key(item))
+
+        item_key = MODULE_KEY.join([key, 'list_box'])
+        label_text = translate_key(item_key)
+        if label_text:
+            item_sizer.Add(wx.StaticText(parent, label=label_text, style=wx.ALIGN_RIGHT))
+        if is_single:
+            item_list_box = KeyListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
+                                       choices=translated_items if translated_items else list_items, style=style)
+        else:
+            item_list_box = KeyCheckListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
+                                            choices=translated_items if translated_items else list_items)
+
+        section_for = section if not is_single else {section: None}
+        if is_single:
+            [item_list_box.SetSelection(list_items.index(item)) for item, value in section_for.items()]
+        else:
+            check_items = [list_items.index(item) for item, value in section_for.items()]
+            item_list_box.SetChecked(check_items)
+        item_sizer.Add(item_list_box, 1, wx.EXPAND)
+        return item_sizer
+
+    def create_dropdown(self, parent, view, key, section, section_gui, section_item=False, short_key=None):
+        item_text = wx.StaticText(parent, label=translate_key(key),
+                                  style=wx.ALIGN_RIGHT)
+        choices = section_gui.get('choices')
+        key = key if section_item else MODULE_KEY.join([key, 'dropdown'])
+        item_box = KeyChoice(parent, id=id_renew(key, update=True),
+                             keys=choices, choices=choices)
+        item_value = section[short_key] if section_item else section
+        item_box.SetSelection(choices.index(item_value))
+        return item_text, item_box
+
+    def create_item(self, parent, view, key, section, section_gui):
+        flex_grid = wx.FlexGridSizer(0, 2, ITEM_SPACING_VERT, ITEM_SPACING_HORZ)
+        flex_grid.SetFlexibleDirection(wx.VERTICAL)
+        if not section:
+            return wx.Sizer()
+        for item, value in section.items():
+            if not self.show_hidden and item in section_gui.get('hidden', []):
+                continue
+            item_name = MODULE_KEY.join([key, item])
+            if item in section_gui:
+                log.info("Got item in keys")
+                if 'list' in section_gui[item].get('view'):
+                    flex_grid.Add(self.create_list(parent, view, item_name, section, section_gui[item]))
+                    flex_grid.AddSpacer(wx.Size(0, 0))
+                elif 'choose' in section_gui[item].get('view'):
+                    flex_grid.Add(self.create_choose(parent, view, item_name, section, section_gui[item]))
+                    flex_grid.AddSpacer(wx.Size(0, 0))
+                elif 'dropdown' in section_gui[item].get('view'):
+                    text, control = self.create_dropdown(parent, view, item_name, section, section_gui[item],
+                                                         section_item=True, short_key=item)
+                    flex_grid.Add(text)
+                    flex_grid.Add(control)
+            else:
                 # Checking type of an item
                 style = wx.ALIGN_CENTER_VERTICAL
-                if not value:  # Button
+                if value is None:  # Button
                     button_id = id_renew(item_name, update=True)
                     item_button = wx.Button(parent, id=button_id, label=translate_key(item_name))
                     flex_grid.Add(item_button, 0, wx.ALIGN_LEFT)
@@ -398,8 +441,7 @@ class SettingsWindow(wx.Frame):
                                               style=wx.ALIGN_RIGHT)
                     flex_grid.Add(item_text)
                     flex_grid.Add(item_box)
-            sizer.Add(flex_grid)
-        return sizer
+        return flex_grid
 
     def button_clicked(self, event):
         log.debug("[Settings] Button clicked: {0}".format(IDS[event.GetId()]))
@@ -432,14 +474,16 @@ class SettingsWindow(wx.Frame):
         event.Skip()
 
     def save_settings(self, module):
-        module_config = self.main_class.loaded_modules.get(module, {})
-        non_dynamic = module_config.get('gui', {}).get('non_dynamic', [])
+        module_settings = self.main_class.loaded_modules.get(module, {})
+        non_dynamic = module_settings.get('gui', {}).get('non_dynamic', [])
+        module_config = module_settings.get('config')
         non_dynamic_check = False
-        if module_config:
-            parser = module_config['parser']
+        if module_settings:
+            parser = module_settings['parser']
             items = get_list_of_ids_from_module_name(module, return_tuple=True)
             for item, name in items:
                 module_name, section, item_name = name.split(MODULE_KEY)
+                # Check for non-dynamic items
                 for d_item in non_dynamic:
                     if section in d_item:
                         if MODULE_KEY.join([section, '*']) in d_item:
@@ -448,14 +492,17 @@ class SettingsWindow(wx.Frame):
                         elif MODULE_KEY.join([section, item_name]) in d_item:
                             non_dynamic_check = True
                             break
+                # Saving
                 wx_window = wx.FindWindowById(item)
                 if isinstance(wx_window, wx.CheckBox):
                     if name == MODULE_KEY.join(['config', 'gui', 'show_hidden']):
                         self.show_hidden = wx_window.IsChecked()
                     parser.set(section, item_name, wx_window.IsChecked())
+                    module_config[section][item_name] = wx_window.IsChecked()
                 elif isinstance(wx_window, wx.TextCtrl):
                     if item_name not in SKIP_TXT_CONTROLS:
                         parser.set(section, item_name, wx_window.GetValue().encode('utf-8').strip())
+                        module_config[section][item_name] = wx_window.GetValue().encode('utf-8').strip()
                 elif isinstance(wx_window, wx.grid.Grid):
                     col_count = wx_window.GetNumberCols()
                     row_count = wx_window.GetNumberRows()
@@ -466,16 +513,23 @@ class SettingsWindow(wx.Frame):
                     if not grid_elements:
                         for option in parser_options:
                             parser.remove_option(section, option)
+                            module_config[section].pop(option)
                     else:
+                        item_list = [item[0] for item in grid_elements]
                         for option in parser_options:
-                            for elements in grid_elements:
-                                if option not in elements:
-                                    parser.remove_option(section, option)
+                            if option not in item_list:
+                                module_config[section].pop(option)
+                                parser.remove_option(section, option)
                         for elements in grid_elements:
                             parser.set(section, *elements)
+                            if len(elements) == 1:
+                                module_config[section][elements[0]] = None
+                            elif len(elements) == 2:
+                                module_config[section][elements[0]] = elements[1]
                 elif isinstance(wx_window, wx.Button):
                     if item_name not in SKIP_BUTTONS:
                         parser.set(section, item_name)
+                        module_config[section][item_name] = None
                 elif isinstance(wx_window, KeyListBox):
                     item_ids = wx_window.GetSelections()
                     parser_options = parser.options(section)
@@ -483,12 +537,15 @@ class SettingsWindow(wx.Frame):
                     if not items_values:
                         for option in parser_options:
                             parser.remove_option(section, option)
+                            module_config[section].pop(option)
                     else:
                         for option in parser_options:
                             if option not in items_values:
                                 parser.remove_option(section, option)
+                                module_config[section].pop(option)
                         for value in items_values:
                             parser.set(section, value)
+                            module_config[section] = value
                 elif isinstance(wx_window, KeyCheckListBox):
                     item_ids = wx_window.GetChecked()
                     parser_options = parser.options(section)
@@ -496,13 +553,21 @@ class SettingsWindow(wx.Frame):
                     if not items_values:
                         for option in parser_options:
                             parser.remove_option(section, option)
+                            module_config[section].pop(option)
                     else:
                         for option in parser_options:
                             if option not in items_values:
                                 parser.remove_option(section, option)
+                                module_config[section].pop(option)
                         for value in items_values:
                             parser.set(section, value)
-            with open(module_config['file'], 'w') as config_file:
+                            module_config[section][value] = None
+                elif isinstance(wx_window, KeyChoice):
+                    item_id = wx_window.GetSelection()
+                    item_value = wx_window.get_key_from_id(item_id)
+                    parser.set(section, item_name, item_value)
+                    module_config[section][item_name] = item_value
+            with open(module_settings['file'], 'w') as config_file:
                 parser.write(config_file)
         return non_dynamic_check
 
