@@ -2,6 +2,7 @@ import os
 import threading
 import json
 import Queue
+import socket
 from collections import OrderedDict
 
 import cherrypy
@@ -156,6 +157,12 @@ class SocketThread(threading.Thread):
                                              'tools.staticdir.dir': os.path.join(http_folder, 'img')}})
 
 
+def socket_open(host, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(2)
+    return sock.connect_ex((host, int(port)))
+
+
 class webchat(MessagingModule):
     def __init__(self, conf_folder, **kwargs):
         MessagingModule.__init__(self)
@@ -185,14 +192,16 @@ class webchat(MessagingModule):
                              'config': conf_dict,
                              'gui': conf_gui,
                              'port': port}
+        if socket_open(host, port):
+            s_thread = SocketThread(host, port, conf_folder, style=style)
+            s_thread.start()
 
-        s_thread = SocketThread(host, port, conf_folder, style=style)
-        s_thread.start()
-
-        self.message_threads = []
-        for thread in range(THREADS+5):
-            self.message_threads.append(MessagingThread())
-            self.message_threads[thread].start()
+            self.message_threads = []
+            for thread in range(THREADS+5):
+                self.message_threads.append(MessagingThread())
+                self.message_threads[thread].start()
+        else:
+            log.error("Port is already used, please change webchat port")
 
     def gui_button_press(self, gui_module, event, list_keys):
         log.debug("Received button press for id {0}".format(event.GetId()))
