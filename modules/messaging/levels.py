@@ -7,12 +7,13 @@ import random
 import sqlite3
 import xml.etree.ElementTree as ElementTree
 from collections import OrderedDict
+import datetime
 
 from modules.helper.parser import self_heal
 from modules.helper.system import system_message, ModuleLoadException
 from modules.helper.modules import MessagingModule
 
-logger = logging.getLogger('levels')
+log = logging.getLogger('levels')
 
 
 class levels(MessagingModule):
@@ -21,7 +22,7 @@ class levels(MessagingModule):
         if not os.path.exists(db_location):
             db = sqlite3.connect(db_location)
             cursor = db.cursor()
-            logger.info("Creating new tables for levels")
+            log.info("Creating new tables for levels")
             cursor.execute('CREATE TABLE UserLevels (User, "Experience")')
             cursor.close()
             db.commit()
@@ -37,9 +38,11 @@ class levels(MessagingModule):
         conf_dict['gui_information'] = {'category': 'messaging'}
         conf_dict['config'] = OrderedDict()
         conf_dict['config']['message'] = u'{0} has leveled up, now he is {1}'
-        conf_dict['config']['db'] = u'levels.db'
+        conf_dict['config']['db'] = os.path.join('conf', u'levels.db')
         conf_dict['config']['experience'] = u'geometrical'
         conf_dict['config']['exp_for_level'] = 200
+        conf_dict['config']['exp_for_message'] = 1
+        conf_dict['config']['decrease_window'] = 60
         conf_gui = {'non_dynamic': ['config.*'],
                     'config': {
                         'experience': {
@@ -52,21 +55,22 @@ class levels(MessagingModule):
                              'parser': config,
                              'config': conf_dict,
                              'gui': conf_gui}
-        tag_config = 'config'
 
         self.conf_folder = conf_folder
-        self.experience = config.get(tag_config, 'experience')
-        self.exp_for_level = int(config.get(tag_config, 'exp_for_level'))
-        self.exp_for_message = 1
+        self.experience = conf_dict['config'].get('experience')
+        self.exp_for_level = float(conf_dict['config'].get('exp_for_level'))
+        self.exp_for_message = float(conf_dict['config'].get('exp_for_message'))
         self.filename = os.path.abspath(os.path.join(main_settings['http_folder'], 'levels.xml'))
         self.levels = []
         self.special_levels = {}
-        self.db_location = os.path.join(conf_folder, config.get(tag_config, 'db'))
-        self.message = config.get(tag_config, 'message').decode('utf-8')
+        self.db_location = os.path.join(conf_dict['config'].get('db'))
+        self.message = conf_dict['config'].get('message').decode('utf-8')
+        self.decrease_window = int(conf_dict['config'].get('decrease_window'))
+        self.threshold_users = {}
 
         # Load levels
         if not os.path.exists(self.filename):
-            logger.error("{0} not found, generating from template".format(self.filename))
+            log.error("{0} not found, generating from template".format(self.filename))
             raise ModuleLoadException("{0} not found, generating from template".format(self.filename))
 
         if self.experience == 'random':
@@ -97,13 +101,14 @@ class levels(MessagingModule):
         user_select = cursor.execute('SELECT User, Experience FROM UserLevels WHERE User = ?', [user])
         user_select = user_select.fetchall()
 
-        experience = 1
+        experience = self.exp_for_message
+        exp_to_add = self.calculate_experience(user)
         if len(user_select) == 1:
             row = user_select[0]
-            experience = int(row[1]) + self.exp_for_message
+            experience = int(row[1]) + exp_to_add
             cursor.execute('UPDATE UserLevels SET Experience = ? WHERE User = ? ', [experience, user])
         elif len(user_select) > 1:
-            logger.error("Select yielded more than one User")
+            log.error("Select yielded more than one User")
         else:
             cursor.execute('INSERT INTO UserLevels VALUES (?, ?)', [user, experience])
         db.commit()
@@ -141,3 +146,12 @@ class levels(MessagingModule):
 
                 message['levels'] = self.set_level(message['user'], queue)
             return message
+
+    def calculate_experience(self, user):
+        exp_to_add = self.exp_for_message
+        if user in self.threshold_users:
+            log.info((datetime.datetime.now() - self.threshold_users[user]).seconds)
+            multiplier = (datetime.datetime.now() - self.threshold_users[user]).seconds / float(self.decrease_window)
+            exp_to_add *= multiplier if multiplier <= 1 else 1
+        self.threshold_users[user] = datetime.datetime.now()
+        return exp_to_add
