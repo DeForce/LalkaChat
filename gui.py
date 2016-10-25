@@ -1,6 +1,7 @@
 import threading
 from collections import OrderedDict
 
+import webbrowser
 import wx
 import wx.grid
 import os
@@ -647,6 +648,16 @@ class ChatGui(wx.Frame):
         # Show window after creation
         self.SetSizer(vbox)
         self.Show(True)
+
+        # Show update dialog if new version found
+        if self.main_config['update']:
+            dialog = wx.MessageDialog(self, message="There is new version, do you want to update?",
+                                      caption="New Update Available",
+                                      style=wx.YES_NO | wx.YES_DEFAULT,
+                                      pos=wx.DefaultPosition)
+            response = dialog.ShowModal()
+            if response == wx.ID_YES:
+                webbrowser.open(self.main_config['update_url'])
 
     def on_close(self, event):
         log.info("Exiting...")
