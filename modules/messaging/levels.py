@@ -150,7 +150,6 @@ class levels(MessagingModule):
     def calculate_experience(self, user):
         exp_to_add = self.exp_for_message
         if user in self.threshold_users:
-            log.info((datetime.datetime.now() - self.threshold_users[user]).seconds)
             multiplier = (datetime.datetime.now() - self.threshold_users[user]).seconds / float(self.decrease_window)
             exp_to_add *= multiplier if multiplier <= 1 else 1
         self.threshold_users[user] = datetime.datetime.now()

@@ -8,11 +8,14 @@ import gui
 import sys
 import logging
 import logging.config
+import requests
+import semantic_version
 from collections import OrderedDict
 from modules.helper.parser import self_heal
 from modules.helper.system import load_translations_keys
 
-
+VERSION = '0.1.0'
+SEM_VERSION = semantic_version.Version(VERSION)
 if hasattr(sys, 'frozen'):
     PYTHON_FOLDER = os.path.dirname(sys.executable)
 else:
@@ -40,8 +43,27 @@ root_logger.addHandler(file_handler)
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(LOG_FORMAT)
 root_logger.addHandler(console_handler)
+logging.getLogger('requests').setLevel(logging.ERROR)
 
-logger = logging.getLogger('main')
+log = logging.getLogger('main')
+
+
+def get_update():
+    github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"
+    try:
+        update_json = requests.get(github_url)
+        if update_json.status_code == 200:
+            update = False
+            update_url = None
+            update_list = update_json.json()
+            for update_item in update_list:
+                if semantic_version.Version.coerce(update_item['tag_name'].lstrip('v')) > SEM_VERSION:
+                    update = True
+                    update_url = update_item['html_url']
+            return update, update_url
+    except Exception as exc:
+        log.info("Got exception: {0}".format(exc))
+    return False, None
 
 
 def init():
@@ -60,7 +82,8 @@ def init():
                    'conf_folder': CONF_FOLDER,
                    'main_conf_file': MAIN_CONF_FILE,
                    'main_conf_file_loc': MAIN_CONF_FILE,
-                   'main_conf_file_name': ''.join(os.path.basename(MAIN_CONF_FILE).split('.')[:-1])}
+                   'main_conf_file_name': ''.join(os.path.basename(MAIN_CONF_FILE).split('.')[:-1]),
+                   'update': False}
 
     if not os.path.isdir(MODULE_FOLDER):
         logging.error("Was not able to find modules folder, check you installation")
@@ -69,14 +92,14 @@ def init():
     # Trying to load config file.
     # Create folder if doesn't exist
     if not os.path.isdir(CONF_FOLDER):
-        logger.error("Could not find {0} folder".format(CONF_FOLDER))
+        log.error("Could not find {0} folder".format(CONF_FOLDER))
         try:
             os.mkdir(CONF_FOLDER)
         except:
-            logger.error("Was unable to create {0} folder.".format(CONF_FOLDER))
+            log.error("Was unable to create {0} folder.".format(CONF_FOLDER))
             exit()
 
-    logger.info("Loading basic configuration")
+    log.info("Loading basic configuration")
     main_config_dict = OrderedDict()
     main_config_dict['gui_information'] = OrderedDict()
     main_config_dict['gui_information']['category'] = 'main'
@@ -133,8 +156,15 @@ def init():
         gui_settings['style'] = fallback_style
     loaded_modules['config']['http_folder'] = os.path.join(HTTP_FOLDER, gui_settings['style'])
 
-    logger.info("Loading Messaging Handler")
-    logger.info("Loading Queue for message handling")
+    # Checking updates
+    log.info("Checking for updates")
+    loaded_modules['config']['update'], loaded_modules['config']['update_url'] = get_update()
+    if loaded_modules['config']['update']:
+        log.info("There is new update, please update!")
+
+    # Starting modules
+    log.info("Loading Messaging Handler")
+    log.info("Loading Queue for message handling")
 
     # Creating queues for messaging transfer between chat threads
     queue = Queue.Queue()
@@ -143,7 +173,7 @@ def init():
     loaded_modules.update(msg.load_modules(main_config, loaded_modules['config']))
     msg.start()
 
-    logger.info("Loading Chats")
+    log.info("Loading Chats")
     # Trying to dynamically load chats that are in config file.
     chat_modules = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_tag = "chats"
@@ -167,10 +197,10 @@ def init():
                                       'gui': chat_conf_gui}
 
     for module, settings in chat_config.items(chat_tag):
-        logger.info("Loading chat module: {0}".format(module))
+        log.info("Loading chat module: {0}".format(module))
         module_location = os.path.join(chat_location, module + ".py")
         if os.path.isfile(module_location):
-            logger.info("found {0}".format(module))
+            log.info("found {0}".format(module))
             # After module is find, we are initializing it.
             # Class should be named as in config
             # Also passing core folder to module so it can load it's own
@@ -182,14 +212,14 @@ def init():
             loaded_modules[module] = class_module.conf_params
             loaded_modules[module]['class'] = class_module
         else:
-            logger.error("Unable to find {0} module")
+            log.error("Unable to find {0} module")
     try:
         load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
     except:
-        logger.exception("Failed loading translations")
+        log.exception("Failed loading translations")
 
     if gui_settings['gui']:
-        logger.info("Loading GUI Interface")
+        log.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,
                                main_config=loaded_modules['config'],
                                loaded_modules=loaded_modules,
@@ -198,17 +228,17 @@ def init():
     try:
         while True:
             console = raw_input("> ")
-            logger.info(console)
+            log.info(console)
             if console == "exit":
-                logger.info("Exiting now!")
+                log.info("Exiting now!")
                 close()
             else:
-                logger.info("Incorrect Command")
+                log.info("Incorrect Command")
     except (KeyboardInterrupt, SystemExit):
-        logger.info("Exiting now!")
+        log.info("Exiting now!")
         close()
     except Exception as exc:
-        logger.info(exc)
+        log.info(exc)
 
 if __name__ == '__main__':
     init()
