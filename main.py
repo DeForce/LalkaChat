@@ -14,7 +14,7 @@ from collections import OrderedDict
 from modules.helper.parser import self_heal
 from modules.helper.system import load_translations_keys
 
-VERSION = '0.1.0'
+VERSION = '0.2.0'
 SEM_VERSION = semantic_version.Version(VERSION)
 if hasattr(sys, 'frozen'):
     PYTHON_FOLDER = os.path.dirname(sys.executable)

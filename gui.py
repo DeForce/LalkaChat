@@ -408,7 +408,6 @@ class SettingsWindow(wx.Frame):
                 continue
             item_name = MODULE_KEY.join([key, item])
             if item in section_gui:
-                log.info("Got item in keys")
                 if 'list' in section_gui[item].get('view'):
                     flex_grid.Add(self.create_list(parent, view, item_name, section, section_gui[item]))
                     flex_grid.AddSpacer(wx.Size(0, 0))
@@ -532,21 +531,18 @@ class SettingsWindow(wx.Frame):
                         parser.set(section, item_name)
                         module_config[section][item_name] = None
                 elif isinstance(wx_window, KeyListBox):
-                    item_ids = wx_window.GetSelections()
+                    item_id = wx_window.GetSelection()
                     parser_options = parser.options(section)
-                    items_values = [wx_window.get_key_from_id(item_id) for item_id in item_ids]
-                    if not items_values:
+                    item_value = wx_window.get_key_from_id(item_id)
+                    if not item_value:
                         for option in parser_options:
                             parser.remove_option(section, option)
-                            module_config[section].pop(option)
+                            module_config[section] = None
                     else:
                         for option in parser_options:
-                            if option not in items_values:
-                                parser.remove_option(section, option)
-                                module_config[section].pop(option)
-                        for value in items_values:
-                            parser.set(section, value)
-                            module_config[section] = value
+                            parser.remove_option(section, option)
+                        parser.set(section, item_value)
+                        module_config[section] = item_value
                 elif isinstance(wx_window, KeyCheckListBox):
                     item_ids = wx_window.GetChecked()
                     parser_options = parser.options(section)

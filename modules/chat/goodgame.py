@@ -29,12 +29,12 @@ CONF_GUI = {
 
 
 class GoodgameMessageHandler(threading.Thread):
-    def __init__(self, ws_class, queue, gg_queue, **kwargs):
+    def __init__(self, ws_class, **kwargs):
         super(self.__class__, self).__init__()
         self.ws_class = ws_class  # type: GGChat
         self.daemon = True
-        self.message_queue = queue
-        self.gg_queue = gg_queue
+        self.message_queue = kwargs.get('queue')
+        self.gg_queue = kwargs.get('gg_queue')
         self.source = SOURCE
 
         self.nick = kwargs.get('nick')
@@ -93,8 +93,7 @@ class GoodgameMessageHandler(threading.Thread):
                 comp['pm'] = True
             self.message_queue.put(comp)
         elif msg['type'] == 'success_join':
-            system_message('Successfully joined channel {0}'.format(self.nick), self.message_queue, SOURCE,
-                           icon=SOURCE_ICON, from_user=SYSTEM_USER)
+            self.ws_class.system_message('Successfully joined channel {0}'.format(self.nick))
         elif msg['type'] == 'error':
             log.info("Received error message: {0}".format(msg))
             if msg['data']['errorMsg'] == 'Invalid channel id':
@@ -103,20 +102,24 @@ class GoodgameMessageHandler(threading.Thread):
 
 
 class GGChat(WebSocketClient):
-    def __init__(self, ws, protocols=None, queue=None, ch_id=None, nick=None, **kwargs):
-        super(self.__class__, self).__init__(ws, protocols=protocols)
+    def __init__(self, ws, **kwargs):
+        super(self.__class__, self).__init__(ws, heartbeat_freq=kwargs.get('heartbeat_freq'),
+                                             protocols=kwargs.get('protocols'))
         # Received value setting.
-        self.ch_id = ch_id
-        self.queue = queue
+        self.ch_id = kwargs.get('ch_id')
+        self.queue = kwargs.get('queue')
         self.gg_queue = Queue.Queue()
 
-        message_handler = GoodgameMessageHandler(self, queue, self.gg_queue, nick=nick, **kwargs)
+        self.main_thread = kwargs.get('main_thread')
+        self.crit_error = False
+
+        message_handler = GoodgameMessageHandler(self, gg_queue=self.gg_queue, **kwargs)
         message_handler.start()
 
     def opened(self):
-        suc_msg = "Connection Successful"
-        log.info(suc_msg)
-        system_message(suc_msg, self.queue, SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
+        success_msg = "Connection Successful"
+        log.info(success_msg)
+        self.system_message(success_msg)
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
@@ -126,15 +129,19 @@ class GGChat(WebSocketClient):
     def closed(self, code, reason=None):
         log.info("Connection Closed Down")
         if 'INV_CH_ID' in reason:
-            pass
+            self.crit_error = True
         else:
-            time.sleep(5)
-            self.connect()
-        
+            self.system_message("Connection died, trying to reconnect")
+            timer = threading.Timer(5.0, self.main_thread.connect)
+            timer.start()
+
     def received_message(self, mes):
         # Deserialize message to json for easier parsing
-        message = json.loads(str(mes))
-        self.gg_queue.put(message)
+        self.gg_queue.put(json.loads(str(mes)))
+
+    def system_message(self, msg):
+        system_message(msg, self.queue, SOURCE,
+                       icon=SOURCE_ICON, from_user=SYSTEM_USER)
 
 
 class GGThread(threading.Thread):
@@ -143,7 +150,7 @@ class GGThread(threading.Thread):
         # Basic value setting.
         # Daemon is needed so when main programm exits
         # all threads will exit too.
-        self.daemon = "True"
+        self.daemon = True
         self.queue = queue
         self.address = address
         self.nick = nick
@@ -187,12 +194,24 @@ class GGThread(threading.Thread):
         return True
         
     def run(self):
-        if self.load_config():
-            # Connecting to goodgame websocket
-            ws = GGChat(self.address, protocols=['websocket'], queue=self.queue, ch_id=self.ch_id, nick=self.nick,
-                        **self.kwargs)
-            ws.connect()
-            ws.run_forever()
+        self.connect()
+
+    def connect(self):
+        try_count = 0
+        while True:
+            try_count += 1
+            log.info("Connecting, try {0}".format(try_count))
+            if self.load_config():
+                # Connecting to goodgame websocket
+                ws = GGChat(self.address, protocols=['websocket'], queue=self.queue, ch_id=self.ch_id, nick=self.nick,
+                            heartbeat_freq=30, main_thread=self, **self.kwargs)
+                try:
+                    ws.connect()
+                    ws.run_forever()
+                    log.debug("Connection closed")
+                    break
+                except Exception as exc:
+                    log.exception(exc)
 
 
 class goodgame(ChatModule):
