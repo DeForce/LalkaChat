@@ -5,10 +5,10 @@ import os
 import re
 import random
 import requests
-import logging
 import logging.config
 import Queue
 from collections import OrderedDict
+import time
 from modules.helper.parser import self_heal
 from modules.helper.modules import ChatModule
 from modules.helper.system import system_message
@@ -24,6 +24,9 @@ NOT_FOUND = 'none'
 SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 SYSTEM_USER = 'Twitch.TV'
+
+PING_DELAY = 30
+
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
@@ -34,6 +37,10 @@ CONF_DICT['config']['port'] = 6667
 CONF_GUI = {
     'config': {
         'hidden': ['host', 'port']}}
+
+
+class TwitchUserError(Exception):
+    """Exception for twitch user error"""
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -119,6 +126,18 @@ class TwitchMessageHandler(threading.Thread):
         self.message_queue.put(comp)
 
 
+class TwitchPingHandler(threading.Thread):
+    def __init__(self, irc_connection):
+        threading.Thread.__init__(self)
+        self.irc_connection = irc_connection
+
+    def run(self):
+        log.info("Ping started")
+        while self.irc_connection.connected:
+            self.irc_connection.ping("keep-alive")
+            time.sleep(PING_DELAY)
+
+
 class IRC(irc.client.SimpleIRCClient):
     def __init__(self, queue, channel, **kwargs):
         irc.client.SimpleIRCClient.__init__(self)
@@ -127,6 +146,8 @@ class IRC(irc.client.SimpleIRCClient):
         self.nick = channel.lower()
         self.queue = queue
         self.twitch_queue = Queue.Queue()
+        self.tw_connection = None
+        self.main_class = kwargs.get('main_class')
 
         msg_handler = TwitchMessageHandler(queue, self.twitch_queue,
                                            nick=self.nick,
@@ -135,23 +156,44 @@ class IRC(irc.client.SimpleIRCClient):
                                            custom_badges=kwargs.get('custom_badges', {}))
         msg_handler.start()
 
-    def on_connect(self, connection, event):
-        log.info("Connected")
+    def system_message(self, message):
+        system_message(message, self.queue,
+                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
+
+    def on_disconnect(self, connection, event):
+        log.info("Connection lost")
+        self.system_message("Connection died, trying to reconnect")
+        timer = threading.Timer(5.0, self.reconnect,
+                                args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
+        timer.start()
+
+    def reconnect(self, host, port, nickname):
+        try_count = 0
+        while True:
+            try_count += 1
+            log.info("Reconnecting, try {0}".format(try_count))
+            try:
+                self.connect(host, port, nickname)
+                break
+            except Exception as exc:
+                log.exception(exc)
 
     def on_welcome(self, connection, event):
         log.info("Welcome Received, joining {0} channel".format(self.channel))
-        system_message('Joining channel {0}'.format(self.channel), self.queue,
-                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
+        self.tw_connection = connection
+        self.system_message('Joining channel {0}'.format(self.channel))
         # After we receive IRC Welcome we send request for join and
-        #  request for Capabilites (Twitch color, Display Name,
+        #  request for Capabilities (Twitch color, Display Name,
         #  Subscriber, etc)
         connection.join(self.channel)
         connection.cap('REQ', ':twitch.tv/tags')
+        ping_handler = TwitchPingHandler(connection)
+        ping_handler.start()
 
     def on_join(self, connection, event):
-        log.info("Joined {0} channel".format(self.channel))
-        system_message('Joined channel {0}'.format(self.channel), self.queue,
-                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
+        msg = "Joined {0} channel".format(self.channel)
+        log.info(msg)
+        self.system_message(msg)
 
     def on_pubmsg(self, connection, event):
         self.twitch_queue.put(event)
@@ -190,19 +232,35 @@ class twThread(threading.Thread):
                 self.nickname += str(random.randint(0, 9))
 
     def run(self):
-        if self.load_config():
-            # We are connecting via IRC handler.
-            irc_client = IRC(self.queue, self.channel, **self.kwargs)
-            irc_client.connect(self.host, self.port, self.nickname)
-            irc_client.start()
+        try_count = 0
+        # We are connecting via IRC handler.
+        while True:
+            try_count += 1
+            log.info("Connecting, try {0}".format(try_count))
+            try:
+                if self.load_config():
+                    irc_client = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
+                    irc_client.connect(self.host, self.port, self.nickname)
+                    irc_client.start()
+                    log.info("Connection closed")
+                    break
+            except TwitchUserError:
+                log.critical("Unable to find twitch user, please fix")
+                break
+            except Exception as exc:
+                log.exception(exc)
 
     def load_config(self):
         try:
             request = requests.get("https://api.twitch.tv/kraken/channels/{0}".format(self.channel), headers=headers)
             if request.status_code == 200:
                 log.info("Channel found, continuing")
+            elif request.status_code == 404:
+                raise TwitchUserError
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
+        except TwitchUserError:
+            raise TwitchUserError
         except Exception as exc:
             log.error("Unable to get channel ID, error: {0}\nArgs: {1}".format(exc.message, exc.args))
             return False

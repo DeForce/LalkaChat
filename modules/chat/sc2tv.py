@@ -16,6 +16,9 @@ log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
 SYSTEM_USER = 'Funstream'
+
+PING_DELAY = 30
+
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
@@ -28,16 +31,18 @@ CONF_GUI = {
 
 
 class FsChat(WebSocketClient):
-    def __init__(self, ws, queue, channel_name, protocols=None, smiles=None):
-        super(self.__class__, self).__init__(ws, protocols=protocols)
+    def __init__(self, ws, queue, channel_name, **kwargs):
+        super(self.__class__, self).__init__(ws, protocols=kwargs.get('protocols', None))
         # Received value setting.
         self.source = SOURCE
         self.queue = queue
         self.channel_name = channel_name
+        self.main_thread = kwargs.get('main_thread')  # type: FsThread
+        self.crit_error = False
 
         self.channel_id = self.fs_get_id()
 
-        self.smiles = smiles
+        self.smiles = kwargs.get('smiles')
         self.smile_regex = ':(\w+|\d+):'
 
         # Because funstream API is fun, we have to iterate the
@@ -60,9 +65,19 @@ class FsChat(WebSocketClient):
 
     def opened(self):
         log.info("Websocket Connection Succesfull")
+        self.fs_system_message("Connected")
 
     def closed(self, code, reason=None):
-        log.info("Websocket Connection Closed Down")
+        if reason == 'INV_CH_ID':
+            self.crit_error = True
+        else:
+            log.info("Websocket Connection Closed Down")
+            self.fs_system_message("Connection died, trying to reconnect")
+            timer = threading.Timer(5.0, self.main_thread.connect)
+            timer.start()
+
+    def fs_system_message(self, message):
+        system_message(message, self.queue, source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
 
     @staticmethod
     def allow_smile(smile, subscriptions):
@@ -105,8 +120,7 @@ class FsChat(WebSocketClient):
                         self.fs_join()
                         self.fs_ping()
                     elif dict_item == 'status':
-                        system_message('Joined channel {0}'.format(self.channel_name), self.queue,
-                                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
+                        self.fs_system_message('Joined channel {0}'.format(self.channel_name))
                     elif dict_item == 'id':
                         try:
                             self.duplicates.index(message[dict_item])
@@ -139,17 +153,22 @@ class FsChat(WebSocketClient):
         # We get ID from POST request to funstream API, and it hopefuly
         #  answers us the correct ID of the channel we need to connect to
         payload = "{'id': null, 'name': \"" + self.channel_name + "\"}"
-        request = requests.post("http://funstream.tv/api/user", data=payload)
-        if request.status_code == 200:
-            channel_id = json.loads(re.findall('{.*}', request.text)[0])['id']
-        else:
-            error_message = request.json()
-            if 'message' in error_message:
-                log.error("Unable to get channel ID. {0}".format(error_message['message']))
+        try:
+            request = requests.post("http://funstream.tv/api/user", data=payload, timeout=5)
+            if request.status_code == 200:
+                channel_id = json.loads(re.findall('{.*}', request.text)[0])['id']
+                return channel_id
             else:
-                log.error("Unable to get channel ID. No message available")
-            channel_id = None
-        return channel_id
+                error_message = request.json()
+                if 'message' in error_message:
+                    log.error("Unable to get channel ID. {0}".format(error_message['message']))
+                    self.closed(0, 'INV_CH_ID')
+                else:
+                    log.error("Unable to get channel ID. No message available")
+                    self.closed(0, 'INV_CH_ID')
+        except requests.ConnectionError:
+            log.info("Unable to get information from api")
+        return None
 
     def fs_join(self):
         # Because we need to iterate each message we iterate it!
@@ -162,8 +181,7 @@ class FsChat(WebSocketClient):
             join = str(iter_sio) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channel_id)},
                                                                     sort_keys=False) + "]"
             self.send(join)
-            system_message('Joining channel {0}'.format(self.channel_name), self.queue,
-                           source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
+            self.fs_system_message("Joining channel {0}".format(self.channel_name))
             log.info("Joined channel {0}".format(self.channel_id))
 
     def fs_ping(self):
@@ -183,22 +201,12 @@ class FsPingThread(threading.Thread):
         threading.Thread.__init__(self)
         self.daemon = "True"
         # Using main websocket
-        self.ws = ws
+        self.ws = ws  # type: FsChat
 
     def run(self):
-        # Basically, if we are alive we send every 30 seconds special
-        #  coded message, that is very hard to decode:
-        #
-        #      2
-        #
-        #  and they answer:
-        #
-        #      3
-        #
-        # No idea why.
-        while True:
+        while not self.ws.terminated:
             self.ws.send("2")
-            time.sleep(30)
+            time.sleep(PING_DELAY)
 
 
 class FsThread(threading.Thread):
@@ -214,20 +222,32 @@ class FsThread(threading.Thread):
         self.smiles = []
 
     def run(self):
-        # Let us get smiles for sc2tv
-        try:
-            smiles = requests.post('http://funstream.tv/api/smile')
-            if smiles.status_code == 200:
-                smiles_answer = smiles.json()
-                for smile in smiles_answer:
-                    self.smiles.append(smile)
-        except requests.ConnectionError:
-            log.error("Unable to get smiles")
+        self.connect()
 
+    def connect(self):
         # Connecting to funstream websocket
-        ws = FsChat(self.socket, self.queue, self.channel_name, protocols=['websocket'], smiles=self.smiles)
-        ws.connect()
-        ws.run_forever()
+        try_count = 0
+        while True:
+            try_count += 1
+            log.info("Connecting, try {0}".format(try_count))
+            if not self.smiles:
+                try:
+                    smiles = requests.post('http://funstream.tv/api/smile', timeout=5)
+                    if smiles.status_code == 200:
+                        smiles_answer = smiles.json()
+                        for smile in smiles_answer:
+                            self.smiles.append(smile)
+                except requests.ConnectionError:
+                    log.error("Unable to get smiles")
+            ws = FsChat(self.socket, self.queue, self.channel_name, protocols=['websocket'], smiles=self.smiles,
+                        main_thread=self)
+            if ws.crit_error:
+                log.critical("Got critical error, halting")
+                break
+            elif ws.channel_id and self.smiles:
+                ws.connect()
+                ws.run_forever()
+                break
 
 
 class sc2tv(ChatModule):
