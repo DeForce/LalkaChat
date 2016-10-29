@@ -85,7 +85,7 @@ class KeyListBox(wx.ListBox):
         self.keys = kwargs.pop('keys', [])
         wx.ListBox.__init__(self, *args, **kwargs)
 
-    def get_key_from_id(self, index):
+    def get_key_from_index(self, index):
         return self.keys[index]
 
 
@@ -94,7 +94,7 @@ class KeyCheckListBox(wx.CheckListBox):
         self.keys = kwargs.pop('keys', [])
         wx.CheckListBox.__init__(self, *args, **kwargs)
 
-    def get_key_from_id(self, index):
+    def get_key_from_index(self, index):
         return self.keys[index]
 
 
@@ -103,7 +103,7 @@ class KeyChoice(wx.Choice):
         self.keys = kwargs.pop('keys', [])
         wx.Choice.__init__(self, *args, **kwargs)
 
-    def get_key_from_id(self, index):
+    def get_key_from_index(self, index):
         return self.keys[index]
 
 
@@ -166,7 +166,7 @@ class SettingsWindow(wx.Frame):
         self.Destroy()
 
     def on_close(self, event):
-        dialog = wx.MessageDialog(self, message="Are you sure you want to quit?",
+        dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['config', 'quit'])),
                                   caption="Caption",
                                   style=wx.YES_NO | wx.CANCEL,
                                   pos=wx.DefaultPosition)
@@ -179,8 +179,7 @@ class SettingsWindow(wx.Frame):
 
     def on_close_save(self, event):
         if not self.settings_saved:
-            dialog = wx.MessageDialog(self, message="Are you sure you want to quit?\n"
-                                                    "Warning, your settings will not be saved.",
+            dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['config', 'quit', 'nosave'])),
                                       caption="Caption",
                                       style=wx.YES_NO,
                                       pos=wx.DefaultPosition)
@@ -192,6 +191,20 @@ class SettingsWindow(wx.Frame):
                 event.StopPropagation()
         else:
             self.on_exit(event)
+
+    def on_listbox_change(self, event):
+        item_object = event.EventObject
+        selection = item_object.get_key_from_index(item_object.GetSelection())
+        description = translate_key(MODULE_KEY.join([selection, 'description']))
+
+        item_key = IDS[event.GetId()].split(MODULE_KEY)
+        show_description = self.main_class.loaded_modules[item_key[0]]['gui'][item_key[1]].get('description', False)
+
+        if show_description:
+            item_id_key = MODULE_KEY.join(item_key[:-1])
+            descr_static_text = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([item_id_key, 'descr', 'explain'])))
+            descr_static_text.SetLabel(description)
+            descr_static_text.Wrap(descr_static_text.GetSize()[0] - 20)
 
     def create_layout(self):
         self.main_grid = wx.BoxSizer(wx.VERTICAL)
@@ -340,6 +353,7 @@ class SettingsWindow(wx.Frame):
 
     def create_choose(self, parent, view, key, section, section_gui):
         is_single = True if 'single' in view else False
+        description = section_gui.get('description', False)
         style = wx.LB_SINGLE if is_single else wx.LB_EXTENDED
         item_sizer = wx.BoxSizer(wx.VERTICAL)
         list_items = []
@@ -377,6 +391,7 @@ class SettingsWindow(wx.Frame):
         else:
             item_list_box = KeyCheckListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
                                             choices=translated_items if translated_items else list_items)
+        self.Bind(wx.EVT_LISTBOX, self.on_listbox_change, item_list_box)
 
         section_for = section if not is_single else {section: None}
         if is_single:
@@ -384,7 +399,18 @@ class SettingsWindow(wx.Frame):
         else:
             check_items = [list_items.index(item) for item, value in section_for.items()]
             item_list_box.SetChecked(check_items)
-        item_sizer.Add(item_list_box, 1, wx.EXPAND)
+        if description:
+            adv_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            adv_sizer.Add(item_list_box, 1, wx.EXPAND)
+
+            descr_key = MODULE_KEY.join([key, 'descr.explain'])
+            descr_text = wx.StaticText(parent, id=id_renew(descr_key, update=True),
+                                       label=translate_key(descr_key), style=wx.ST_NO_AUTORESIZE)
+            adv_sizer.Add(descr_text, 0, wx.EXPAND | wx.ALL, 10)
+            descr_text.Wrap(descr_text.GetSize()[0] - 20)
+            item_sizer.Add(adv_sizer)
+        else:
+            item_sizer.Add(item_list_box)
         return item_sizer
 
     def create_dropdown(self, parent, view, key, section, section_gui, section_item=False, short_key=None):
@@ -400,7 +426,6 @@ class SettingsWindow(wx.Frame):
 
     def create_item(self, parent, view, key, section, section_gui):
         flex_grid = wx.FlexGridSizer(0, 2, ITEM_SPACING_VERT, ITEM_SPACING_HORZ)
-        flex_grid.SetFlexibleDirection(wx.VERTICAL)
         if not section:
             return wx.Sizer()
         for item, value in section.items():
@@ -441,6 +466,7 @@ class SettingsWindow(wx.Frame):
                                               style=wx.ALIGN_RIGHT)
                     flex_grid.Add(item_text)
                     flex_grid.Add(item_box)
+        flex_grid.Fit(parent)
         return flex_grid
 
     def button_clicked(self, event):
@@ -453,8 +479,8 @@ class SettingsWindow(wx.Frame):
             module_name = MODULE_KEY.join(keys[1:-1])
             if self.save_settings(module_name):
                 log.debug('Got non-dynamic changes')
-                dialog = wx.MessageDialog(self, message="Warning, you have saved setting that are not dynamic, "
-                                                        "please restart program to apply changes",
+                dialog = wx.MessageDialog(self,
+                                          message=translate_key(MODULE_KEY.join(['config', 'save', 'non_dynamic'])),
                                           caption="Caption",
                                           style=wx.OK_DEFAULT,
                                           pos=wx.DefaultPosition)
@@ -533,7 +559,7 @@ class SettingsWindow(wx.Frame):
                 elif isinstance(wx_window, KeyListBox):
                     item_id = wx_window.GetSelection()
                     parser_options = parser.options(section)
-                    item_value = wx_window.get_key_from_id(item_id)
+                    item_value = wx_window.get_key_from_index(item_id)
                     if not item_value:
                         for option in parser_options:
                             parser.remove_option(section, option)
@@ -546,7 +572,7 @@ class SettingsWindow(wx.Frame):
                 elif isinstance(wx_window, KeyCheckListBox):
                     item_ids = wx_window.GetChecked()
                     parser_options = parser.options(section)
-                    items_values = [wx_window.get_key_from_id(item_id) for item_id in item_ids]
+                    items_values = [wx_window.get_key_from_index(item_id) for item_id in item_ids]
                     if not items_values:
                         for option in parser_options:
                             parser.remove_option(section, option)
@@ -561,7 +587,7 @@ class SettingsWindow(wx.Frame):
                             module_config[section][value] = None
                 elif isinstance(wx_window, KeyChoice):
                     item_id = wx_window.GetSelection()
-                    item_value = wx_window.get_key_from_id(item_id)
+                    item_value = wx_window.get_key_from_index(item_id)
                     parser.set(section, item_name, item_value)
                     module_config[section][item_name] = item_value
             with open(module_settings['file'], 'w') as config_file:

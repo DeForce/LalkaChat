@@ -13,12 +13,16 @@ var socket = new WebSocket(ws_url);
 
 var chatMessages;
 socket.onopen = function() {
+    console.log("Socket connected")
     chatMessages = document.getElementById('ChatContainer');
 };
 
 socket.onclose = function(event) {
 	if (event.wasClean) {
-	} else {
+	    console.log("Socket closed cleanly")
+	}
+	else {
+	    console.log("Socket closed not cleanly")
 	}
 };
 
