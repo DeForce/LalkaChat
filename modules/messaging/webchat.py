@@ -46,7 +46,8 @@ class FireFirstMessages(threading.Thread):
     def run(self):
         sleep(0.1)
         for item in self.history:
-            self.ws.send(json.dumps(item))
+            if item:
+                self.ws.send(json.dumps(item))
 
 
 class WebChatSocketServer(WebSocket):

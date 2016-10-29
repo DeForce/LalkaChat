@@ -49,7 +49,8 @@ class Message(threading.Thread):
             'messaging': {'check': 'modules/messaging',
                           'check_type': 'files',
                           'file_extension': False,
-                          'view': 'choose_multiple'},
+                          'view': 'choose_multiple',
+                          'description': True},
             'non_dynamic': ['messaging.*']}
         config = self_heal(conf_file, conf_dict)
         modules_list['messaging_modules'] = {'folder': main_config['conf_folder'], 'file': conf_file,
