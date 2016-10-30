@@ -15,6 +15,9 @@ class BaseModule:
     def gui_button_press(self, *args):
         pass
 
+    def apply_settings(self):
+        pass
+
 
 class MessagingModule(BaseModule):
     def __init__(self, *args, **kwargs):

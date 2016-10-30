@@ -444,6 +444,15 @@ class SettingsWindow(wx.Frame):
         item_box.SetSelection(choices.index(item_value))
         return item_text, item_box
 
+    def create_spin(self, parent, view, key, section, section_gui, section_item=False, short_key=None):
+        item_text = wx.StaticText(parent, label=translate_key(key),
+                                  style=wx.ALIGN_RIGHT)
+        key = key if section_item else MODULE_KEY.join([key, 'spin'])
+        value = short_key if section_item else section
+        item_box = wx.SpinCtrl(parent, id=id_renew(key, update=True), min=section_gui['min'], max=section_gui['max'],
+                               initial=value)
+        return item_text, item_box
+
     def create_item(self, parent, view, key, section, section_gui):
         flex_grid = wx.FlexGridSizer(0, 2, ITEM_SPACING_VERT, ITEM_SPACING_HORZ)
         if not section:
@@ -462,6 +471,11 @@ class SettingsWindow(wx.Frame):
                 elif 'dropdown' in section_gui[item].get('view'):
                     text, control = self.create_dropdown(parent, view, item_name, section, section_gui[item],
                                                          section_item=True, short_key=item)
+                    flex_grid.Add(text)
+                    flex_grid.Add(control)
+                elif 'spin' in section_gui[item].get('view'):
+                    text, control = self.create_spin(parent, view, item_name, section, section_gui[item],
+                                                     section_item=True, short_key=section[item])
                     flex_grid.Add(text)
                     flex_grid.Add(control)
             else:
@@ -483,7 +497,7 @@ class SettingsWindow(wx.Frame):
                     item_box = wx.TextCtrl(parent, id=id_renew(item_name, update=True),
                                            value=str(value).decode('utf-8'))
                     item_text = wx.StaticText(parent, label=translate_key(item_name),
-                                              style=wx.ALIGN_RIGHT)
+                                              style=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_HORIZONTAL)
                     flex_grid.Add(item_text)
                     flex_grid.Add(item_box)
         flex_grid.Fit(parent)
@@ -510,6 +524,9 @@ class SettingsWindow(wx.Frame):
                     self.on_exit(event)
                 else:
                     event.StopPropagation()
+            module_class = self.main_class.loaded_modules[module_name].get('class')
+            if module_class:
+                module_class.apply_settings()
             self.settings_saved = True
         elif keys[-1] == 'cancel_button':
             self.on_close(event)
@@ -620,6 +637,10 @@ class SettingsWindow(wx.Frame):
                 elif isinstance(wx_window, KeyChoice):
                     item_id = wx_window.GetSelection()
                     item_value = wx_window.get_key_from_index(item_id)
+                    parser.set(section, item_name, item_value)
+                    module_config[section][item_name] = item_value
+                elif isinstance(wx_window, wx.SpinCtrl):
+                    item_value = wx_window.GetValue()
                     parser.set(section, item_name, item_value)
                     module_config[section][item_name] = item_value
             with open(module_settings['file'], 'w') as config_file:

@@ -3,10 +3,10 @@ import threading
 import json
 import Queue
 import socket
-from collections import OrderedDict
-
 import cherrypy
 import logging
+from collections import OrderedDict
+from jinja2 import Template
 from cherrypy.lib.static import serve_file
 from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
@@ -106,6 +106,18 @@ class WebChatPlugin(WebSocketPlugin):
         return self.history
 
 
+class CssRoot(object):
+    def __init__(self, http_folder, settings):
+        object.__init__(self)
+        self.http_folder = http_folder
+        self.settings = settings
+
+    @cherrypy.expose()
+    def style_css(self):
+        with open(os.path.join(self.http_folder, 'css', 'style.css'), 'r') as css:
+            return Template(css.read()).render(**self.settings)
+
+
 class HttpRoot(object):
     def __init__(self, http_folder):
         object.__init__(self)
@@ -132,10 +144,10 @@ class SocketThread(threading.Thread):
         self.port = port
         self.root_folder = root_folder
         self.style = kwargs.pop('style')
+        self.settings = kwargs.pop('settings')
 
         cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host,
-                                'engine.autoreload.on': False
-                                })
+                                'engine.autoreload.on': False})
         WebChatPlugin(cherrypy.engine).subscribe()
         cherrypy.tools.websocket = WebSocketTool()
 
@@ -149,15 +161,27 @@ class SocketThread(threading.Thread):
         cherrypy.log.access_log.propagate = False
         cherrypy.log.error_log.setLevel(logging.ERROR)
 
-        cherrypy.quickstart(HttpRoot(http_folder), '/',
-                            config={'/ws': {'tools.websocket.on': True,
-                                            'tools.websocket.handler_cls': WebChatSocketServer},
-                                    '/js': {'tools.staticdir.on': True,
-                                            'tools.staticdir.dir': os.path.join(http_folder, 'js')},
-                                    '/css': {'tools.staticdir.on': True,
-                                             'tools.staticdir.dir': os.path.join(http_folder, 'css')},
-                                    '/img': {'tools.staticdir.on': True,
-                                             'tools.staticdir.dir': os.path.join(http_folder, 'img')}})
+        config = {
+            '/ws': {'tools.websocket.on': True,
+                    'tools.websocket.handler_cls': WebChatSocketServer},
+            '/js': {'tools.staticdir.on': True,
+                    'tools.staticdir.dir': os.path.join(http_folder, 'js')},
+            '/img': {'tools.staticdir.on': True,
+                     'tools.staticdir.dir': os.path.join(http_folder, 'img')}}
+
+        cherrypy.tree.mount(HttpRoot(http_folder), '', config)
+        cherrypy.tree.mount(CssRoot(http_folder, self.settings), '/css')
+
+        cherrypy.engine.start()
+        cherrypy.engine.block()
+
+        # cherrypy.quickstart(HttpRoot(http_folder), '/',
+        #                     config={'/ws': {'tools.websocket.on': True,
+        #                                     'tools.websocket.handler_cls': WebChatSocketServer},
+        #                             '/js': {'tools.staticdir.on': True,
+        #                                     'tools.staticdir.dir': os.path.join(http_folder, 'js')},
+        #                             '/img': {'tools.staticdir.on': True,
+        #                                      'tools.staticdir.dir': os.path.join(http_folder, 'img')}})
 
 
 def socket_open(host, port):
@@ -169,7 +193,6 @@ def socket_open(host, port):
 class webchat(MessagingModule):
     def __init__(self, conf_folder, **kwargs):
         MessagingModule.__init__(self)
-        main_settings = kwargs.get('main_settings')
         conf_file = os.path.join(conf_folder, "webchat.cfg")
         conf_dict = OrderedDict()
         conf_dict['gui_information'] = {
@@ -180,11 +203,18 @@ class webchat(MessagingModule):
         conf_dict['server']['host'] = '127.0.0.1'
         conf_dict['server']['port'] = '8080'
         conf_dict['style'] = 'czt'
+        conf_dict['style_settings'] = {
+            'font_size': 15
+        }
         conf_gui = {
             'style': {
                 'check': 'http',
                 'check_type': 'dir',
                 'view': 'choose_single'},
+            'style_settings': {
+                'font_size': {'view': 'spin',
+                              'min': 10,
+                              'max': 100}},
             'non_dynamic': ['server.*']}
 
         config = self_heal(conf_file, conf_dict)
@@ -205,16 +235,18 @@ class webchat(MessagingModule):
                              'host': conf_dict['server']['host'],
                              'port': conf_dict['server']['port'],
                              'style_location': style_location}
-
+        self.queue = None
         self.message_threads = []
 
     def load_module(self, *args, **kwargs):
+        self.queue = kwargs.get('queue')
         conf_dict = self._conf_params
         host = conf_dict['host']
         port = conf_dict['port']
 
         if socket_open(host, port):
-            s_thread = SocketThread(host, port, CONF_FOLDER, style=self._conf_params['style_location'])
+            s_thread = SocketThread(host, port, CONF_FOLDER, style=self._conf_params['style_location'],
+                                    settings=self._conf_params['config']['style_settings'])
             s_thread.start()
 
             for thread in range(THREADS+5):
@@ -223,11 +255,17 @@ class webchat(MessagingModule):
         else:
             log.error("Port is already used, please change webchat port")
 
+    def reload_chat(self):
+        self.queue.put({'command': 'reload'})
+
+    def apply_settings(self):
+        self.reload_chat()
+
     def gui_button_press(self, gui_module, event, list_keys):
         log.debug("Received button press for id {0}".format(event.GetId()))
         keys = MODULE_KEY.join(list_keys)
         if keys == 'menu.reload':
-            gui_module.queue.put({'command': 'reload'})
+            self.reload_chat()
         event.Skip()
 
     def process_message(self, message, queue, **kwargs):

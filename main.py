@@ -194,7 +194,8 @@ def init():
     # Actually loading modules
     for f_module, f_config in loaded_modules.iteritems():
         if 'class' in f_config:
-            f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules)
+            f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules,
+                                          queue=queue)
     try:
         load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
     except:
