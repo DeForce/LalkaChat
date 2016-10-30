@@ -53,11 +53,11 @@ class Message(threading.Thread):
                           'description': True},
             'non_dynamic': ['messaging.*']}
         config = self_heal(conf_file, conf_dict)
-        modules_list['messaging_modules'] = {'folder': main_config['conf_folder'], 'file': conf_file,
-                                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                                             'parser': config,
-                                             'config': conf_dict,
-                                             'gui': conf_gui}
+        modules_list['messaging'] = {'folder': main_config['conf_folder'], 'file': conf_file,
+                                     'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                                     'parser': config,
+                                     'config': conf_dict,
+                                     'gui': conf_gui}
 
         modules = {}
         # Loading modules from cfg.

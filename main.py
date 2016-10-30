@@ -139,14 +139,14 @@ def init():
     }
     config = self_heal(MAIN_CONF_FILE, main_config_dict)
     # Adding config for main module
-    loaded_modules['config'] = {'folder': CONF_FOLDER,
-                                'file': main_config['main_conf_file_loc'],
-                                'filename': main_config['main_conf_file_name'],
-                                'parser': config,
-                                'root_folder': main_config['root_folder'],
-                                'logs_folder': LOG_FOLDER,
-                                'config': main_config_dict,
-                                'gui': main_config_gui}
+    loaded_modules['main'] = {'folder': CONF_FOLDER,
+                              'file': main_config['main_conf_file_loc'],
+                              'filename': main_config['main_conf_file_name'],
+                              'parser': config,
+                              'root_folder': main_config['root_folder'],
+                              'logs_folder': LOG_FOLDER,
+                              'config': main_config_dict,
+                              'gui': main_config_gui}
 
     gui_settings['gui'] = main_config_dict[GUI_TAG].get('gui')
     gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
@@ -166,12 +166,12 @@ def init():
             gui_settings['style'] = fallback_style
     else:
         gui_settings['style'] = fallback_style
-    loaded_modules['config']['http_folder'] = os.path.join(HTTP_FOLDER, gui_settings['style'])
+    loaded_modules['main']['http_folder'] = os.path.join(HTTP_FOLDER, gui_settings['style'])
 
     # Checking updates
     log.info("Checking for updates")
-    loaded_modules['config']['update'], loaded_modules['config']['update_url'] = get_update()
-    if loaded_modules['config']['update']:
+    loaded_modules['main']['update'], loaded_modules['main']['update_url'] = get_update()
+    if loaded_modules['main']['update']:
         log.info("There is new update, please update!")
 
     # Starting modules
@@ -182,7 +182,7 @@ def init():
     queue = Queue.Queue()
     # Loading module for message processing...
     msg = messaging.Message(queue)
-    loaded_modules.update(msg.load_modules(main_config, loaded_modules['config']))
+    loaded_modules.update(msg.load_modules(main_config, loaded_modules['main']))
     msg.start()
 
     log.info("Loading Chats")
@@ -202,11 +202,11 @@ def init():
             'file_extension': False},
         'non_dynamic': ['chats.list_box']}
     chat_config = self_heal(chat_modules, chat_conf_dict)
-    loaded_modules['chat_modules'] = {'folder': CONF_FOLDER, 'file': chat_modules,
-                                      'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
-                                      'parser': chat_config,
-                                      'config': chat_conf_dict,
-                                      'gui': chat_conf_gui}
+    loaded_modules['chat'] = {'folder': CONF_FOLDER, 'file': chat_modules,
+                              'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
+                              'parser': chat_config,
+                              'config': chat_conf_dict,
+                              'gui': chat_conf_gui}
 
     for module, settings in chat_config.items(chat_tag):
         log.info("Loading chat module: {0}".format(module))
@@ -233,7 +233,7 @@ def init():
     if gui_settings['gui']:
         log.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,
-                               main_config=loaded_modules['config'],
+                               main_config=loaded_modules['main'],
                                loaded_modules=loaded_modules,
                                queue=queue)
         window.start()

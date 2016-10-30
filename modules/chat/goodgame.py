@@ -25,7 +25,8 @@ CONF_DICT['config']['socket'] = 'ws://chat.goodgame.ru:8081/chat/websocket'
 
 CONF_GUI = {
     'config': {
-        'hidden': ['socket']}}
+        'hidden': ['socket']},
+    'non_dynamic': ['config.*']}
 
 
 class GoodgameMessageHandler(threading.Thread):

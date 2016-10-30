@@ -27,7 +27,8 @@ CONF_DICT['config']['socket'] = 'ws://funstream.tv/socket.io/'
 
 CONF_GUI = {
     'config': {
-        'hidden': ['socket']}}
+        'hidden': ['socket']},
+    'non_dynamic': ['config.*']}
 
 
 class FsChat(WebSocketClient):
