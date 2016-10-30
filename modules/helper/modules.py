@@ -9,6 +9,9 @@ class BaseModule:
         params['class'] = self
         return params
 
+    def load_module(self, *args, **kwargs):
+        pass
+
     def gui_button_press(self, *args):
         pass
 

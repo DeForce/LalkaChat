@@ -94,6 +94,7 @@ class Message(threading.Thread):
         for sorted_priority, sorted_list in sorted_module:
             for sorted_list_item in sorted_list:
                 self.modules.append(sorted_list_item)
+
         return modules_list
 
     def msg_process(self, message):

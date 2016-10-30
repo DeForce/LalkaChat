@@ -25,7 +25,6 @@ TRANSLATION_FOLDER = os.path.join(PYTHON_FOLDER, "translations")
 CONF_FOLDER = os.path.join(PYTHON_FOLDER, "conf")
 MODULE_FOLDER = os.path.join(PYTHON_FOLDER, "modules")
 MAIN_CONF_FILE = os.path.join(CONF_FOLDER, "config.cfg")
-HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 GUI_TAG = 'gui'
 
 LOG_FOLDER = os.path.join(PYTHON_FOLDER, "logs")
@@ -39,21 +38,6 @@ LANGUAGE_DICT = {
     'en_GB': 'en',
     'ru_RU': 'ru'
 }
-
-root_logger = logging.getLogger()
-# Logging level
-root_logger.setLevel(level=logging.INFO)
-file_handler = logging.FileHandler(LOG_FILE)
-file_handler.setFormatter(LOG_FORMAT)
-root_logger.addHandler(file_handler)
-
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(LOG_FORMAT)
-root_logger.addHandler(console_handler)
-logging.getLogger('requests').setLevel(logging.ERROR)
-
-log = logging.getLogger('main')
-
 
 def get_update():
     github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"
@@ -122,20 +106,15 @@ def init():
     main_config_dict['gui']['gui'] = True
     main_config_dict['gui']['on_top'] = True
     main_config_dict['gui']['reload'] = None
-    main_config_dict['style'] = 'czt'
     main_config_dict['language'] = get_language()
 
     main_config_gui = {
-        'style': {
-            'check': 'http',
-            'check_type': 'dir',
-            'view': 'choose_single'},
         'language': {
             'view': 'choose_single',
             'check_type': 'dir',
             'check': 'translations'
         },
-        'non_dynamic': ['style.list_box', 'language.list_box', 'gui.*']
+        'non_dynamic': ['language.list_box', 'gui.*']
     }
     config = self_heal(MAIN_CONF_FILE, main_config_dict)
     # Adding config for main module
@@ -154,19 +133,6 @@ def init():
     gui_settings['show_hidden'] = main_config_dict[GUI_TAG].get('show_hidden')
     gui_settings['size'] = (main_config_dict['gui_information'].get('width'),
                             main_config_dict['gui_information'].get('height'))
-
-    # Fallback if style folder not found
-    fallback_style = 'czt'
-    if len(config.items('style')) > 0:
-        style, null_element = config.items('style')[0]
-        path = os.path.abspath(os.path.join(HTTP_FOLDER, style))
-        if os.path.exists(path):
-            gui_settings['style'] = style
-        else:
-            gui_settings['style'] = fallback_style
-    else:
-        gui_settings['style'] = fallback_style
-    loaded_modules['main']['http_folder'] = os.path.join(HTTP_FOLDER, gui_settings['style'])
 
     # Checking updates
     log.info("Checking for updates")
@@ -221,10 +187,14 @@ def init():
             tmp = imp.load_source(module, module_location)
             chat_init = getattr(tmp, module)
             class_module = chat_init(queue, PYTHON_FOLDER)
-            loaded_modules[module] = class_module.conf_params
-            loaded_modules[module]['class'] = class_module
+            loaded_modules[module] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")
+
+    # Actually loading modules
+    for f_module, f_config in loaded_modules.iteritems():
+        if 'class' in f_config:
+            f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules)
     try:
         load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
     except:
@@ -253,4 +223,17 @@ def init():
         log.info(exc)
 
 if __name__ == '__main__':
+    root_logger = logging.getLogger()
+    # Logging level
+    root_logger.setLevel(level=logging.INFO)
+    file_handler = logging.FileHandler(LOG_FILE)
+    file_handler.setFormatter(LOG_FORMAT)
+    root_logger.addHandler(file_handler)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(LOG_FORMAT)
+    root_logger.addHandler(console_handler)
+    logging.getLogger('requests').setLevel(logging.ERROR)
+
+    log = logging.getLogger('main')
     init()

@@ -324,20 +324,19 @@ class twitch(ChatModule):
         conf_file = os.path.join(conf_folder, "twitch.cfg")
 
         config = self_heal(conf_file, CONF_DICT)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config,
-                            'config': CONF_DICT,
-                            'gui': CONF_GUI}
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'config': CONF_DICT,
+                             'gui': CONF_GUI}
 
-        config.read(conf_file)
-        # Checking config file for needed variables
-        config_tag = 'config'
-        host = config.get(config_tag, 'host')
-        port = int(config.get(config_tag, 'port'))
-        channel = config.get(config_tag, 'channel')
-        bttv_smiles = config.get(config_tag, 'bttv')
+        self.queue = queue
+        self.host = CONF_DICT['config']['host']
+        self.port = CONF_DICT['config']['port']
+        self.channel = CONF_DICT['config']['channel']
+        self.bttv = CONF_DICT['config']['bttv']
 
+    def load_module(self, *args, **kwargs):
         # Creating new thread with queue in place for messaging transfers
-        tw = twThread(queue, host, port, channel, bttv_smiles)
+        tw = twThread(self.queue, self.host, self.port, self.channel, self.bttv)
         tw.start()

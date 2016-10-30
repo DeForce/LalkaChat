@@ -224,18 +224,16 @@ class goodgame(ChatModule):
         log.info("Initializing goodgame chat")
         conf_file = os.path.join(conf_folder, "goodgame.cfg")
         config = self_heal(conf_file, CONF_DICT)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config,
-                            'config': CONF_DICT,
-                            'gui': CONF_GUI}
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'config': CONF_DICT,
+                             'gui': CONF_GUI}
+        self.queue = queue
+        self.host = CONF_DICT['config']['socket']
+        self.channel_name = CONF_DICT['config']['channel_name']
 
-        # Checking config file for needed variables
-        conf_tag = 'config'
-        address = config.get(conf_tag, 'socket')
-        channel_name = config.get(conf_tag, 'channel_name')
-        # ch_id
-
+    def load_module(self, *args, **kwargs):
         # Creating new thread with queue in place for messaging transfers
-        gg = GGThread(queue, address, channel_name)
+        gg = GGThread(self.queue, self.host, self.channel_name)
         gg.start()

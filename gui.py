@@ -775,7 +775,7 @@ class GuiThread(threading.Thread):
 
     def run(self):
         chromectrl.Initialize()
-        url = ':'.join([self.url, self.port])
+        url = ':'.join([self.url, str(self.port)])
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
         self.gui = ChatGui(None, "LalkaChat", url, **self.kwargs)  # A Frame is a top-level window.
         app.MainLoop()

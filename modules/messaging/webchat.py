@@ -15,9 +15,11 @@ from modules.helper.parser import self_heal
 from modules.helper.system import THREADS
 from modules.helper.modules import MessagingModule
 from gui import MODULE_KEY
+from main import PYTHON_FOLDER, CONF_FOLDER
 
 DEFAULT_PRIORITY = 9001
 HISTORY_SIZE = 20
+HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 log = logging.getLogger('webchat')
@@ -177,14 +179,22 @@ class webchat(MessagingModule):
         conf_dict['server'] = OrderedDict()
         conf_dict['server']['host'] = '127.0.0.1'
         conf_dict['server']['port'] = '8080'
-        conf_gui = {'non_dynamic': ['server.*']}
+        conf_dict['style'] = 'czt'
+        conf_gui = {
+            'style': {
+                'check': 'http',
+                'check_type': 'dir',
+                'view': 'choose_single'},
+            'non_dynamic': ['server.*']}
 
         config = self_heal(conf_file, conf_dict)
 
-        tag_server = 'server'
-        host = config.get(tag_server, 'host')
-        port = config.get(tag_server, 'port')
-        style = main_settings['http_folder']
+        fallback_style = 'czt'
+        path = os.path.abspath(os.path.join(HTTP_FOLDER, conf_dict['style']))
+        if os.path.exists(path):
+            style_location = path
+        else:
+            style_location = os.path.join(HTTP_FOLDER, fallback_style)
 
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
@@ -192,12 +202,21 @@ class webchat(MessagingModule):
                              'id': config.get('gui_information', 'id'),
                              'config': conf_dict,
                              'gui': conf_gui,
-                             'port': port}
+                             'host': conf_dict['server']['host'],
+                             'port': conf_dict['server']['port'],
+                             'style_location': style_location}
+
+        self.message_threads = []
+
+    def load_module(self, *args, **kwargs):
+        conf_dict = self._conf_params
+        host = conf_dict['host']
+        port = conf_dict['port']
+
         if socket_open(host, port):
-            s_thread = SocketThread(host, port, conf_folder, style=style)
+            s_thread = SocketThread(host, port, CONF_FOLDER, style=self._conf_params['style_location'])
             s_thread.start()
 
-            self.message_threads = []
             for thread in range(THREADS+5):
                 self.message_threads.append(MessagingThread())
                 self.message_threads[thread].start()
