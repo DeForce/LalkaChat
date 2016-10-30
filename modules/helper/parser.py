@@ -34,6 +34,8 @@ def self_heal(conf_file, heal_dict):
 def return_type(item):
     if item:
         try:
+            if isinstance(item, bool):
+                return item
             return int(item)
         except:
             if item.lower() == 'true':

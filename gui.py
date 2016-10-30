@@ -168,7 +168,7 @@ class SettingsWindow(wx.Frame):
         self.Destroy()
 
     def on_close(self, event):
-        dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['config', 'quit'])),
+        dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['main', 'quit'])),
                                   caption="Caption",
                                   style=wx.YES_NO | wx.CANCEL,
                                   pos=wx.DefaultPosition)
@@ -181,7 +181,7 @@ class SettingsWindow(wx.Frame):
 
     def on_close_save(self, event):
         if not self.settings_saved:
-            dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['config', 'quit', 'nosave'])),
+            dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['main', 'quit', 'nosave'])),
                                       caption="Caption",
                                       style=wx.YES_NO,
                                       pos=wx.DefaultPosition)

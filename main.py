@@ -15,7 +15,7 @@ from collections import OrderedDict
 from modules.helper.parser import self_heal
 from modules.helper.system import load_translations_keys
 
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 SEM_VERSION = semantic_version.Version(VERSION)
 if hasattr(sys, 'frozen'):
     PYTHON_FOLDER = os.path.dirname(sys.executable)
@@ -38,6 +38,7 @@ LANGUAGE_DICT = {
     'en_GB': 'en',
     'ru_RU': 'ru'
 }
+
 
 def get_update():
     github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"

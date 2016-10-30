@@ -169,8 +169,12 @@ class SocketThread(threading.Thread):
             '/img': {'tools.staticdir.on': True,
                      'tools.staticdir.dir': os.path.join(http_folder, 'img')}}
 
+        css_config = {
+            '/': {}
+        }
+
         cherrypy.tree.mount(HttpRoot(http_folder), '', config)
-        cherrypy.tree.mount(CssRoot(http_folder, self.settings), '/css')
+        cherrypy.tree.mount(CssRoot(http_folder, self.settings), '/css', css_config)
 
         cherrypy.engine.start()
         cherrypy.engine.block()
