@@ -36,7 +36,8 @@ CONF_DICT['config']['host'] = 'irc.twitch.tv'
 CONF_DICT['config']['port'] = 6667
 CONF_GUI = {
     'config': {
-        'hidden': ['host', 'port']}}
+        'hidden': ['host', 'port']},
+    'non_dynamic': ['config.*']}
 
 
 class TwitchUserError(Exception):
@@ -337,6 +338,6 @@ class twitch(ChatModule):
         channel = config.get(config_tag, 'channel')
         bttv_smiles = config.get(config_tag, 'bttv')
 
-        # Creating new thread with queue in place for messaging tranfers
+        # Creating new thread with queue in place for messaging transfers
         tw = twThread(queue, host, port, channel, bttv_smiles)
         tw.start()
