@@ -260,20 +260,16 @@ class sc2tv(ChatModule):
         conf_folder = os.path.join(python_folder, "conf")
         conf_file = os.path.join(conf_folder, "sc2tv.cfg")
         config = self_heal(conf_file, CONF_DICT)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config,
-                            'config': CONF_DICT,
-                            'gui': CONF_GUI}
-        # Checking config file for needed variables
-        config_tag = 'config'
-        socket = config.get(config_tag, 'socket')
-        channel_name = config.get(config_tag, 'channel_name')
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'config': CONF_DICT,
+                             'gui': CONF_GUI}
+        self.queue = queue
+        self.socket = CONF_DICT['config']['socket']
+        self.channel_name = CONF_DICT['config']['channel_name']
 
-        # If any of the value are non-existent then exit the programm with error.
-        if (socket is None) or (channel_name is None):
-            log.critical("Config for funstream is not correct!")
-
-        # Creating new thread with queue in place for messaging tranfers
-        fs = FsThread(queue, socket, channel_name)
+    def load_module(self, *args, **kwargs):
+        # Creating new thread with queue in place for messaging transfers
+        fs = FsThread(self.queue, self.socket, self.channel_name)
         fs.start()

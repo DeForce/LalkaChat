@@ -30,8 +30,6 @@ class levels(MessagingModule):
 
     def __init__(self, conf_folder, **kwargs):
         MessagingModule.__init__(self)
-        # Creating filter and replace strings.
-        main_settings = kwargs.get('main_settings')
 
         conf_file = os.path.join(conf_folder, "levels.cfg")
         conf_dict = OrderedDict()
@@ -56,11 +54,32 @@ class levels(MessagingModule):
                              'config': conf_dict,
                              'gui': conf_gui}
 
+        self.conf_folder = None
+        self.experience = None
+        self.exp_for_level = None
+        self.exp_for_message = None
+        self.filename = None
+        self.levels = None
+        self.special_levels = None
+        self.db_location = None
+        self.message = None
+        self.decrease_window = None
+        self.threshold_users = None
+
+    def load_module(self, *args, **kwargs):
+        main_settings = kwargs.get('main_settings')
+        loaded_modules = kwargs.get('loaded_modules')
+        if 'webchat' not in loaded_modules:
+            raise ModuleLoadException("Unable to find webchat module that is needed for level module")
+
+        conf_folder = self._conf_params['folder']
+        conf_dict = self._conf_params['config']
+
         self.conf_folder = conf_folder
         self.experience = conf_dict['config'].get('experience')
         self.exp_for_level = float(conf_dict['config'].get('exp_for_level'))
         self.exp_for_message = float(conf_dict['config'].get('exp_for_message'))
-        self.filename = os.path.abspath(os.path.join(main_settings['http_folder'], 'levels.xml'))
+        self.filename = os.path.abspath(os.path.join(loaded_modules['webchat']['style_location'], 'levels.xml'))
         self.levels = []
         self.special_levels = {}
         self.db_location = os.path.join(conf_dict['config'].get('db'))
