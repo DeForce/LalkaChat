@@ -204,7 +204,7 @@ class SettingsWindow(wx.Frame):
             item_id_key = MODULE_KEY.join(item_key[:-1])
             descr_static_text = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([item_id_key, 'descr', 'explain'])))
             descr_static_text.SetLabel(description)
-            descr_static_text.Wrap(descr_static_text.GetSize()[0] - 20)
+            descr_static_text.Wrap(descr_static_text.GetSize()[0])
 
     def create_layout(self):
         self.main_grid = wx.BoxSizer(wx.VERTICAL)
@@ -401,13 +401,18 @@ class SettingsWindow(wx.Frame):
             item_list_box.SetChecked(check_items)
         if description:
             adv_sizer = wx.BoxSizer(wx.HORIZONTAL)
-            adv_sizer.Add(item_list_box, 1, wx.EXPAND)
+            adv_sizer.Add(item_list_box, 0, wx.EXPAND)
 
             descr_key = MODULE_KEY.join([key, 'descr.explain'])
             descr_text = wx.StaticText(parent, id=id_renew(descr_key, update=True),
                                        label=translate_key(descr_key), style=wx.ST_NO_AUTORESIZE)
-            adv_sizer.Add(descr_text, 0, wx.EXPAND | wx.ALL, 10)
-            descr_text.Wrap(descr_text.GetSize()[0] - 20)
+            adv_sizer.Add(descr_text, 0, wx.EXPAND | wx.LEFT, 10)
+
+            sizes = descr_text.GetSize()
+            sizes[0] -= 20
+            descr_text.SetMinSize(sizes)
+            descr_text.Fit()
+            # descr_text.Wrap(descr_text.GetSize()[0])
             item_sizer.Add(adv_sizer)
         else:
             item_sizer.Add(item_list_box)

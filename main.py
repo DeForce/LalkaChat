@@ -10,6 +10,7 @@ import logging
 import logging.config
 import requests
 import semantic_version
+import locale
 from collections import OrderedDict
 from modules.helper.parser import self_heal
 from modules.helper.system import load_translations_keys
@@ -32,6 +33,12 @@ if not os.path.exists(LOG_FOLDER):
     os.makedirs(LOG_FOLDER)
 LOG_FILE = os.path.join(LOG_FOLDER, 'chat_log.log')
 LOG_FORMAT = logging.Formatter("%(asctime)s [%(name)s] [%(levelname)s]  %(message)s")
+
+LANGUAGE_DICT = {
+    'en_US': 'en',
+    'en_GB': 'en',
+    'ru_RU': 'ru'
+}
 
 root_logger = logging.getLogger()
 # Logging level
@@ -64,6 +71,11 @@ def get_update():
     except Exception as exc:
         log.info("Got exception: {0}".format(exc))
     return False, None
+
+
+def get_language():
+    local_name, local_encoding = locale.getdefaultlocale()
+    return LANGUAGE_DICT.get(local_name, 'en')
 
 
 def init():
@@ -111,7 +123,7 @@ def init():
     main_config_dict['gui']['on_top'] = True
     main_config_dict['gui']['reload'] = None
     main_config_dict['style'] = 'czt'
-    main_config_dict['language'] = 'en'
+    main_config_dict['language'] = get_language()
 
     main_config_gui = {
         'style': {
