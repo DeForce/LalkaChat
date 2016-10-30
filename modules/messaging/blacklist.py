@@ -2,42 +2,54 @@
 # -*- coding: utf-8 -*-
 import re
 import os
-from modules.helpers.parser import self_heal
+from collections import OrderedDict
+from modules.helper.parser import self_heal
+from modules.helper.modules import MessagingModule
 
 DEFAULT_PRIORITY = 30
 
 
-class blacklist:
+class blacklist(MessagingModule):
     users = {}
     words = {}
 
     def __init__(self, conf_folder, **kwargs):
+        MessagingModule.__init__(self)
         # Dwarf professions.
         conf_file = os.path.join(conf_folder, "blacklist.cfg")
-        config_dict = [
-            {'gui_information': {
-                'category': 'messaging',
-                'id': DEFAULT_PRIORITY}},
-            {'main': {
-                'message': u'ignored message'}},
-            {'users__gui': {
-                'for': 'users_hide, users_block',
-                'view': 'list',
-                'addable': 'true'}},
-            {'users_hide': {}},
-            {'users_block': {
-                'announce': None}},
-            {'words__gui': {
-                'for': 'words_hide, words_block',
-                'addable': True,
-                'view': 'list'}}
-        ]
 
-        config = self_heal(conf_file, config_dict)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config,
-                            'id': config.get('gui_information', 'id')}
+        # Ordered because order matters
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {
+            'category': 'messaging',
+            'id': DEFAULT_PRIORITY}
+        conf_dict['main'] = {'message': u'ignored message'}
+        conf_dict['users_hide'] = {}
+        conf_dict['users_block'] = {}
+        conf_dict['words_hide'] = {}
+        conf_dict['words_block'] = {}
+
+        conf_gui = {
+            'words_hide': {
+                'addable': True,
+                'view': 'list'},
+            'words_block': {
+                'addable': True,
+                'view': 'list'},
+            'users_hide': {
+                'view': 'list',
+                'addable': 'true'},
+            'users_block': {
+                'view': 'list',
+                'addable': 'true'},
+            'non_dynamic': ['main.*']}
+        config = self_heal(conf_file, conf_dict)
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'id': config.get('gui_information', 'id'),
+                             'config': OrderedDict(conf_dict),
+                             'gui': conf_gui}
 
         for item in config.sections():
             for param, value in config.items(item):
@@ -53,16 +65,18 @@ class blacklist:
                 elif item == 'words_block':
                     self.words[param] = 'b'
 
-    def get_message(self, message, queue):
+    def process_message(self, message, queue, **kwargs):
         if message:
-            user = self.process_user(message)
+            if 'command' in message:
+                return message
+            user = self.blacklist_user_handler(message)
             # True = Hide, False = Del, None = Do Nothing
             if user:
                 message['text'] = self.message
             elif user is False:
                 return
 
-            words = self.process_message(message)
+            words = self.blacklist_message_handler(message)
             if words:
                 message['text'] = self.message
             elif words is False:
@@ -70,7 +84,7 @@ class blacklist:
 
             return message
 
-    def process_user(self, message):
+    def blacklist_user_handler(self, message):
         user = message.get('user').lower()
         if user in self.users:
             if self.users[user] == 'h':
@@ -79,7 +93,7 @@ class blacklist:
                 return False
         return None
 
-    def process_message(self, message):
+    def blacklist_message_handler(self, message):
         for word in self.words:
             if re.search(word, message['text'].encode('utf-8')):
                 if self.words[word] == 'h':

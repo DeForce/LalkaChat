@@ -4,7 +4,9 @@ import logging
 import os
 import random
 import re
-from modules.helpers.parser import self_heal
+from collections import OrderedDict
+from modules.helper.parser import self_heal
+from modules.helper.modules import MessagingModule
 
 DEFAULT_PRIORITY = 10
 log = logging.getLogger('c2b')
@@ -30,26 +32,30 @@ def twitch_replace_indexes(filter_name, text, filter_size, replace_size, emotes_
     return emotes
 
 
-class c2b:
+class c2b(MessagingModule):
     def __init__(self, conf_folder, **kwargs):
+        MessagingModule.__init__(self)
         # Creating filter and replace strings.
         conf_file = os.path.join(conf_folder, "c2b.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'messaging',
-                'id': DEFAULT_PRIORITY}},
-            {'config__gui': {
-                'for': 'config',
-                'addable': 'true',
-                'view': 'list_dual'}},
-            {'config': {}}
-        ]
 
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {
+            'category': 'messaging',
+            'id': DEFAULT_PRIORITY}
+        conf_dict['config'] = {}
+
+        conf_gui = {
+            'config': {
+                'addable': 'true',
+                'view': 'list_dual'},
+            'non_dynamic': ['config.*']}
         config = self_heal(conf_file, conf_dict)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config,
-                            'id': config.get('gui_information', 'id')}
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'id': config.get('gui_information', 'id'),
+                             'config': conf_dict,
+                             'gui': conf_gui}
 
         tag_config = 'config'
         self.f_items = []
@@ -58,10 +64,12 @@ class c2b:
             f_item['replace'] = [item.strip().decode('utf-8') for item in f_item['replace']]
             self.f_items.append(f_item)
 
-    def get_message(self, message, queue):
+    def process_message(self, message, queue, **kwargs):
         # Replacing the message if needed.
         # Please do the needful
         if message:
+            if 'command' in message:
+                return message
             for replace in self.f_items:
                 if replace['filter'] in message['text']:
                     replace_word = random.choice(replace['replace'])

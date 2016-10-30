@@ -1,13 +1,17 @@
+
 import irc.client
 import threading
 import os
 import re
 import random
 import requests
-import logging
 import logging.config
 import Queue
-from modules.helpers.parser import self_heal
+from collections import OrderedDict
+import time
+from modules.helper.parser import self_heal
+from modules.helper.modules import ChatModule
+from modules.helper.system import system_message
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -19,18 +23,25 @@ emote_bits_url = 'static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
 NOT_FOUND = 'none'
 SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
-CONF_DICT = [
-            {'gui_information': {
-                'category': 'chat'}},
-            {'config__gui': {
-                'for': 'config',
-                'hidden': 'host, port'}},
-            {'config': {
-                'bttv': 'true',
-                'channel': 'CHANGE_ME',
-                'host': 'irc.twitch.tv',
-                'port': '6667'}}
-        ]
+SYSTEM_USER = 'Twitch.TV'
+
+PING_DELAY = 30
+
+CONF_DICT = OrderedDict()
+CONF_DICT['gui_information'] = {'category': 'chat'}
+CONF_DICT['config'] = OrderedDict()
+CONF_DICT['config']['channel'] = 'CHANGE_ME'
+CONF_DICT['config']['bttv'] = True
+CONF_DICT['config']['host'] = 'irc.twitch.tv'
+CONF_DICT['config']['port'] = 6667
+CONF_GUI = {
+    'config': {
+        'hidden': ['host', 'port']},
+    'non_dynamic': ['config.*']}
+
+
+class TwitchUserError(Exception):
+    """Exception for twitch user error"""
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -110,10 +121,22 @@ class TwitchMessageHandler(threading.Thread):
                 comp['bttv_emotes'].append({'emote_id': bttv_smile['regex'],
                                             'emote_url': 'http:{0}'.format(bttv_smile['url'])})
 
-        if re.match('^@?{0}( |,)'.format(self.nick), comp['text'].lower()):
+        if re.match('^@?{0}[ ,]?'.format(self.nick), comp['text'].lower()):
             comp['pm'] = True
 
         self.message_queue.put(comp)
+
+
+class TwitchPingHandler(threading.Thread):
+    def __init__(self, irc_connection):
+        threading.Thread.__init__(self)
+        self.irc_connection = irc_connection
+
+    def run(self):
+        log.info("Ping started")
+        while self.irc_connection.connected:
+            self.irc_connection.ping("keep-alive")
+            time.sleep(PING_DELAY)
 
 
 class IRC(irc.client.SimpleIRCClient):
@@ -122,7 +145,10 @@ class IRC(irc.client.SimpleIRCClient):
         # Basic variables, twitch channel are IRC so #channel
         self.channel = "#" + channel.lower()
         self.nick = channel.lower()
+        self.queue = queue
         self.twitch_queue = Queue.Queue()
+        self.tw_connection = None
+        self.main_class = kwargs.get('main_class')
 
         msg_handler = TwitchMessageHandler(queue, self.twitch_queue,
                                            nick=self.nick,
@@ -131,19 +157,44 @@ class IRC(irc.client.SimpleIRCClient):
                                            custom_badges=kwargs.get('custom_badges', {}))
         msg_handler.start()
 
-    def on_connect(self, connection, event):
-        log.info("Connected")
+    def system_message(self, message):
+        system_message(message, self.queue,
+                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
+
+    def on_disconnect(self, connection, event):
+        log.info("Connection lost")
+        self.system_message("Connection died, trying to reconnect")
+        timer = threading.Timer(5.0, self.reconnect,
+                                args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
+        timer.start()
+
+    def reconnect(self, host, port, nickname):
+        try_count = 0
+        while True:
+            try_count += 1
+            log.info("Reconnecting, try {0}".format(try_count))
+            try:
+                self.connect(host, port, nickname)
+                break
+            except Exception as exc:
+                log.exception(exc)
 
     def on_welcome(self, connection, event):
         log.info("Welcome Received, joining {0} channel".format(self.channel))
+        self.tw_connection = connection
+        self.system_message('Joining channel {0}'.format(self.channel))
         # After we receive IRC Welcome we send request for join and
-        #  request for Capabilites (Twitch color, Display Name,
+        #  request for Capabilities (Twitch color, Display Name,
         #  Subscriber, etc)
         connection.join(self.channel)
         connection.cap('REQ', ':twitch.tv/tags')
+        ping_handler = TwitchPingHandler(connection)
+        ping_handler.start()
 
     def on_join(self, connection, event):
-        log.info("Joined {0} channel".format(self.channel))
+        msg = "Joined {0} channel".format(self.channel)
+        log.info(msg)
+        self.system_message(msg)
 
     def on_pubmsg(self, connection, event):
         self.twitch_queue.put(event)
@@ -182,19 +233,35 @@ class twThread(threading.Thread):
                 self.nickname += str(random.randint(0, 9))
 
     def run(self):
-        if self.load_config():
-            # We are connecting via IRC handler.
-            irc_client = IRC(self.queue, self.channel, **self.kwargs)
-            irc_client.connect(self.host, self.port, self.nickname)
-            irc_client.start()
+        try_count = 0
+        # We are connecting via IRC handler.
+        while True:
+            try_count += 1
+            log.info("Connecting, try {0}".format(try_count))
+            try:
+                if self.load_config():
+                    irc_client = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
+                    irc_client.connect(self.host, self.port, self.nickname)
+                    irc_client.start()
+                    log.info("Connection closed")
+                    break
+            except TwitchUserError:
+                log.critical("Unable to find twitch user, please fix")
+                break
+            except Exception as exc:
+                log.exception(exc)
 
     def load_config(self):
         try:
             request = requests.get("https://api.twitch.tv/kraken/channels/{0}".format(self.channel), headers=headers)
             if request.status_code == 200:
                 log.info("Channel found, continuing")
+            elif request.status_code == 404:
+                raise TwitchUserError
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
+        except TwitchUserError:
+            raise TwitchUserError
         except Exception as exc:
             log.error("Unable to get channel ID, error: {0}\nArgs: {1}".format(exc.message, exc.args))
             return False
@@ -247,8 +314,9 @@ class twThread(threading.Thread):
         return True
 
 
-class twitch:
+class twitch(ChatModule):
     def __init__(self, queue, python_folder, **kwargs):
+        ChatModule.__init__(self)
         log.info("Initializing twitch chat")
 
         # Reading config from main directory.
@@ -256,18 +324,19 @@ class twitch:
         conf_file = os.path.join(conf_folder, "twitch.cfg")
 
         config = self_heal(conf_file, CONF_DICT)
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'config': CONF_DICT,
+                             'gui': CONF_GUI}
 
-        config.read(conf_file)
-        # Checking config file for needed variables
-        config_tag = 'config'
-        host = config.get(config_tag, 'host')
-        port = int(config.get(config_tag, 'port'))
-        channel = config.get(config_tag, 'channel')
-        bttv_smiles = config.get(config_tag, 'bttv')
+        self.queue = queue
+        self.host = CONF_DICT['config']['host']
+        self.port = CONF_DICT['config']['port']
+        self.channel = CONF_DICT['config']['channel']
+        self.bttv = CONF_DICT['config']['bttv']
 
-        # Creating new thread with queue in place for messaging tranfers
-        tw = twThread(queue, host, port, channel, bttv_smiles)
+    def load_module(self, *args, **kwargs):
+        # Creating new thread with queue in place for messaging transfers
+        tw = twThread(self.queue, self.host, self.port, self.channel, self.bttv)
         tw.start()

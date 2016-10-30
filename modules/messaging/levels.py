@@ -6,59 +6,90 @@ import os
 import random
 import sqlite3
 import xml.etree.ElementTree as ElementTree
-import jinja2
-from modules.helpers.parser import self_heal
-from modules.helpers.system import system_message, ModuleLoadException
+from collections import OrderedDict
+import datetime
 
-logger = logging.getLogger('levels')
+from modules.helper.parser import self_heal
+from modules.helper.system import system_message, ModuleLoadException
+from modules.helper.modules import MessagingModule
+
+log = logging.getLogger('levels')
 
 
-class levels:
+class levels(MessagingModule):
     @staticmethod
     def create_db(db_location):
         if not os.path.exists(db_location):
             db = sqlite3.connect(db_location)
             cursor = db.cursor()
-            logger.info("Creating new tables for levels")
+            log.info("Creating new tables for levels")
             cursor.execute('CREATE TABLE UserLevels (User, "Experience")')
             cursor.close()
             db.commit()
             db.close()
 
     def __init__(self, conf_folder, **kwargs):
-        # Creating filter and replace strings.
-        main_settings = kwargs.get('main_settings')
+        MessagingModule.__init__(self)
 
         conf_file = os.path.join(conf_folder, "levels.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': u'messaging'}},
-            {'config': {
-                'message': u'{0} has leveled up, now he is {1}',
-                'db': u'levels.db',
-                'experience': u'geometrical',
-                'exp_for_level': 200}}
-        ]
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {'category': 'messaging'}
+        conf_dict['config'] = OrderedDict()
+        conf_dict['config']['message'] = u'{0} has leveled up, now he is {1}'
+        conf_dict['config']['db'] = os.path.join('conf', u'levels.db')
+        conf_dict['config']['experience'] = u'geometrical'
+        conf_dict['config']['exp_for_level'] = 200
+        conf_dict['config']['exp_for_message'] = 1
+        conf_dict['config']['decrease_window'] = 60
+        conf_gui = {'non_dynamic': ['config.*'],
+                    'config': {
+                        'experience': {
+                            'view': 'dropdown',
+                            'choices': ['static', 'geometrical', 'random']}}}
         config = self_heal(conf_file, conf_dict)
 
-        self.conf_params = {'folder': conf_folder, 'file': conf_file,
-                            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                            'parser': config}
-        tag_config = 'config'
+        self._conf_params = {'folder': conf_folder, 'file': conf_file,
+                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                             'parser': config,
+                             'config': conf_dict,
+                             'gui': conf_gui}
+
+        self.conf_folder = None
+        self.experience = None
+        self.exp_for_level = None
+        self.exp_for_message = None
+        self.filename = None
+        self.levels = None
+        self.special_levels = None
+        self.db_location = None
+        self.message = None
+        self.decrease_window = None
+        self.threshold_users = None
+
+    def load_module(self, *args, **kwargs):
+        main_settings = kwargs.get('main_settings')
+        loaded_modules = kwargs.get('loaded_modules')
+        if 'webchat' not in loaded_modules:
+            raise ModuleLoadException("Unable to find webchat module that is needed for level module")
+
+        conf_folder = self._conf_params['folder']
+        conf_dict = self._conf_params['config']
 
         self.conf_folder = conf_folder
-        self.experience = config.get(tag_config, 'experience')
-        self.exp_for_level = int(config.get(tag_config, 'exp_for_level'))
-        self.exp_for_message = 1
-        self.filename = os.path.abspath(os.path.join(main_settings['http_folder'], 'levels.xml'))
+        self.experience = conf_dict['config'].get('experience')
+        self.exp_for_level = float(conf_dict['config'].get('exp_for_level'))
+        self.exp_for_message = float(conf_dict['config'].get('exp_for_message'))
+        self.filename = os.path.abspath(os.path.join(loaded_modules['webchat']['style_location'], 'levels.xml'))
         self.levels = []
         self.special_levels = {}
-        self.db_location = os.path.join(conf_folder, config.get(tag_config, 'db'))
-        self.message = config.get(tag_config, 'message').decode('utf-8')
+        self.db_location = os.path.join(conf_dict['config'].get('db'))
+        self.message = conf_dict['config'].get('message').decode('utf-8')
+        self.decrease_window = int(conf_dict['config'].get('decrease_window'))
+        self.threshold_users = {}
 
         # Load levels
         if not os.path.exists(self.filename):
-            logger.error("{0} not found, generating from template".format(self.filename))
+            log.error("{0} not found, generating from template".format(self.filename))
             raise ModuleLoadException("{0} not found, generating from template".format(self.filename))
 
         if self.experience == 'random':
@@ -89,13 +120,14 @@ class levels:
         user_select = cursor.execute('SELECT User, Experience FROM UserLevels WHERE User = ?', [user])
         user_select = user_select.fetchall()
 
-        experience = 1
+        experience = self.exp_for_message
+        exp_to_add = self.calculate_experience(user)
         if len(user_select) == 1:
             row = user_select[0]
-            experience = int(row[1]) + self.exp_for_message
+            experience = int(row[1]) + exp_to_add
             cursor.execute('UPDATE UserLevels SET Experience = ? WHERE User = ? ', [experience, user])
         elif len(user_select) > 1:
-            logger.error("Select yielded more than one User")
+            log.error("Select yielded more than one User")
         else:
             cursor.execute('INSERT INTO UserLevels VALUES (?, ?)', [user, experience])
         db.commit()
@@ -119,8 +151,10 @@ class levels:
         cursor.close()
         return self.levels[max_level]
 
-    def get_message(self, message, queue):
+    def process_message(self, message, queue, **kwargs):
         if message:
+            if 'command' in message:
+                return message
             if 'system_msg' not in message or not message['system_msg']:
                 if 'user' in message and message['user'] in self.special_levels:
                     level_info = self.special_levels[message['user']]
@@ -131,3 +165,11 @@ class levels:
 
                 message['levels'] = self.set_level(message['user'], queue)
             return message
+
+    def calculate_experience(self, user):
+        exp_to_add = self.exp_for_message
+        if user in self.threshold_users:
+            multiplier = (datetime.datetime.now() - self.threshold_users[user]).seconds / float(self.decrease_window)
+            exp_to_add *= multiplier if multiplier <= 1 else 1
+        self.threshold_users[user] = datetime.datetime.now()
+        return exp_to_add

@@ -5,12 +5,24 @@ import threading
 import imp
 import operator
 import logging
+from collections import OrderedDict
 
-from modules.helpers.system import ModuleLoadException
-from modules.helpers.parser import self_heal
+from modules.helper.system import ModuleLoadException, THREADS
+from modules.helper.parser import self_heal
 
 log = logging.getLogger('messaging')
 MODULE_PRI_DEFAULT = '100'
+
+
+class MessageHandler(threading.Thread):
+    def __init__(self, queue, process):
+        self.queue = queue
+        self.process = process
+        threading.Thread.__init__(self)
+
+    def run(self):
+        while True:
+            self.process(self.queue.get())
 
 
 class Message(threading.Thread):
@@ -22,27 +34,30 @@ class Message(threading.Thread):
         self.msg_counter = 0
         self.queue = queue
         self.module_tag = "modules.messaging"
+        self.threads = []
 
-    def load_modules(self, config_dict, settings):
+    def load_modules(self, main_config, settings):
         log.info("Loading configuration file for messaging")
-        modules_list = {}
+        modules_list = OrderedDict()
 
-        conf_file = os.path.join(config_dict['conf_folder'], "messaging.cfg")
-        conf_dict = [
-            {'gui_information': {
-                'category': 'main'}},
-            {'messaging__gui': {'check': 'modules/messaging',
-                                'check_type': 'files',
-                                'file_extension': False,
-                                'for': 'messaging',
-                                'view': 'choose_multiple'}},
-            {'messaging': {
-                'webchat': None}}
-        ]
+        conf_file = os.path.join(main_config['conf_folder'], "messaging_modules.cfg")
+        conf_dict = OrderedDict()
+        conf_dict['gui_information'] = {'category': 'messaging'}
+        conf_dict['messaging'] = {'webchat': None}
+
+        conf_gui = {
+            'messaging': {'check': 'modules/messaging',
+                          'check_type': 'files',
+                          'file_extension': False,
+                          'view': 'choose_multiple',
+                          'description': True},
+            'non_dynamic': ['messaging.*']}
         config = self_heal(conf_file, conf_dict)
-        modules_list['messaging_modules'] = {'folder': config_dict['conf_folder'], 'file': conf_file,
-                                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                                             'parser': config}
+        modules_list['messaging'] = {'folder': main_config['conf_folder'], 'file': conf_file,
+                                     'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                                     'parser': config,
+                                     'config': conf_dict,
+                                     'gui': conf_gui}
 
         modules = {}
         # Loading modules from cfg.
@@ -52,17 +67,18 @@ class Message(threading.Thread):
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
                 #  same name as module name
-                join_path = [config_dict['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(module)]
+                join_path = [main_config['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(module)]
                 file_path = os.path.join(*join_path)
 
                 try:
                     tmp = imp.load_source(module, file_path)
                     class_init = getattr(tmp, module)
-                    class_module = class_init(config_dict['conf_folder'], root_folder=config_dict['root_folder'],
+                    class_module = class_init(main_config['conf_folder'], root_folder=main_config['root_folder'],
                                               main_settings=settings)
 
-                    if 'id' in class_module.conf_params:
-                        priority = class_module.conf_params['id']
+                    params = class_module.conf_params()
+                    if 'id' in params:
+                        priority = params['id']
                     else:
                         priority = MODULE_PRI_DEFAULT
 
@@ -71,14 +87,14 @@ class Message(threading.Thread):
                     else:
                         modules[int(priority)] = [class_module]
 
-                    modules_list[module] = class_module.conf_params
-                    modules_list[module]['class'] = class_module
+                    modules_list[module] = params
                 except ModuleLoadException as exc:
                     log.error("Unable to load module {0}".format(module))
         sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
         for sorted_priority, sorted_list in sorted_module:
             for sorted_list_item in sorted_list:
                 self.modules.append(sorted_list_item)
+
         return modules_list
 
     def msg_process(self, message):
@@ -93,8 +109,10 @@ class Message(threading.Thread):
         #  content so it can be passed to new module, or to pass to CLI
 
         for module in self.modules:
-            message = module.get_message(message, self.queue)
+            message = module.process_message(message, self.queue)
 
     def run(self):
-        while True:
-            self.msg_process(self.queue.get())
+        for thread in range(THREADS):
+            self.threads.append(MessageHandler(self.queue, self.msg_process))
+            self.threads[thread].start()
+
