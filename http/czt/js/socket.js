@@ -131,6 +131,8 @@ function showMessage(message) {
 	var elements = {};
 	elements['message'] = document.createElement('div');
 	elements.message.setAttribute('class', 'msg');
+	elements.message.setAttribute('id', message.id);
+	elements.message.setAttribute('user', message.user);
 	if(timeout > 0) {
 		elements.message.setAttribute('timer-id', setTimeout(removeMessage, timeout * 1000, elements.message));
 	}
@@ -272,4 +274,18 @@ function runCommand(message) {
     if(message.command == 'reload'){
         window.location.reload();
     }
+    else if(message.command == 'remove_msg') {
+        if(message.ids) {
+            message.ids.forEach(function(message_item) {
+                item = document.getElementById(message_item)
+                if (item) {
+                    item.parentNode.removeChild(item)
+                }
+            })
+        }
+    }
+    else {
+        console.log("Got unknown command " + message.command)
+    }
 }
+
