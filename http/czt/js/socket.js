@@ -265,7 +265,7 @@ function showMessage(message) {
 
 	}
 	document.getElementById('ChatContainer').appendChild(elements.message);
-    updateMessages();
+    // updateMessages();
 }
 
 function runCommand(message) {
