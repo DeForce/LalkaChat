@@ -1,3 +1,5 @@
+# This Python file uses the following encoding: utf-8
+# -*- coding: utf-8 -*-
 import json
 import threading
 import os
@@ -5,7 +7,6 @@ import requests
 import Queue
 import re
 import logging
-import time
 from collections import OrderedDict
 from modules.helper.parser import self_heal
 from modules.helper.system import system_message
@@ -17,6 +18,7 @@ log = logging.getLogger('goodgame')
 SOURCE = 'gg'
 SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
 SYSTEM_USER = 'GoodGame'
+ID_PREFIX = 'gg_{0}'
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
@@ -50,7 +52,8 @@ class GoodgameMessageHandler(threading.Thread):
         if msg['type'] == "message":
             # Getting all needed data from received message
             # and sending it to queue for further message handling
-            comp = {'source': self.source,
+            comp = {'id': ID_PREFIX.format(msg['data']['message_id']),
+                    'source': self.source,
                     'source_icon': SOURCE_ICON,
                     'user': msg['data']['user_name'],
                     'text': msg['data']['text'],
@@ -100,6 +103,27 @@ class GoodgameMessageHandler(threading.Thread):
             if msg['data']['errorMsg'] == 'Invalid channel id':
                 self.ws_class.close(reason='INV_CH_ID')
                 log.error("Failed to find channel on GoodGame, please check channel name")
+        elif msg['type'] == 'user_warn':
+            self.ws_class.system_message(u"{0} вынес предупреждение {1}".format(msg['data']['moder_name'],
+                                                                                msg['data']['user_name']))
+        elif msg['type'] == 'remove_message':
+            remove_id = ID_PREFIX.format(msg['data']['message_id'])
+            self.message_queue.put({'command': 'remove_msg',
+                                    'ids': [remove_id]})
+        elif msg['type'] == 'user_ban':
+            if msg['data']['duration']:
+                self.ws_class.system_message(u'{0} забанил {1} на {2} минут '
+                                             u'по причине: {3}'.format(msg['data']['moder_name'],
+                                                                       msg['data']['user_name'],
+                                                                       msg['data']['duration']/60,
+                                                                       msg['data']['reason']))
+            else:
+                if msg['data']['permanent']:
+                    self.ws_class.system_message(u'{0} забанил бессрочно {1}'.format(msg['data']['moder_name'],
+                                                                                     msg['data']['user_name']))
+                else:
+                    self.ws_class.system_message(u'{0} разбанил {1}'.format(msg['data']['moder_name'],
+                                                                            msg['data']['user_name']))
 
 
 class GGChat(WebSocketClient):
