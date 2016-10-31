@@ -283,6 +283,17 @@ function runCommand(message) {
                 }
             })
         }
+        else if(message.user) {
+            message.user.forEach(function(user) {
+                var children = chatMessages.childNodes
+                var node_length = children.length - 1
+                for(i=node_length; i >= 0; --i) {
+                    if(children[i].getAttribute('user') == user) {
+                        children[i].parentNode.removeChild(children[i])
+                    }
+                }
+            })
+        }
     }
     else {
         console.log("Got unknown command " + message.command)
