@@ -29,7 +29,7 @@ def return_type(item):
         if isinstance(item, bool):
             return item
         elif isinstance(item, int):
-            return str(item)
+            return item
         elif item.lower() == 'true':
             return True
         elif item.lower() == 'false':

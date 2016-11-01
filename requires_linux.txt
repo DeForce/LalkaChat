@@ -1,9 +1,8 @@
 requests
-cherrypy
+cherrypy==8.1.0
 ws4py
 irc
-wxpython
-cefpython3
 semantic_version
 jinja2
 pyScss
+pyyaml

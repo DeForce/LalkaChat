@@ -1,4 +1,11 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
+try:
+    from cefpython3.wx import chromectrl as browser
+    HAS_CHROME = True
+except ImportError:
+    from wx import html2 as browser
+    HAS_CHROME = False
+
 from collections import OrderedDict
 import threading
 import os
@@ -6,12 +13,10 @@ import logging
 import webbrowser
 import wx
 import wx.grid
-from cefpython3.wx import chromectrl
 from modules.helper.system import MODULE_KEY, translate_key, PYTHON_FOLDER
 from modules.helper.parser import return_type
 from modules.helper.module import BaseModule
 # ToDO: Support customization of borders/spacings
-# ToDO: Exit by cancel button
 
 IDS = {}
 log = logging.getLogger('chat_gui')
@@ -516,7 +521,6 @@ class SettingsWindow(wx.Frame):
 
         tree_ctrl_id = id_renew('settings.tree', update=True)
         tree_ctrl = wx.TreeCtrl(self, id=tree_ctrl_id, style=style)
-        tree_ctrl.SetQuickBestSize(False)
         root_key = MODULE_KEY.join(['settings', 'tree', 'root'])
         root_node = tree_ctrl.AddRoot(translate_key(root_key))
         for item, value in self.categories.iteritems():
@@ -532,15 +536,15 @@ class SettingsWindow(wx.Frame):
                     f_item_data.SetData(f_item_key)
                     tree_ctrl.AppendItem(item_node, translate_key(f_item), data=f_item_data)
         tree_ctrl.ExpandAll()
-        tree_ctrl.SetMinSize(wx.Size(tree_ctrl.GetSize()[0] + 70, -1))
 
         self.tree_ctrl = tree_ctrl
         self.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_tree_ctrl_changed, id=tree_ctrl_id)
-        self.main_grid.Add(self.tree_ctrl, 0, wx.EXPAND | wx.ALL, 7)
+
+        self.main_grid.Add(tree_ctrl, 7, wx.EXPAND | wx.ALL, 7)
 
         content_page_id = id_renew(MODULE_KEY.join(['settings', 'content']))
         self.content_page = wx.Panel(self, id=content_page_id)
-        self.main_grid.Add(self.content_page, 1, wx.EXPAND)
+        self.main_grid.Add(self.content_page, 15, wx.EXPAND)
 
         self.main_grid.Layout()
         self.SetSizer(self.main_grid)
@@ -1143,6 +1147,7 @@ class ChatGui(wx.Frame):
         self.queue = kwargs.get('queue')
         self.settings_window = None
         self.status_frame = None
+        self.browser = None
 
         wx.Frame.__init__(self, parent, title=title, size=self.gui_settings.get('size'))
         # Set window style
@@ -1166,7 +1171,11 @@ class ChatGui(wx.Frame):
             self.status_frame = StatusFrame(self, chat_modules=self.sorted_categories['chat'])
             vbox.Add(self.status_frame, 0, wx.EXPAND)
         if self.gui_settings['show_browser']:
-            vbox.Add(chromectrl.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False), 1, wx.EXPAND)
+            if HAS_CHROME:
+                self.browser = browser.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False)
+            else:
+                self.browser = browser.WebView.New(parent=self, url=url, name='LalkaWebViewGui')
+            vbox.Add(self.browser, 1, wx.EXPAND)
 
         # Set events
         self.Bind(wx.EVT_CLOSE, self.on_close)
@@ -1260,7 +1269,8 @@ class GuiThread(threading.Thread, BaseModule):
             self.port = self.kwargs['loaded_modules']['webchat']['port']
 
     def run(self):
-        chromectrl.Initialize()
+        if HAS_CHROME:
+            browser.Initialize()
         url = ':'.join([self.url, str(self.port)])
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
         self.gui = ChatGui(None, "LalkaChat", url, **self.kwargs)  # A Frame is a top-level window.
