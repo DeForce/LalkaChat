@@ -146,7 +146,7 @@ class SettingsWindow(wx.Frame):
         self.settings_saved = True
         self.tree_ctrl = None
         self.content_page = None
-        self.sizer_dict = {}
+        self.sizer_list = []
 
         # Setting up the window
         self.SetBackgroundColour('cream')
@@ -208,6 +208,19 @@ class SettingsWindow(wx.Frame):
             descr_static_text.SetLabel(description)
             descr_static_text.Wrap(descr_static_text.GetSize()[0])
 
+    def on_tree_ctrl_changed(self, event):
+        self.settings_saved = False
+        tree_ctrl = event.EventObject  # type: wx.TreeCtrl
+        selection = tree_ctrl.GetFocusedItem()
+        selection_text = tree_ctrl.GetItemData(selection).GetData()
+        key_list = selection_text.split(MODULE_KEY)
+
+        # Drawing page
+        self.fill_page_with_content(self.content_page, key_list[1], key_list[-1],
+                                    self.main_class.loaded_modules[key_list[-1]])
+
+        event.Skip()
+
     def create_layout(self):
         self.main_grid = wx.BoxSizer(wx.HORIZONTAL)
         tree_ctrl_size = wx.Size(220, -1)
@@ -234,7 +247,7 @@ class SettingsWindow(wx.Frame):
         tree_ctrl.ExpandAll()
 
         self.tree_ctrl = tree_ctrl
-        self.Bind(wx.EVT_TREE_SEL_CHANGED, self.tree_ctrl_changed, id=tree_ctrl_id)
+        self.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_tree_ctrl_changed, id=tree_ctrl_id)
         self.main_grid.Add(self.tree_ctrl, 0, wx.EXPAND | wx.ALL, 7)
 
         content_page_id = id_renew(MODULE_KEY.join(['settings', 'content']))
@@ -255,22 +268,30 @@ class SettingsWindow(wx.Frame):
         page_sizer = panel.GetSizer()  # type: wx.Sizer
         if not page_sizer:
             page_sizer = wx.BoxSizer(wx.VERTICAL)
+            panel.SetSizer(page_sizer)
         else:
-            page_sizer.DeleteWindows()
+            children = page_sizer.GetChildren()
+            for child in children:
+                window = child.GetWindow() if child.GetWindow() else child.GetSizer()
+                page_sizer.Hide(window)
 
-        # Creating sizer for page
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        # Window for settings
-        sizer.Add(self.fill_sc_with_config(panel, category_config, category_item), 1, wx.EXPAND)
-        # Buttons
-        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        for button_name in ['apply_button', 'cancel_button']:
-            button_sizer.Add(create_button(MODULE_KEY.join([setting_category, category_item, button_name]),
-                                           self.button_clicked), 0, wx.ALIGN_RIGHT)
-        sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT)
-        page_sizer.Add(sizer, 1, wx.EXPAND)
+        if category_item in self.sizer_list:
+            sizer_index = self.sizer_list.index(category_item)
+            page_sizer.Show(sizer_index)
+        else:
+            # Creating sizer for page
+            sizer = wx.BoxSizer(wx.VERTICAL)
+            # Window for settings
+            sizer.Add(self.fill_sc_with_config(panel, category_config, category_item), 1, wx.EXPAND)
+            # Buttons
+            button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            for button_name in ['apply_button', 'cancel_button']:
+                button_sizer.Add(create_button(MODULE_KEY.join([setting_category, category_item, button_name]),
+                                               self.button_clicked), 0, wx.ALIGN_RIGHT)
+            sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT)
+            page_sizer.Add(sizer, 1, wx.EXPAND)
+            self.sizer_list.append(category_item)
         page_sizer.Layout()
-        panel.SetSizer(page_sizer)
         panel.Layout()
 
     def fill_sc_with_config(self, panel, category_config, category_item):
@@ -530,19 +551,6 @@ class SettingsWindow(wx.Frame):
             self.settings_saved = True
         elif keys[-1] == 'cancel_button':
             self.on_close(event)
-        event.Skip()
-
-    def tree_ctrl_changed(self, event):
-        self.settings_saved = False
-        tree_ctrl = event.EventObject  # type: wx.TreeCtrl
-        selection = tree_ctrl.GetFocusedItem()
-        selection_text = tree_ctrl.GetItemData(selection).GetData()
-        key_list = selection_text.split(MODULE_KEY)
-
-        # Drawing page
-        self.fill_page_with_content(self.content_page, key_list[1], key_list[-1],
-                                    self.main_class.loaded_modules[key_list[-1]])
-
         event.Skip()
 
     def save_settings(self, module):
