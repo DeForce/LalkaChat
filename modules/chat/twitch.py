@@ -339,7 +339,7 @@ class twitch(ChatModule):
 
         self.queue = queue
         self.host = CONF_DICT['config']['host']
-        self.port = CONF_DICT['config']['port']
+        self.port = int(CONF_DICT['config']['port'])
         self.channel = CONF_DICT['config']['channel']
         self.bttv = CONF_DICT['config']['bttv']
 

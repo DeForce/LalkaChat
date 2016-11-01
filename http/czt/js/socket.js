@@ -1,48 +1,54 @@
 var MAX_MESSAGES = 70;
-var find_location = window.location.href;
-var RegExp = /:(\d+)/;
-var find_list = RegExp.exec(find_location.toString());
-var find_port = find_list[1];
-var ws_url = "ws://127.0.0.1:".concat(find_port, "/ws");
+var ws_url = "ws://" + window.location.host + "/ws";
 
 // Chat settings
 var timeout = 0;
 var loadHistory = true;
-
-var socket = new WebSocket(ws_url);
-
+var socket;
 var chatMessages;
-socket.onopen = function() {
-    console.log("Socket connected")
-    chatMessages = document.getElementById('ChatContainer');
-};
 
-socket.onclose = function(event) {
-	if (event.wasClean) {
-	    console.log("Socket closed cleanly")
-	}
-	else {
-	    console.log("Socket closed not cleanly")
-	}
-};
+function connectToWS() {
+    console.log("Connecting to WS")
+    socket = new WebSocket(ws_url);
 
-socket.onmessage = function(event) {
-	var incomingMessage = JSON.parse(event.data);
-    if(incomingMessage.hasOwnProperty('command')) {
-        runCommand(incomingMessage);
-    }
-    else {
-        if (loadHistory) {
-            showMessage(incomingMessage);
+    socket.onopen = function() {
+        console.log("Socket connected")
+        chatMessages = document.getElementById('ChatContainer');
+    };
+
+    socket.onclose = function(event) {
+    	if (event.wasClean) {
+    	    console.log("Socket closed cleanly");
+    	}
+    	else {
+    	    console.log("Socket closed not cleanly");
+    	}
+    	setTimeout(function() {
+          connectToWS(ws_url);
+        }, 1000)
+    };
+
+    socket.onmessage = function(event) {
+    	var incomingMessage = JSON.parse(event.data);
+        if(incomingMessage.hasOwnProperty('command')) {
+            runCommand(incomingMessage);
         }
-        else if (!incomingMessage.hasOwnProperty('history')) {
-            showMessage(incomingMessage);
+        else {
+            if (loadHistory) {
+                showMessage(incomingMessage);
+            }
+            else if (!incomingMessage.hasOwnProperty('history')) {
+                showMessage(incomingMessage);
+            }
         }
-    }
-};
+    };
 
-socket.onerror = function(error) {
-};
+    socket.onerror = function(error) {
+        console.log("Error")
+    };
+}
+
+connectToWS();
 
 twitch_processEmoticons = function(message, emotes) {
 	if (!emotes) {
@@ -123,7 +129,6 @@ function updateMessages() {
     }
     removeMessage(element);
   }
-
 
 function showMessage(message) {
 	var badge_colors = 1;

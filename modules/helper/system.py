@@ -61,8 +61,9 @@ def load_translations_keys(translation_folder, language):
 def find_key_translation(item):
     translation = TRANSLATIONS.get(item)
     if translation is None:
-        if len(item.split(MODULE_KEY)) > 2:
-            wildcard_item = MODULE_KEY.join([split for split in item.split(MODULE_KEY) if split != '*'][1:])
+        split_item = [f_item for f_item in item.split(MODULE_KEY) if f_item != '*']
+        if len(split_item) > 1:
+            wildcard_item = MODULE_KEY.join(split_item[1:])
             return find_key_translation('*{0}{1}'.format(MODULE_KEY, wildcard_item))
         else:
             return item

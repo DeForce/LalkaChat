@@ -100,8 +100,8 @@ def init():
     main_config_dict = OrderedDict()
     main_config_dict['gui_information'] = OrderedDict()
     main_config_dict['gui_information']['category'] = 'main'
-    main_config_dict['gui_information']['width'] = 450
-    main_config_dict['gui_information']['height'] = 500
+    main_config_dict['gui_information']['width'] = '450'
+    main_config_dict['gui_information']['height'] = '500'
     main_config_dict['gui'] = OrderedDict()
     main_config_dict['gui']['show_hidden'] = False
     main_config_dict['gui']['gui'] = True
@@ -132,8 +132,8 @@ def init():
     gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
     gui_settings['language'] = main_config_dict.get('language')
     gui_settings['show_hidden'] = main_config_dict[GUI_TAG].get('show_hidden')
-    gui_settings['size'] = (main_config_dict['gui_information'].get('width'),
-                            main_config_dict['gui_information'].get('height'))
+    gui_settings['size'] = (int(main_config_dict['gui_information'].get('width')),
+                            int(main_config_dict['gui_information'].get('height')))
 
     # Checking updates
     log.info("Checking for updates")

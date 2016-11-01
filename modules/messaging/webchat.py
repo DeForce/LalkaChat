@@ -47,8 +47,8 @@ class FireFirstMessages(threading.Thread):
 
     def run(self):
         sleep(0.1)
-        for item in self.history:
-            if item:
+        if self.ws.stream:
+            for item in self.history:
                 self.ws.send(json.dumps(item))
 
 
@@ -112,7 +112,7 @@ class CssRoot(object):
         self.http_folder = http_folder
         self.settings = settings
 
-    @cherrypy.expose()
+    @cherrypy.expose
     def style_css(self):
         with open(os.path.join(self.http_folder, 'css', 'style.css'), 'r') as css:
             return Template(css.read()).render(**self.settings)
@@ -170,7 +170,7 @@ class SocketThread(threading.Thread):
                      'tools.staticdir.dir': os.path.join(http_folder, 'img')}}
 
         css_config = {
-            '/': {}
+            '/': {'tools.response_headers.headers': [('Content-Type', 'text/plain')]}
         }
 
         cherrypy.tree.mount(HttpRoot(http_folder), '', config)
