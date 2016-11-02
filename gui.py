@@ -19,7 +19,7 @@ INFORMATION_TAG = 'gui_information'
 SECTION_GUI_TAG = '__gui'
 SKIP_TAGS = [INFORMATION_TAG]
 SKIP_TXT_CONTROLS = ['list_input', 'list_input2']
-SKIP_BUTTONS = ['list_add', 'list_remove', 'apply_button', 'cancel_button']
+SKIP_BUTTONS = ['list_add', 'list_remove', 'apply_button', 'cancel_button', 'ok_button']
 ITEM_SPACING_VERT = 6
 ITEM_SPACING_HORZ = 30
 
@@ -156,7 +156,7 @@ class SettingsWindow(wx.Frame):
         self.show_hidden = self.main_class.gui_settings.get('show_hidden')
 
         # Setting up events
-        self.Bind(wx.EVT_CLOSE, self.on_close_save)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
 
         styles = wx.DEFAULT_FRAME_STYLE
         if wx.STAY_ON_TOP & self.main_class.GetWindowStyle() == wx.STAY_ON_TOP:
@@ -171,31 +171,7 @@ class SettingsWindow(wx.Frame):
         self.Destroy()
 
     def on_close(self, event):
-        dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['main', 'quit'])),
-                                  caption="Caption",
-                                  style=wx.YES_NO | wx.CANCEL,
-                                  pos=wx.DefaultPosition)
-        response = dialog.ShowModal()
-
-        if response == wx.ID_YES:
-            self.on_exit(event)
-        else:
-            event.StopPropagation()
-
-    def on_close_save(self, event):
-        if not self.settings_saved:
-            dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['main', 'quit', 'nosave'])),
-                                      caption="Caption",
-                                      style=wx.YES_NO,
-                                      pos=wx.DefaultPosition)
-            response = dialog.ShowModal()
-
-            if response == wx.ID_YES:
-                self.on_exit(event)
-            else:
-                event.StopPropagation()
-        else:
-            self.on_exit(event)
+        self.on_exit(event)
 
     def on_listbox_change(self, event):
         item_object = event.EventObject
@@ -338,6 +314,8 @@ class SettingsWindow(wx.Frame):
             panel.SetSizer(page_sizer)
             # Buttons
             button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            button_sizer.Add(create_button(MODULE_KEY.join(['settings', 'ok_button']),
+                                           self.button_clicked), 0, wx.ALIGN_RIGHT)
             button_sizer.Add(create_button(MODULE_KEY.join(['settings', 'apply_button']),
                                            self.button_clicked, enabled=False), 0, wx.ALIGN_RIGHT)
             button_sizer.Add(create_button(MODULE_KEY.join(['settings', 'cancel_button']),
@@ -608,7 +586,7 @@ class SettingsWindow(wx.Frame):
         if keys[-1] in ['list_add', 'list_remove']:
             self.list_operation(MODULE_KEY.join(keys[:-1]), action=keys[-1])
             self.on_change(IDS[button_id], 'listbox_changed', listbox=True)
-        elif keys[-1] == 'apply_button':
+        elif keys[-1] in ['ok_button', 'apply_button']:
             if self.save_settings():
                 log.debug('Got non-dynamic changes')
                 dialog = wx.MessageDialog(self,
@@ -616,15 +594,13 @@ class SettingsWindow(wx.Frame):
                                           caption="Caption",
                                           style=wx.OK_DEFAULT,
                                           pos=wx.DefaultPosition)
-                response = dialog.ShowModal()
-
-                if response == wx.ID_YES:
+                dialog.ShowModal()
+                if keys[-1] == 'ok_button':
                     self.on_exit(event)
-                else:
-                    event.StopPropagation()
             self.settings_saved = True
         elif keys[-1] == 'cancel_button':
             self.on_close(event)
+
         event.Skip()
 
     def save_settings(self):
