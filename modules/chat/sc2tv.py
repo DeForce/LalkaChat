@@ -130,7 +130,8 @@ class FsChat(WebSocketClient):
                                     'source_icon': SOURCE_ICON,
                                     'user': message['from']['name'],
                                     'text': message['text'],
-                                    'emotes': []}
+                                    'emotes': [],
+                                    'type': 'message'}
                             if message['to'] is not None:
                                 comp['to'] = message['to']['name']
                                 if comp['to'] == self.channel_name:

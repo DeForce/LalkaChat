@@ -5,6 +5,7 @@ import os
 from collections import OrderedDict
 from modules.helper.parser import self_heal
 from modules.helper.modules import MessagingModule
+from modules.helper.system import IGNORED_TYPES
 
 DEFAULT_PRIORITY = 30
 
@@ -67,7 +68,7 @@ class blacklist(MessagingModule):
 
     def process_message(self, message, queue, **kwargs):
         if message:
-            if 'command' in message:
+            if message['type'] in IGNORED_TYPES:
                 return message
             user = self.blacklist_user_handler(message)
             # True = Hide, False = Del, None = Do Nothing

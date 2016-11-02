@@ -6,6 +6,7 @@ from collections import OrderedDict
 
 from modules.helper.parser import self_heal
 from modules.helper.modules import MessagingModule
+from modules.helper.system import IGNORED_TYPES
 
 DEFAULT_PRIORITY = 20
 
@@ -50,7 +51,7 @@ class logger(MessagingModule):
 
     def process_message(self, message, queue, **kwargs):
         if message:
-            if 'command' in message:
+            if message['type'] in IGNORED_TYPES:
                 return message
             with open('{0}.txt'.format(
                     os.path.join(self.destination, datetime.datetime.now().strftime(self.format))), 'a') as f:
