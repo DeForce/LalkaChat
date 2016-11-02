@@ -7,6 +7,7 @@ import re
 from collections import OrderedDict
 from modules.helper.parser import self_heal
 from modules.helper.modules import MessagingModule
+from modules.helper.system import IGNORED_TYPES
 
 DEFAULT_PRIORITY = 10
 log = logging.getLogger('c2b')
@@ -68,7 +69,7 @@ class c2b(MessagingModule):
         # Replacing the message if needed.
         # Please do the needful
         if message:
-            if 'command' in message:
+            if message['type'] in IGNORED_TYPES:
                 return message
             for replace in self.f_items:
                 if replace['filter'] in message['text']:

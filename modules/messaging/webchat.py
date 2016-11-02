@@ -12,13 +12,14 @@ from time import sleep
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from modules.helper.parser import self_heal
-from modules.helper.system import THREADS
+from modules.helper.system import THREADS, IGNORED_TYPES
 from modules.helper.modules import MessagingModule
 from gui import MODULE_KEY
 from main import PYTHON_FOLDER, CONF_FOLDER
 
 DEFAULT_PRIORITY = 9001
 HISTORY_SIZE = 20
+HISTORY_TYPES = ['system_message', 'message']
 HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
@@ -34,7 +35,7 @@ class MessagingThread(threading.Thread):
         while True:
             message = s_queue.get()
             cherrypy.engine.publish('websocket-broadcast', json.dumps(message))
-            if 'command' not in message:
+            if message['type'] in HISTORY_TYPES:
                 cherrypy.engine.publish('add-history', message)
 
 
@@ -260,7 +261,7 @@ class webchat(MessagingModule):
             log.error("Port is already used, please change webchat port")
 
     def reload_chat(self):
-        self.queue.put({'command': 'reload'})
+        self.queue.put({'type': 'command', 'command': 'reload'})
 
     def apply_settings(self):
         self.reload_chat()
@@ -275,7 +276,7 @@ class webchat(MessagingModule):
     def process_message(self, message, queue, **kwargs):
         if message:
             if 'flags' in message:
-                if message['flags'] == 'hidden':
+                if 'hidden' in message['flags']:
                     return message
             s_queue.put(message)
             return message

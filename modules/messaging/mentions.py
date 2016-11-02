@@ -6,6 +6,7 @@ from collections import OrderedDict
 
 from modules.helper.parser import self_heal
 from modules.helper.modules import MessagingModule
+from modules.helper.system import IGNORED_TYPES
 
 
 class mentions(MessagingModule):
@@ -48,7 +49,7 @@ class mentions(MessagingModule):
         # Replacing the message if needed.
         # Please do the needful
         if message:
-            if 'command' in message:
+            if message['type'] in IGNORED_TYPES:
                 return message
             for mention in self.mentions:
                 if re.search(mention, message['text'].lower()):

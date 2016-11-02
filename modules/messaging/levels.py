@@ -10,7 +10,7 @@ from collections import OrderedDict
 import datetime
 
 from modules.helper.parser import self_heal
-from modules.helper.system import system_message, ModuleLoadException
+from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES
 from modules.helper.modules import MessagingModule
 
 log = logging.getLogger('levels')
@@ -67,7 +67,6 @@ class levels(MessagingModule):
         self.threshold_users = None
 
     def load_module(self, *args, **kwargs):
-        main_settings = kwargs.get('main_settings')
         loaded_modules = kwargs.get('loaded_modules')
         if 'webchat' not in loaded_modules:
             raise ModuleLoadException("Unable to find webchat module that is needed for level module")
@@ -153,7 +152,7 @@ class levels(MessagingModule):
 
     def process_message(self, message, queue, **kwargs):
         if message:
-            if 'command' in message:
+            if message['type'] in IGNORED_TYPES:
                 return message
             if 'system_msg' not in message or not message['system_msg']:
                 if 'user' in message and message['user'] in self.special_levels:

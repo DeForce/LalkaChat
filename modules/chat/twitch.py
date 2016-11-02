@@ -75,6 +75,7 @@ class TwitchMessageHandler(threading.Thread):
                     'emotes': [],
                     'bttv_emotes': [],
                     'user': 'TwitchSystem',
+                    'type': 'message',
                     'msg_type': msg.type}
             for tag in msg.tags:
                 tag_value, tag_key = tag.values()
@@ -126,7 +127,8 @@ class TwitchMessageHandler(threading.Thread):
                 comp['pm'] = True
             self.message_queue.put(comp)
         elif msg.type in ['clearchat']:
-            self.message_queue.put({'command': 'remove_msg',
+            self.message_queue.put({'type': 'command',
+                                    'command': 'remove_by_user',
                                     'user': msg.arguments})
 
 

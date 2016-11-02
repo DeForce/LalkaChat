@@ -10,6 +10,7 @@ SOURCE = 'sy'
 SOURCE_USER = 'System'
 SOURCE_ICON = '/img/sources/lalka_cup.png'
 
+IGNORED_TYPES = ['command', 'system_message']
 TRANSLATIONS = {}
 SPLIT_TRANSLATION = '='
 MODULE_KEY = '.'
@@ -23,7 +24,7 @@ def system_message(message, queue, source=SOURCE, icon=SOURCE_ICON, from_user=SO
                'source_icon': icon,
                'user': from_user,
                'text': message,
-               'system_msg': True})
+               'type': 'system_message'})
 
 
 class ModuleLoadException(Exception):

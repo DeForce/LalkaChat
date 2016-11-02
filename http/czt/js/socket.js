@@ -276,19 +276,19 @@ function showMessage(message) {
 }
 
 function runCommand(message) {
-    if(message.command == 'reload'){
-        window.location.reload();
-    }
-    else if(message.command == 'remove_msg') {
-        if(message.ids) {
+    switch (message.command) {
+        case 'reload':
+            window.location.reload();
+            break
+        case 'remove_by_id':
             message.ids.forEach(function(message_item) {
                 item = document.getElementById(message_item)
                 if (item) {
                     item.parentNode.removeChild(item)
                 }
             })
-        }
-        else if(message.user) {
+            break
+        case 'remove_by_user':
             message.user.forEach(function(user) {
                 var children = chatMessages.childNodes
                 var node_length = children.length - 1
@@ -298,10 +298,9 @@ function runCommand(message) {
                     }
                 }
             })
-        }
-    }
-    else {
-        console.log("Got unknown command " + message.command)
+            break
+        default:
+            console.log("Got unknown command")
     }
 }
 

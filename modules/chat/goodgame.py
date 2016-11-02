@@ -57,7 +57,8 @@ class GoodgameMessageHandler(threading.Thread):
                     'source_icon': SOURCE_ICON,
                     'user': msg['data']['user_name'],
                     'text': msg['data']['text'],
-                    'emotes': []}
+                    'emotes': [],
+                    'type': 'message'}
 
             smiles_array = re.findall(self.smile_regex, comp['text'])
             for smile in smiles_array:
@@ -108,7 +109,8 @@ class GoodgameMessageHandler(threading.Thread):
                                                                                 msg['data']['user_name']))
         elif msg['type'] == 'remove_message':
             remove_id = ID_PREFIX.format(msg['data']['message_id'])
-            self.message_queue.put({'command': 'remove_msg',
+            self.message_queue.put({'type': 'command',
+                                    'command': 'remove_by_id',
                                     'ids': [remove_id]})
         elif msg['type'] == 'user_ban':
             if msg['data']['duration']:
