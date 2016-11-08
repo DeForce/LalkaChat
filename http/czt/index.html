@@ -1,12 +1,38 @@
-<head>
-    <title>LalkaChat</title>
-    <meta charset="UTF-8"/>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <title>Lalka - chat</title>
+        <meta charset="UTF-8"/>
+        <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
-    <script src="js/socket.js"></script>
-    <link rel="stylesheet" type="text/css" href="css/style.css">
-</head>
+        <link rel="stylesheet" type="text/css" href="css/style.css" />
 
-<body>
-	<div id='ChatContainer'></div>
-</body>
+        <script src="js/polyfills.min.js"></script>
+        <script src="js/purify.min.js"></script>
+        <script src="js/vue.min.js"></script>
+    </head>
+
+    <body>
+        <div id="chat-container">
+            <div class="message" v-for="message in messages">
+                <div class="message-source">
+                    <img class="platform" :src="message.source_icon || './img/sources/' + message.source + '.png'" />
+                </div>
+
+                <div class="message-badges" v-for="badge in message.badges">
+                    <img class="badge" :src="badge.url" :style="{ 'broadcaster': badge.badge === 'broadcaster', 'mod': badge.badge === 'mod', 'turbo': badge.badge === 'turbo' }" />
+                </div>
+
+                <template v-if="message.levels">
+                    <div class="message-level">
+                        <img class="level" :src="message.levels.url" />
+                    </div>
+                </template>
+
+                <div class="username">{{message.user}}:</div>
+                <div class="text" v-html="sanitize(message)" :class="{ 'system': message.source === 'sy', 'private': message.pm, 'mention': message.mention }"></div>
+            </div>
+        </div>
+        <script src="js/app.js"></script>
+    </body>
+</html>

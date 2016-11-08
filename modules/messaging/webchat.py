@@ -115,8 +115,10 @@ class CssRoot(object):
 
     @cherrypy.expose
     def style_css(self):
+        cherrypy.response.headers['Content-Type'] = 'text/css'
         with open(os.path.join(self.http_folder, 'css', 'style.css'), 'r') as css:
-            return Template(css.read()).render(**self.settings)
+            css_content = css.read()
+            return Template(css_content).render(**self.settings)
 
 
 class HttpRoot(object):
@@ -171,7 +173,7 @@ class SocketThread(threading.Thread):
                      'tools.staticdir.dir': os.path.join(http_folder, 'img')}}
 
         css_config = {
-            '/': {'tools.response_headers.headers': [('Content-Type', 'text/plain')]}
+            '/': {}
         }
 
         cherrypy.tree.mount(HttpRoot(http_folder), '', config)
