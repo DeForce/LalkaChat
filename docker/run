@@ -1,0 +1,14 @@
+#!/bin/sh
+
+webchatCF="/usr/lib/python2.7/site-packages/LalkaChat/conf/webchat.cfg"
+
+if [ -f $webchatCF ];
+then
+   sed -i 's/^host =.*$/host = 0.0.0.0/' $webchatCF
+else
+   printf '[server]\nhost = 0.0.0.0\n\n' > $webchatCF
+fi
+
+cd /usr/lib/python2.7/site-packages/LalkaChat
+
+python ./main.py
