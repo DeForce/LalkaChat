@@ -21,7 +21,9 @@
             this.socket.onmessage = this.onmessage;
             this.socket.onopen = this.onopen;
             this.socket.onclose = this.onclose;
-            if (this.messagesInterval > 0) setInterval(this.clear, 500)
+            if (this.messagesInterval > 0) {
+                setInterval(this.clear, 500);
+            }
         },
         methods: {
             clear: function () {
@@ -110,12 +112,17 @@
             },
             removeByIds: function (ids) {
                 this.messages = this.messages.filter(function (message) {
-                    return !ids.includes(message.id);
+                    return ids.indexOf(message.id) < 0;
                 });
             },
             removeByUsernames: function (usernames) {
+                usernames = usernames.map(function (value) {
+                    return value.toLowerCase();
+                });
+
                 this.messages = this.messages.filter(function(message) {
-                    return !usernames.includes(message.user);
+                    var user = message.user.toLowerCase();
+                    return usernames.indexOf(user) < 0;
                 });
             },
             run: function (message) {
@@ -157,7 +164,7 @@
                     this.socketInterval = null;
                 }
             },
-            onclose: function (reason) {
+            onclose: function () {
                 this.socketInterval = setInterval(this.reconnect, 1000);
             },
             reconnect: function () {
