@@ -53,11 +53,9 @@ body {
     top: 2px;
 }
 
-.username {
-    padding-left: 5px;
-}
 
-.text {
+.text,
+.username {
     padding-left: 5px;
 }
 
@@ -83,4 +81,8 @@ body {
 
 .turbo {
     background-color: #6441a5;
+}
+
+.premium {
+    background-color: #009CDC;
 }

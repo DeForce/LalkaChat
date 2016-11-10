@@ -6,8 +6,6 @@
         <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
         <link rel="stylesheet" type="text/css" href="css/style.css" />
-
-        <script src="js/polyfills.min.js"></script>
         <script src="js/purify.min.js"></script>
         <script src="js/vue.min.js"></script>
     </head>
@@ -20,7 +18,7 @@
                 </div>
 
                 <div class="message-badges" v-for="badge in message.badges">
-                    <img class="badge" :src="badge.url" :style="{ 'broadcaster': badge.badge === 'broadcaster', 'mod': badge.badge === 'mod', 'turbo': badge.badge === 'turbo' }" />
+                    <img class="badge" :src="badge.url" :class="{ 'broadcaster': badge.badge == 'broadcaster', 'mod': badge.badge == 'mod', 'turbo': badge.badge == 'turbo', 'premium': badge.badge == 'premium' }" />
                 </div>
 
                 <template v-if="message.levels">
