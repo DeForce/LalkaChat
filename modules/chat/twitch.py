@@ -1,4 +1,3 @@
-
 import irc.client
 import threading
 import os
@@ -11,7 +10,8 @@ from collections import OrderedDict
 import time
 from modules.helper.parser import self_heal
 from modules.helper.modules import ChatModule
-from modules.helper.system import system_message
+from modules.helper.system import system_message, translate_key
+from gui import MODULE_KEY
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -168,7 +168,7 @@ class IRC(irc.client.SimpleIRCClient):
 
     def on_disconnect(self, connection, event):
         log.info("Connection lost")
-        self.system_message("Connection died, trying to reconnect")
+        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'connection_died'])))
         timer = threading.Timer(5.0, self.reconnect,
                                 args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
         timer.start()
@@ -187,7 +187,7 @@ class IRC(irc.client.SimpleIRCClient):
     def on_welcome(self, connection, event):
         log.info("Welcome Received, joining {0} channel".format(self.channel))
         self.tw_connection = connection
-        self.system_message('Joining channel {0}'.format(self.channel))
+        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'joining'])).format(self.channel))
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilities (Twitch color, Display Name,
         #  Subscriber, etc)
@@ -198,7 +198,7 @@ class IRC(irc.client.SimpleIRCClient):
         ping_handler.start()
 
     def on_join(self, connection, event):
-        msg = "Joined {0} channel".format(self.channel)
+        msg = translate_key(MODULE_KEY.join(['twitch', 'join_success'])).format(self.channel)
         log.info(msg)
         self.system_message(msg)
 
