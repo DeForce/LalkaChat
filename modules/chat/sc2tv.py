@@ -9,7 +9,8 @@ from collections import OrderedDict
 from ws4py.client.threadedclient import WebSocketClient
 from modules.helper.modules import ChatModule
 from modules.helper.parser import self_heal
-from modules.helper.system import system_message
+from modules.helper.system import system_message, translate_key
+from gui import MODULE_KEY
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
@@ -66,14 +67,14 @@ class FsChat(WebSocketClient):
 
     def opened(self):
         log.info("Websocket Connection Succesfull")
-        self.fs_system_message("Connected")
+        self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_success'])))
 
     def closed(self, code, reason=None):
         if reason == 'INV_CH_ID':
             self.crit_error = True
         else:
             log.info("Websocket Connection Closed Down")
-            self.fs_system_message("Connection died, trying to reconnect")
+            self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])))
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
@@ -121,7 +122,8 @@ class FsChat(WebSocketClient):
                         self.fs_join()
                         self.fs_ping()
                     elif dict_item == 'status':
-                        self.fs_system_message('Joined channel {0}'.format(self.channel_name))
+                        self.fs_system_message(
+                            translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.channel_name))
                     elif dict_item == 'id':
                         try:
                             self.duplicates.index(message[dict_item])
@@ -183,8 +185,9 @@ class FsChat(WebSocketClient):
             join = str(iter_sio) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channel_id)},
                                                                     sort_keys=False) + "]"
             self.send(join)
-            self.fs_system_message("Joining channel {0}".format(self.channel_name))
-            log.info("Joined channel {0}".format(self.channel_id))
+            msg_joining = translate_key(MODULE_KEY.join(['sc2tv', 'joining']))
+            self.fs_system_message(msg_joining.format(self.channel_name))
+            log.info(msg_joining.format(self.channel_id))
 
     def fs_ping(self):
         # Because funstream is not your normal websocket they
