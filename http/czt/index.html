@@ -17,15 +17,15 @@
                     <img class="platform" :src="message.source_icon || './img/sources/' + message.source + '.png'" />
                 </div>
 
-                <div class="message-badges" v-for="badge in message.badges">
-                    <img class="badge" :src="badge.url" :class="{ 'broadcaster': badge.badge == 'broadcaster', 'mod': badge.badge == 'mod', 'turbo': badge.badge == 'turbo', 'premium': badge.badge == 'premium' }" />
-                </div>
-
                 <template v-if="message.levels">
                     <div class="message-level">
                         <img class="level" :src="message.levels.url" />
                     </div>
                 </template>
+
+                <div class="message-badges" v-for="badge in message.badges">
+                    <img class="badge" :src="badge.url" :class="{ 'broadcaster': badge.badge == 'broadcaster', 'mod': badge.badge == 'mod', 'turbo': badge.badge == 'turbo', 'premium': badge.badge == 'premium' }" />
+                </div>
 
                 <div class="username">{{message.user}}:</div>
                 <div class="text" v-html="sanitize(message)" :class="{ 'system': message.source === 'sy', 'private': message.pm, 'mention': message.mention }"></div>
