@@ -9,9 +9,10 @@ import re
 import logging
 from collections import OrderedDict
 from modules.helper.parser import self_heal
-from modules.helper.system import system_message
+from modules.helper.system import system_message, translate_key
 from modules.helper.modules import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
+from gui import MODULE_KEY
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('goodgame')
@@ -98,15 +99,15 @@ class GoodgameMessageHandler(threading.Thread):
                 comp['pm'] = True
             self.message_queue.put(comp)
         elif msg['type'] == 'success_join':
-            self.ws_class.system_message('Successfully joined channel {0}'.format(self.nick))
+            self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'join_success'])).format(self.nick))
         elif msg['type'] == 'error':
             log.info("Received error message: {0}".format(msg))
             if msg['data']['errorMsg'] == 'Invalid channel id':
                 self.ws_class.close(reason='INV_CH_ID')
                 log.error("Failed to find channel on GoodGame, please check channel name")
         elif msg['type'] == 'user_warn':
-            self.ws_class.system_message(u"{0} вынес предупреждение {1}".format(msg['data']['moder_name'],
-                                                                                msg['data']['user_name']))
+            self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'warning'])).format(
+                msg['data']['moder_name'], msg['data']['user_name']))
         elif msg['type'] == 'remove_message':
             remove_id = ID_PREFIX.format(msg['data']['message_id'])
             self.message_queue.put({'type': 'command',
@@ -114,18 +115,20 @@ class GoodgameMessageHandler(threading.Thread):
                                     'ids': [remove_id]})
         elif msg['type'] == 'user_ban':
             if msg['data']['duration']:
-                self.ws_class.system_message(u'{0} забанил {1} на {2} минут '
-                                             u'по причине: {3}'.format(msg['data']['moder_name'],
-                                                                       msg['data']['user_name'],
-                                                                       msg['data']['duration']/60,
-                                                                       msg['data']['reason']))
+                self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'ban'])).format(
+                    msg['data']['moder_name'],
+                    msg['data']['user_name'],
+                    msg['data']['duration']/60,
+                    msg['data']['reason']))
             else:
                 if msg['data']['permanent']:
-                    self.ws_class.system_message(u'{0} забанил бессрочно {1}'.format(msg['data']['moder_name'],
-                                                                                     msg['data']['user_name']))
+                    self.ws_class.system_message(
+                        translate_key(MODULE_KEY.join(['goodgame', 'ban_permanent'])).format(msg['data']['moder_name'],
+                                                                                             msg['data']['user_name']))
                 else:
-                    self.ws_class.system_message(u'{0} разбанил {1}'.format(msg['data']['moder_name'],
-                                                                            msg['data']['user_name']))
+                    self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'unban'])).format(
+                        msg['data']['moder_name'],
+                        msg['data']['user_name']))
 
 
 class GGChat(WebSocketClient):
@@ -146,7 +149,7 @@ class GGChat(WebSocketClient):
     def opened(self):
         success_msg = "Connection Successful"
         log.info(success_msg)
-        self.system_message(success_msg)
+        self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])))
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
@@ -158,7 +161,7 @@ class GGChat(WebSocketClient):
         if 'INV_CH_ID' in reason:
             self.crit_error = True
         else:
-            self.system_message("Connection died, trying to reconnect")
+            self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_died'])))
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
