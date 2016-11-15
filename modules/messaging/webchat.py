@@ -126,6 +126,34 @@ class WebChatPlugin(WebSocketPlugin):
         return self.history
 
 
+class RestRoot(object):
+    def __init__(self, http_folder, modules):
+        object.__init__(self)
+        self.http_folder = http_folder
+        self._rest_modules = {}
+
+        for name, params in modules.iteritems():
+            module_class = params.get('class', None)
+            if module_class:
+                api = params['class'].rest_api()
+                if api:
+                    self._rest_modules[name] = api
+
+    @cherrypy.expose
+    def default(self, *args):
+        if len(args) > 0:
+            module_name = args[0]
+            query = args[1:]
+            if module_name in self._rest_modules:
+                method = cherrypy.request.method
+                api = self._rest_modules[module_name]
+                if method in api:
+                    return api[method](query)
+        return json.dumps({'error': 'Bad Request',
+                           'status': 400,
+                           'message': 'Unable to find module'})
+
+
 class CssRoot(object):
     def __init__(self, http_folder, settings):
         object.__init__(self)
@@ -167,6 +195,7 @@ class SocketThread(threading.Thread):
         self.root_folder = root_folder
         self.style = kwargs.pop('style')
         self.settings = kwargs.pop('settings')
+        self.modules = kwargs.pop('modules')
 
         cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host,
                                 'engine.autoreload.on': False})
@@ -190,13 +219,17 @@ class SocketThread(threading.Thread):
                     'tools.staticdir.dir': os.path.join(http_folder, 'js')},
             '/img': {'tools.staticdir.on': True,
                      'tools.staticdir.dir': os.path.join(http_folder, 'img')}}
+        cherrypy.tree.mount(HttpRoot(http_folder), '', config)
 
         css_config = {
             '/': {}
         }
-
-        cherrypy.tree.mount(HttpRoot(http_folder), '', config)
         cherrypy.tree.mount(CssRoot(http_folder, self.settings), '/css', css_config)
+
+        rest_config = {
+            '/': {}
+        }
+        cherrypy.tree.mount(RestRoot(http_folder, self.modules), '/rest', rest_config)
 
         cherrypy.engine.start()
         cherrypy.engine.block()
@@ -211,6 +244,7 @@ def socket_open(host, port):
 class webchat(MessagingModule):
     def __init__(self, conf_folder, **kwargs):
         MessagingModule.__init__(self)
+        # Module configuration
         conf_file = os.path.join(conf_folder, "webchat.cfg")
         conf_dict = OrderedDict()
         conf_dict['gui_information'] = {
@@ -224,6 +258,7 @@ class webchat(MessagingModule):
         conf_dict['style_settings'] = OrderedDict()
         conf_dict['style_settings']['font_size'] = 15
         conf_dict['style_settings']['show_system_msg'] = False
+        conf_dict['style_settings']['timer'] = -1
         conf_gui = {
             'style': {
                 'check': 'http',
@@ -232,7 +267,10 @@ class webchat(MessagingModule):
             'style_settings': {
                 'font_size': {'view': 'spin',
                               'min': 10,
-                              'max': 100}},
+                              'max': 100},
+                'timer': {'view': 'spin',
+                          'min': -1,
+                          'max': 3600}},
             'non_dynamic': ['server.*']}
 
         config = self_heal(conf_file, conf_dict)
@@ -256,6 +294,9 @@ class webchat(MessagingModule):
         self.queue = None
         self.message_threads = []
 
+        # Rest Api Settings
+        self._rest_api['GET'] = self.rest_get
+
     def load_module(self, *args, **kwargs):
         self.queue = kwargs.get('queue')
         conf_dict = self._conf_params
@@ -264,7 +305,8 @@ class webchat(MessagingModule):
 
         if socket_open(host, port):
             s_thread = SocketThread(host, port, CONF_FOLDER, style=self._conf_params['style_location'],
-                                    settings=self._conf_params['config']['style_settings'])
+                                    settings=self._conf_params['config']['style_settings'],
+                                    modules=kwargs.get('loaded_modules', {}))
             s_thread.start()
 
             for thread in range(THREADS+5):
@@ -293,3 +335,6 @@ class webchat(MessagingModule):
                     return message
             s_queue.put(message)
             return message
+
+    def rest_get(self, *args):
+        return json.dumps(self._conf_params['config']['style_settings'])
