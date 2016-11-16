@@ -45,7 +45,7 @@ class FsChat(WebSocketClient):
         self.channel_id = self.fs_get_id()
 
         self.smiles = kwargs.get('smiles')
-        self.smile_regex = ':(\w+|\d+):'
+        self.smile_regex = re.compile(':(\w+|\d+):')
 
         # Because funstream API is fun, we have to iterate the
         #  requests in "proper" format:
@@ -83,17 +83,7 @@ class FsChat(WebSocketClient):
 
     @staticmethod
     def allow_smile(smile, subscriptions):
-        allow = False
-
-        if smile['user']:
-            channel_id = smile['user']['id']
-            for sub in subscriptions:
-                if sub == channel_id:
-                    allow = True
-        else:
-            allow = True
-
-        return allow
+        return smile['user']['id'] in subscriptions if smile['user'] else True
 
     def received_message(self, mes):
         # Funstream send all kind of different messages
@@ -103,76 +93,77 @@ class FsChat(WebSocketClient):
         #
         # Websocket has it's own type, so we serialise it to string.
         message = str(mes)
-        if len(message) > 5:
-            # "Fun" messages consists of strange format:
-            # 	       43Iter{json}
-            # ex:      430{'somedata': 'somedata'}
-            # We need to just get the json, so we "regexp" it.
-            if re.findall('{.*}', message)[0]:
-                # If message does have JSON (some of them dont, dont know why)
-                #  we analyze the real "json" message.
-                message = json.loads(re.findall('{.*}', message)[0])
-                for dict_item in message:
-                    # SID type is "start" packet, after that we can join channels,
-                    #  at least I think so.
-                    if dict_item == 'sid':
-                        # "Funstream" has some interesting infrastructure, so
-                        #  we first need to find the channel ID from
-                        #  nickname of streamer we need to connect to.
-                        self.fs_join()
-                        self.fs_ping()
-                    elif dict_item == 'status':
-                        self.fs_system_message(
-                            translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.channel_name))
-                    elif dict_item == 'id':
-                        try:
-                            self.duplicates.index(message[dict_item])
-                        except ValueError:
-                            comp = {'source': self.source,
-                                    'source_icon': SOURCE_ICON,
-                                    'user': message['from']['name'],
-                                    'text': message['text'],
-                                    'emotes': [],
-                                    'type': 'message'}
-                            if message['to'] is not None:
-                                comp['to'] = message['to']['name']
-                                if comp['to'] == self.channel_name:
-                                    comp['pm'] = True
-                            else:
-                                comp['to'] = None
+        if len(message) <= 5:
+            return
+        # "Fun" messages consists of strange format:
+        # 	       43Iter{json}
+        # ex:      430{'somedata': 'somedata'}
+        # We need to just get the json, so we "regexp" it.
+        if not re.findall('{.*}', message)[0]:
+            return
+        # If message does have JSON (some of them dont, dont know why)
+        #  we analyze the real "json" message.
+        message = json.loads(re.findall('{.*}', message)[0])
+        for dict_item in message:
+            # SID type is "start" packet, after that we can join channels,
+            #  at least I think so.
+            if dict_item == 'sid':
+                # "Funstream" has some interesting infrastructure, so
+                #  we first need to find the channel ID from
+                #  nickname of streamer we need to connect to.
+                self.fs_join()
+                self.fs_ping()
+            elif dict_item == 'status':
+                self.fs_system_message(
+                    translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.channel_name))
+            elif dict_item == 'id':
+                try:
+                    self.duplicates.index(message[dict_item])
+                except ValueError:
+                    comp = {'source': self.source,
+                            'source_icon': SOURCE_ICON,
+                            'user': message['from']['name'],
+                            'text': message['text'],
+                            'emotes': [],
+                            'type': 'message'}
+                    if message['to'] is not None:
+                        comp['to'] = message['to']['name']
+                        if comp['to'] == self.channel_name:
+                            comp['pm'] = True
+                    else:
+                        comp['to'] = None
 
-                            smiles_array = re.findall(self.smile_regex, comp['text'])
-                            for smile in smiles_array:
-                                for smile_find in self.smiles:
-                                    if smile_find['code'] == smile:
-                                        if self.allow_smile(smile_find, message['store']['subscriptions']):
-                                            comp['emotes'].append({'emote_id': smile, 'emote_url': smile_find['url']})
+                    smiles_array = self.smile_regex.findall(comp['text'])
 
-                            self.queue.put(comp)
-                            self.duplicates.append(message[dict_item])
-                            if len(self.duplicates) > self.bufferForDup:
-                                self.duplicates.pop(0)
+                    for smile in smiles_array:
+                        for smile_find in self.smiles:
+                            if smile_find['code'] == smile and self.allow_smile(smile_find, message['store']['subscriptions']):
+                                comp['emotes'].append({'emote_id': smile, 'emote_url': smile_find['url']})
+                                break
+
+                    self.queue.put(comp)
+                    self.duplicates.append(message[dict_item])
+                    if len(self.duplicates) > self.bufferForDup:
+                        self.duplicates.pop(0)
 
     def fs_get_id(self):
         # We get ID from POST request to funstream API, and it hopefuly
         #  answers us the correct ID of the channel we need to connect to
-        payload = "{'id': null, 'name': \"" + self.channel_name + "\"}"
+        payload = json.dumps({'id': None, 'name': self.channel_name})
         try:
-            request = requests.post("http://funstream.tv/api/user", data=payload, timeout=5)
-            if request.status_code == 200:
-                channel_id = json.loads(re.findall('{.*}', request.text)[0])['id']
+            response = requests.post("http://funstream.tv/api/user", data=payload, timeout=5).json()
+            if response.status_code == 200:
+                channel_id = str(response['id'])
                 return channel_id
             else:
-                error_message = request.json()
-                if 'message' in error_message:
-                    log.error("Unable to get channel ID. {0}".format(error_message['message']))
-                    self.closed(0, 'INV_CH_ID')
+                if 'message' in response:
+                    log.error("Unable to get channel ID. {0}".format(response['message']))
                 else:
                     log.error("Unable to get channel ID. No message available")
-                    self.closed(0, 'INV_CH_ID')
+
+                self.closed(0, 'INV_CH_ID')
         except requests.ConnectionError:
             log.info("Unable to get information from api")
-        return None
 
     def fs_join(self):
         # Because we need to iterate each message we iterate it!
@@ -182,8 +173,7 @@ class FsChat(WebSocketClient):
         # Then we send the message acording to needed format and
         #  hope it joins us
         if self.channel_id:
-            join = str(iter_sio) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channel_id)},
-                                                                    sort_keys=False) + "]"
+            join = iter_sio + json.dumps(['/chat/join', {'channel': 'stream/'+self.channel_id}])
             self.send(join)
             msg_joining = translate_key(MODULE_KEY.join(['sc2tv', 'joining']))
             self.fs_system_message(msg_joining.format(self.channel_name))
@@ -237,11 +227,9 @@ class FsThread(threading.Thread):
             log.info("Connecting, try {0}".format(try_count))
             if not self.smiles:
                 try:
-                    smiles = requests.post('http://funstream.tv/api/smile', timeout=5)
-                    if smiles.status_code == 200:
-                        smiles_answer = smiles.json()
-                        for smile in smiles_answer:
-                            self.smiles.append(smile)
+                    response = requests.post('http://funstream.tv/api/smile', timeout=5)
+                    if response.status_code == 200:
+                        self.smiles = response.json()
                 except requests.ConnectionError:
                     log.error("Unable to get smiles")
             ws = FsChat(self.socket, self.queue, self.channel_name, protocols=['websocket'], smiles=self.smiles,
