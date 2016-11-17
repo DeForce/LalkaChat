@@ -57,8 +57,8 @@ class logger(MessagingModule):
             filename = '{0}.txt'.format(os.path.join(self.destination, datetime.datetime.now().strftime(self.format)))
             with open(filename, 'a') as f:
                 f.write('[{time}] [{source}] {user}: {text}\n'.format(
-                    source = message['source'].encode('utf-8'),
-                    user = message['user'].encode('utf-8'),
-                    text = message['text'].encode('utf-8'),
-                    time = datetime.datetime.now().strftime(self.ts_format).encode('utf-8')))
+                    source=message['source'].encode('utf-8'),
+                    user=message['user'].encode('utf-8'),
+                    text=message['text'].encode('utf-8'),
+                    time=datetime.datetime.now().strftime(self.ts_format).encode('utf-8')))
             return message

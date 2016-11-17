@@ -169,13 +169,13 @@ class FsChat(WebSocketClient):
 
     def fs_join(self):
         # Because we need to iterate each message we iterate it!
-        iter_sio = "42"+str(self.iter)
+        iter_sio = "42" + str(self.iter)
         self.iter += 1
 
         # Then we send the message acording to needed format and
         #  hope it joins us
         if self.channel_id:
-            join = iter_sio + json.dumps(['/chat/join', {'channel': 'stream/'+self.channel_id}])
+            join = iter_sio + json.dumps(['/chat/join', {'channel': 'stream/' + self.channel_id}])
             self.send(join)
             msg_joining = translate_key(MODULE_KEY.join(['sc2tv', 'joining']))
             self.fs_system_message(msg_joining.format(self.channel_name))
