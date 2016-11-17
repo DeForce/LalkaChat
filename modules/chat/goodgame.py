@@ -28,8 +28,10 @@ CONF_DICT['config']['socket'] = 'ws://chat.goodgame.ru:8081/chat/websocket'
 
 CONF_GUI = {
     'config': {
-        'hidden': ['socket']},
-    'non_dynamic': ['config.*']}
+        'hidden': ['socket'],
+    },
+    'non_dynamic': ['config.*'],
+}
 
 
 class GoodgameMessageHandler(threading.Thread):
@@ -61,58 +63,31 @@ class GoodgameMessageHandler(threading.Thread):
                     'emotes': [],
                     'type': 'message'}
 
-            smiles_array = re.findall(self.smile_regex, comp['text'])
-            for smile in smiles_array:
-                if smile in self.smiles:
-                    smile_info = self.smiles.get(smile)
-                    allow = False
-                    gif = False
-                    if msg['data']['user_rights'] >= 40:
-                        allow = True
-                    elif msg['data']['user_rights'] >= 20 \
-                            and (smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603'):
-                        allow = True
-                    elif smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603':
-                        if not smile_info['is_premium']:
-                            if smile_info['donate_lvl'] == 0:
-                                allow = True
-                            elif smile_info['donate_lvl'] <= int(msg['data']['payments']):
-                                allow = True
-                        else:
-                            if msg['data']['premium']:
-                                allow = True
-
-                    for premium in msg['data']['premiums']:
-                        if smile_info['channel_id'] == str(premium):
-                            if smile_info['is_premium']:
-                                allow = True
-                                gif = True
-
-                    if allow:
-                        if smile not in comp['emotes']:
-                            if gif and smile_info['urls']['gif']:
-                                comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['gif']})
-                            else:
-                                comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['big']})
+            self.parse_smiles(comp, msg)
 
             if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):
                 comp['pm'] = True
             self.message_queue.put(comp)
+
         elif msg['type'] == 'success_join':
             self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'join_success'])).format(self.nick))
+
         elif msg['type'] == 'error':
             log.info("Received error message: {0}".format(msg))
             if msg['data']['errorMsg'] == 'Invalid channel id':
                 self.ws_class.close(reason='INV_CH_ID')
                 log.error("Failed to find channel on GoodGame, please check channel name")
+
         elif msg['type'] == 'user_warn':
             self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'warning'])).format(
                 msg['data']['moder_name'], msg['data']['user_name']))
+
         elif msg['type'] == 'remove_message':
             remove_id = ID_PREFIX.format(msg['data']['message_id'])
             self.message_queue.put({'type': 'command',
                                     'command': 'remove_by_id',
                                     'ids': [remove_id]})
+
         elif msg['type'] == 'user_ban':
             if msg['data']['duration']:
                 self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'ban'])).format(
@@ -129,6 +104,39 @@ class GoodgameMessageHandler(threading.Thread):
                     self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'unban'])).format(
                         msg['data']['moder_name'],
                         msg['data']['user_name']))
+
+    def parse_smiles(self, comp, msg):
+        smiles_array = re.findall(self.smile_regex, comp['text'])
+        for smile in smiles_array:
+            if smile not in self.smiles:
+                continue
+            smile_info = self.smiles.get(smile)
+            allow = False
+            gif = False
+            if msg['data']['user_rights'] >= 40:
+                allow = True
+            elif msg['data']['user_rights'] >= 20 \
+                    and (smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603'):
+                allow = True
+            elif smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603':
+                if not smile_info['is_premium']:
+                    if smile_info['donate_lvl'] == 0:
+                        allow = True
+                    elif smile_info['donate_lvl'] <= int(msg['data']['payments']):
+                        allow = True
+                elif msg['data']['premium']:
+                    allow = True
+
+            for premium in msg['data']['premiums']:
+                if smile_info['channel_id'] == str(premium) and smile_info['is_premium']:
+                    allow = True
+                    gif = True
+
+            if allow and smile not in comp['emotes']:
+                if gif and smile_info['urls']['gif']:
+                    comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['gif']})
+                else:
+                    comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['big']})
 
 
 class GGChat(WebSocketClient):
