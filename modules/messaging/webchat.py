@@ -27,29 +27,37 @@ log = logging.getLogger('webchat')
 
 
 class MessagingThread(threading.Thread):
-    def __init__(self):
+    def __init__(self, settings):
         super(self.__class__, self).__init__()
         self.daemon = True
+        self.settings = settings
 
     def run(self):
         while True:
             message = s_queue.get()
+            if message['type'] == 'system_message' and not self.settings['show_system_msg']:
+                continue
+
             cherrypy.engine.publish('websocket-broadcast', json.dumps(message))
             if message['type'] in HISTORY_TYPES:
                 cherrypy.engine.publish('add-history', message)
 
 
 class FireFirstMessages(threading.Thread):
-    def __init__(self, ws, history):
+    def __init__(self, ws, history, settings):
         super(self.__class__, self).__init__()
         self.daemon = True
         self.ws = ws
         self.history = history
+        self.settings = settings
 
     def run(self):
         sleep(0.1)
+        show_system_msg = cherrypy.engine.publish('get-settings')[0]['show_system_msg']
         if self.ws.stream:
             for item in self.history:
+                if item['type'] == 'system_message' and not show_system_msg:
+                    continue
                 self.ws.send(json.dumps(item))
 
 
@@ -57,10 +65,12 @@ class WebChatSocketServer(WebSocket):
     def __init__(self, sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None):
         WebSocket.__init__(self, sock)
         self.clients = []
+        self.settings = cherrypy.engine.publish('get-settings')
 
     def opened(self):
         cherrypy.engine.publish('add-client', self.peer_address, self)
-        send_history = FireFirstMessages(self, cherrypy.engine.publish('get-history')[0])
+        send_history = FireFirstMessages(self, cherrypy.engine.publish('get-history')[0],
+                                         cherrypy.engine.publish('get-settings')[0])
         send_history.start()
 
     def closed(self, code, reason=None):
@@ -68,14 +78,16 @@ class WebChatSocketServer(WebSocket):
 
 
 class WebChatPlugin(WebSocketPlugin):
-    def __init__(self, bus):
+    def __init__(self, bus, settings):
         WebSocketPlugin.__init__(self, bus)
         self.clients = []
+        self.settings = settings
         self.history = []
         self.history_size = HISTORY_SIZE
 
     def start(self):
         WebSocketPlugin.start(self)
+        self.bus.subscribe('get-settings', self.get_settings)
         self.bus.subscribe('add-client', self.add_client)
         self.bus.subscribe('del-client', self.del_client)
         self.bus.subscribe('add-history', self.add_history)
@@ -83,6 +95,7 @@ class WebChatPlugin(WebSocketPlugin):
 
     def stop(self):
         WebSocketPlugin.stop(self)
+        self.bus.unsubscribe('get-settings', self.get_settings)
         self.bus.unsubscribe('add-client', self.add_client)
         self.bus.unsubscribe('del-client', self.del_client)
         self.bus.unsubscribe('add-history', self.add_history)
@@ -102,6 +115,9 @@ class WebChatPlugin(WebSocketPlugin):
         self.history.append(message)
         if len(self.history) > self.history_size:
             self.history.pop(0)
+
+    def get_settings(self):
+        return self.settings
 
     def get_history(self):
         return self.history
@@ -151,7 +167,7 @@ class SocketThread(threading.Thread):
 
         cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host,
                                 'engine.autoreload.on': False})
-        WebChatPlugin(cherrypy.engine).subscribe()
+        WebChatPlugin(cherrypy.engine, self.settings).subscribe()
         cherrypy.tools.websocket = WebSocketTool()
 
     def run(self):
@@ -182,14 +198,6 @@ class SocketThread(threading.Thread):
         cherrypy.engine.start()
         cherrypy.engine.block()
 
-        # cherrypy.quickstart(HttpRoot(http_folder), '/',
-        #                     config={'/ws': {'tools.websocket.on': True,
-        #                                     'tools.websocket.handler_cls': WebChatSocketServer},
-        #                             '/js': {'tools.staticdir.on': True,
-        #                                     'tools.staticdir.dir': os.path.join(http_folder, 'js')},
-        #                             '/img': {'tools.staticdir.on': True,
-        #                                      'tools.staticdir.dir': os.path.join(http_folder, 'img')}})
-
 
 def socket_open(host, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -210,9 +218,9 @@ class webchat(MessagingModule):
         conf_dict['server']['host'] = '127.0.0.1'
         conf_dict['server']['port'] = '8080'
         conf_dict['style'] = 'czt'
-        conf_dict['style_settings'] = {
-            'font_size': 15
-        }
+        conf_dict['style_settings'] = OrderedDict()
+        conf_dict['style_settings']['font_size'] = 15
+        conf_dict['style_settings']['show_system_msg'] = False
         conf_gui = {
             'style': {
                 'check': 'http',
@@ -257,7 +265,7 @@ class webchat(MessagingModule):
             s_thread.start()
 
             for thread in range(THREADS+5):
-                self.message_threads.append(MessagingThread())
+                self.message_threads.append(MessagingThread(self._conf_params['config']['style_settings']))
                 self.message_threads[thread].start()
         else:
             log.error("Port is already used, please change webchat port")
