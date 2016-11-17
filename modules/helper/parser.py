@@ -14,7 +14,8 @@ def self_heal(conf_file, heal_dict):
                     if not heal_config.has_option(section, item):
                         heal_config.set(section, item, value)
                 for item, value in heal_config.items(section):
-                    heal_dict[section][item] = return_type(value)
+                    if item in heal_dict[section]:
+                        heal_dict[section][item] = return_type(value)
             else:
                 heal_dict[section] = OrderedDict()
                 for item, value in heal_config.items(section):
