@@ -18,12 +18,21 @@
             }
         },
         created: function () {
-            this.socket.onmessage = this.onmessage;
-            this.socket.onopen = this.onopen;
-            this.socket.onclose = this.onclose;
-            if (this.messagesInterval > 0) {
-                setInterval(this.clear, 500);
-            }
+            var self = this;
+
+            self.socket.onmessage = this.onmessage;
+            self.socket.onopen = this.onopen;
+            self.socket.onclose = this.onclose;
+
+            self.get(window.location.href + 'rest/webchat', function (err, response) {
+                if (!err) {
+                    self.messagesInterval = response.timer || -1;
+                }
+
+                if (self.messagesInterval > 0) {
+                    setInterval(self.clear, 500);
+                }
+            });
         },
         methods: {
             clear: function () {
@@ -75,7 +84,7 @@
                     }
                 }
 
-                placesToReplace.sort(function(first, second) {
+                placesToReplace.sort(function (first, second) {
                     return second.from - first.from;
                 });
 
@@ -84,15 +93,15 @@
                     message = message.substring(0, place.from) + "$emoticon#" + place.emote_id + "$" + message.substring(place.to);
                 }
 
-                return message.replace(/\$emoticon#(\d+)\$/g, function(code, emoteId) {
+                return message.replace(/\$emoticon#(\d+)\$/g, function (code, emoteId) {
                     var url = 'http://static-cdn.jtvnw.net/emoticons/v1/' + emoteId + '/1.0';
-                    return '<img class="smile" src="' + url +  '" />';
+                    return '<img class="smile" src="' + url + '" />';
                 });
             },
-            replaceBttvEmoticons: function(message, emotes) {
+            replaceBttvEmoticons: function (message, emotes) {
                 return message.replace(/(^| )?(\S+)?( |$)/g, function (code, b1, emote_key, b2) {
-                    for(var emote in emotes) {
-                        if(emotes[emote].emote_id == emote_key && emotes[emote].emote_url) {
+                    for (var emote in emotes) {
+                        if (emotes[emote].emote_id == emote_key && emotes[emote].emote_url) {
                             return '<img class="btsmile" src="' + emotes[emote]['emote_url'] + '" />';
                         }
                     }
@@ -100,7 +109,7 @@
                 });
             },
             replaceDefaultEmotions: function (message, emotes) {
-                return message.replace(/:(\w+|\d+):/g, function(code, emote_key) {
+                return message.replace(/:(\w+|\d+):/g, function (code, emote_key) {
                     for (var emote in emotes) {
                         if (!!emotes[emote] && emotes[emote]['emote_id'] == emote_key) {
                             return '<img class="smile" src="' + emotes[emote]['emote_url'] + '" />';
@@ -120,7 +129,7 @@
                     return value.toLowerCase();
                 });
 
-                this.messages = this.messages.filter(function(message) {
+                this.messages = this.messages.filter(function (message) {
                     var user = message.user.toLowerCase();
                     return usernames.indexOf(user) < 0;
                 });
@@ -171,6 +180,26 @@
                 this.attempts++;
 
                 this.socket = new WebSocket(this.url);
+            },
+            load: function (method, url, callback, data) {
+                var xhr = new XMLHttpRequest();
+                xhr.onload = function () {
+                    var obj = JSON.parse(xhr.responseText);
+                    callback(null, obj);
+                };
+                xhr.onerror = function () {
+                    var obj = JSON.parse(xhr.responseText);
+                    callback(obj);
+                };
+
+                xhr.open(method, url);
+                xhr.send(data);
+            },
+            get: function (url, callback, data) {
+                return this.load('get', url, callback, data);
+            },
+            post: function (url, data, callback) {
+                return this.load('post', url, callback, data);
             }
         },
         filters: {}
