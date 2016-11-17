@@ -106,6 +106,7 @@ def init():
     main_config_dict['gui']['show_hidden'] = False
     main_config_dict['gui']['gui'] = True
     main_config_dict['gui']['on_top'] = True
+    main_config_dict['gui']['show_browser'] = True
     main_config_dict['gui']['reload'] = None
     main_config_dict['language'] = get_language()
 
@@ -134,6 +135,7 @@ def init():
     gui_settings['show_hidden'] = main_config_dict[GUI_TAG].get('show_hidden')
     gui_settings['size'] = (int(main_config_dict['gui_information'].get('width')),
                             int(main_config_dict['gui_information'].get('height')))
+    gui_settings['show_browser'] = main_config_dict['gui'].get('show_browser')
 
     # Checking updates
     log.info("Checking for updates")

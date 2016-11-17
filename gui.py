@@ -761,11 +761,10 @@ class ChatGui(wx.Frame):
         self.toolbar = MainMenuToolBar(self, main_class=self)
 
         vbox.Add(self.toolbar, 0, wx.EXPAND)
-
-        browser_window  = chromectrl.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False)
-        if hasattr(browser_window, 'stub') != True:
-            self.browser_window = browser_window
-            vbox.Add(self.browser_window, 1, wx.EXPAND)
+        if self.gui_settings['show_browser']:
+            vbox.Add(chromectrl.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False), 1, wx.EXPAND)
+        else:
+            self.Fit()
 
         # Set events
         self.Bind(wx.EVT_CLOSE, self.on_close)
