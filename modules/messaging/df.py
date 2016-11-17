@@ -6,6 +6,7 @@ from collections import OrderedDict
 
 from modules.helper.parser import self_heal
 from modules.helper.modules import MessagingModule
+from modules.helper.system import IGNORED_TYPES
 
 
 class df(MessagingModule):
@@ -61,7 +62,7 @@ class df(MessagingModule):
 
     def process_message(self, message, queue, **kwargs):
         if message:
-            if 'command' in message:
+            if message['type'] in IGNORED_TYPES:
                 return message
             for regexp in self.prof:
                 if re.search(regexp[1], message['text']):

@@ -9,3 +9,6 @@ levels.db*
 *.spec
 *.log
 govno_rutony.py
+http/**/js/purify.min.js
+http/**/js/vue.min.js
+

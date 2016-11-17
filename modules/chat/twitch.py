@@ -1,4 +1,3 @@
-
 import irc.client
 import threading
 import os
@@ -11,7 +10,8 @@ from collections import OrderedDict
 import time
 from modules.helper.parser import self_heal
 from modules.helper.modules import ChatModule
-from modules.helper.system import system_message
+from modules.helper.system import system_message, translate_key
+from gui import MODULE_KEY
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -68,63 +68,68 @@ class TwitchMessageHandler(threading.Thread):
         # Also, there is slight problem with some users, they don't have
         #  the display-name tag, so we have to check their "real" username
         #  and capitalize it because twitch does so, so we do the same.
-        comp = {'source': self.source,
-                'source_icon': SOURCE_ICON,
-                'badges': [],
-                'emotes': [],
-                'bttv_emotes': [],
-                'user': 'TwitchSystem',
-                'msg_type': msg.type}
-        for tag in msg.tags:
-            tag_value, tag_key = tag.values()
-            if tag_key == 'display-name':
-                if tag_value:
-                    comp['user'] = tag_value
-                else:
-                    # If there is not display-name then we strip the user
-                    #  from the string and use it as it is.
-                    comp['user'] = msg.source.split('!')[0].capitalize()
-            elif tag_key == 'badges' and tag_value:
-                for badge in tag_value.split(','):
-                    badge_tag, badge_size = badge.split('/')
-                    # Fix some of the names
-                    badge_tag = badge_tag.replace('moderator', 'mod')
-
-                    if badge_tag in self.badges:
-                        badge_info = self.badges.get(badge_tag)
-                        if 'svg' in badge_info:
-                            url = badge_info.get('svg')
-                        elif 'image' in badge_info:
-                            url = badge_info.get('image')
-                        else:
-                            url = 'none'
-                    elif badge_tag in self.custom_badges:
-                        badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
-                        url = badge_info.get('image_url_4x')
+        if msg.type in ['pubmsg', 'action']:
+            comp = {'source': self.source,
+                    'source_icon': SOURCE_ICON,
+                    'badges': [],
+                    'emotes': [],
+                    'bttv_emotes': [],
+                    'user': 'TwitchSystem',
+                    'type': 'message',
+                    'msg_type': msg.type}
+            for tag in msg.tags:
+                tag_value, tag_key = tag.values()
+                if tag_key == 'display-name':
+                    if tag_value:
+                        comp['user'] = tag_value
                     else:
-                        url = NOT_FOUND
-                    comp['badges'].append({'badge': badge_tag, 'size': badge_size, 'url': url})
+                        # If there is not display-name then we strip the user
+                        #  from the string and use it as it is.
+                        comp['user'] = msg.source.split('!')[0].capitalize()
+                elif tag_key == 'badges' and tag_value:
+                    for badge in tag_value.split(','):
+                        badge_tag, badge_size = badge.split('/')
+                        # Fix some of the names
+                        badge_tag = badge_tag.replace('moderator', 'mod')
 
-            elif tag_key == 'emotes' and tag_value:
-                emotes_split = tag_value.split('/')
-                for emote in emotes_split:
-                    emote_name, emote_pos_diap = emote.split(':')
-                    emote_pos_list = emote_pos_diap.split(',')
-                    comp['emotes'].append({'emote_id': emote_name, 'emote_pos': emote_pos_list})
+                        if badge_tag in self.badges:
+                            badge_info = self.badges.get(badge_tag)
+                            if 'svg' in badge_info:
+                                url = badge_info.get('svg')
+                            elif 'image' in badge_info:
+                                url = badge_info.get('image')
+                            else:
+                                url = 'none'
+                        elif badge_tag in self.custom_badges:
+                            badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
+                            url = badge_info.get('image_url_4x')
+                        else:
+                            url = NOT_FOUND
+                        comp['badges'].append({'badge': badge_tag, 'size': badge_size, 'url': url})
 
-        # Then we comp the message and send it to queue for message handling.
-        comp['text'] = msg.arguments.pop()
+                elif tag_key == 'emotes' and tag_value:
+                    emotes_split = tag_value.split('/')
+                    for emote in emotes_split:
+                        emote_name, emote_pos_diap = emote.split(':')
+                        emote_pos_list = emote_pos_diap.split(',')
+                        comp['emotes'].append({'emote_id': emote_name, 'emote_pos': emote_pos_list})
 
-        for word in comp['text'].split():
-            if word in self.bttv:
-                bttv_smile = self.bttv.get(word)
-                comp['bttv_emotes'].append({'emote_id': bttv_smile['regex'],
-                                            'emote_url': 'http:{0}'.format(bttv_smile['url'])})
+            # Then we comp the message and send it to queue for message handling.
+            comp['text'] = msg.arguments.pop()
 
-        if re.match('^@?{0}[ ,]?'.format(self.nick), comp['text'].lower()):
-            comp['pm'] = True
+            for word in comp['text'].split():
+                if word in self.bttv:
+                    bttv_smile = self.bttv.get(word)
+                    comp['bttv_emotes'].append({'emote_id': bttv_smile['regex'],
+                                                'emote_url': 'http:{0}'.format(bttv_smile['url'])})
 
-        self.message_queue.put(comp)
+            if re.match('^@?{0}[ ,]?'.format(self.nick), comp['text'].lower()):
+                comp['pm'] = True
+            self.message_queue.put(comp)
+        elif msg.type in ['clearchat']:
+            self.message_queue.put({'type': 'command',
+                                    'command': 'remove_by_user',
+                                    'user': msg.arguments})
 
 
 class TwitchPingHandler(threading.Thread):
@@ -163,7 +168,7 @@ class IRC(irc.client.SimpleIRCClient):
 
     def on_disconnect(self, connection, event):
         log.info("Connection lost")
-        self.system_message("Connection died, trying to reconnect")
+        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'connection_died'])))
         timer = threading.Timer(5.0, self.reconnect,
                                 args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
         timer.start()
@@ -182,17 +187,18 @@ class IRC(irc.client.SimpleIRCClient):
     def on_welcome(self, connection, event):
         log.info("Welcome Received, joining {0} channel".format(self.channel))
         self.tw_connection = connection
-        self.system_message('Joining channel {0}'.format(self.channel))
+        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'joining'])).format(self.channel))
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilities (Twitch color, Display Name,
         #  Subscriber, etc)
         connection.join(self.channel)
         connection.cap('REQ', ':twitch.tv/tags')
+        connection.cap('REQ', ':twitch.tv/commands')
         ping_handler = TwitchPingHandler(connection)
         ping_handler.start()
 
     def on_join(self, connection, event):
-        msg = "Joined {0} channel".format(self.channel)
+        msg = translate_key(MODULE_KEY.join(['twitch', 'join_success'])).format(self.channel)
         log.info(msg)
         self.system_message(msg)
 
@@ -200,6 +206,9 @@ class IRC(irc.client.SimpleIRCClient):
         self.twitch_queue.put(event)
 
     def on_action(self, connection, event):
+        self.twitch_queue.put(event)
+
+    def on_clearchat(self, connection, event):
         self.twitch_queue.put(event)
 
 
@@ -332,7 +341,7 @@ class twitch(ChatModule):
 
         self.queue = queue
         self.host = CONF_DICT['config']['host']
-        self.port = CONF_DICT['config']['port']
+        self.port = int(CONF_DICT['config']['port'])
         self.channel = CONF_DICT['config']['channel']
         self.bttv = CONF_DICT['config']['bttv']
 

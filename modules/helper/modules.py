@@ -3,6 +3,7 @@
 class BaseModule:
     def __init__(self, *args, **kwargs):
         self._conf_params = {}
+        self._rest_api = {}
 
     def conf_params(self):
         params = self._conf_params
@@ -17,6 +18,9 @@ class BaseModule:
 
     def apply_settings(self):
         pass
+
+    def rest_api(self):
+        return self._rest_api
 
 
 class MessagingModule(BaseModule):
