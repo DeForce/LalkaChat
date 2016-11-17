@@ -47,12 +47,11 @@ class FireFirstMessages(threading.Thread):
     def __init__(self, ws, history, settings):
         super(self.__class__, self).__init__()
         self.daemon = True
-        self.ws = ws
+        self.ws = ws  # type: WebChatSocketServer
         self.history = history
         self.settings = settings
 
     def run(self):
-        sleep(0.1)
         show_system_msg = cherrypy.engine.publish('get-settings')[0]['show_system_msg']
         if self.ws.stream:
             for item in self.history:
@@ -69,12 +68,16 @@ class WebChatSocketServer(WebSocket):
 
     def opened(self):
         cherrypy.engine.publish('add-client', self.peer_address, self)
-        send_history = FireFirstMessages(self, cherrypy.engine.publish('get-history')[0],
-                                         cherrypy.engine.publish('get-settings')[0])
-        send_history.start()
+        timer = threading.Timer(0.1, self.fire_history)
+        timer.start()
 
     def closed(self, code, reason=None):
         cherrypy.engine.publish('del-client', self.peer_address)
+
+    def fire_history(self):
+        send_history = FireFirstMessages(self, cherrypy.engine.publish('get-history')[0],
+                                         cherrypy.engine.publish('get-settings')[0])
+        send_history.start()
 
 
 class WebChatPlugin(WebSocketPlugin):
