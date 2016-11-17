@@ -151,11 +151,13 @@ class FsChat(WebSocketClient):
         #  answers us the correct ID of the channel we need to connect to
         payload = json.dumps({'id': None, 'name': self.channel_name})
         try:
-            response = requests.post("http://funstream.tv/api/user", data=payload, timeout=5).json()
+            response = requests.post("http://funstream.tv/api/user", data=payload, timeout=5)
             if response.status_code == 200:
+                response = response.json()
                 channel_id = str(response['id'])
                 return channel_id
             else:
+                response = response.json()
                 if 'message' in response:
                     log.error("Unable to get channel ID. {0}".format(response['message']))
                 else:
