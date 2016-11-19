@@ -2,7 +2,8 @@ FROM alpine:edge
 
 MAINTAINER CzT/DeForce <vlad@czt.lv>
 
-ARG WXPY_SRC_URL="http://heanet.dl.sourceforge.net/project/wxpython/wxPython/3.0.2.0/wxPython-src-3.0.2.0.tar.bz2"
+# docker build --build-arg WXPY_SRC_URL=http://heanet.dl.sourceforge.net/project/wxpython/wxPython/3.0.1.0/wxPython-src-3.0.1.0.tar.bz2 -t deforce/alpine-wxpython:3.0.1.0 .
+ARG WXPY_SRC_URL="http://heanet.dl.sourceforge.net/project/wxpython/wxPython/3.0.2.0/wxPython-src-3.0.1.0.tar.bz2"
 
 RUN echo "http://nl.alpinelinux.org/alpine/edge/main"         \
       >> /etc/apk/repositories                             && \
