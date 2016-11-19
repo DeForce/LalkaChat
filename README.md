@@ -2,9 +2,18 @@
 
 ## Usage(GNU/Linux macOS Windows):
  - [Install docker](https://docs.docker.com/engine/installation/)
- - `docker run -ti --rm -p 10000:10000 -p 8080:8080 -e XPRA_PASSWORD=<PASSWORD> -v <PLACE TO STORE CHAT CONFIG>:/usr/lib/python2.7/site-packages/LalkaChat/conf czt/lalkachat`
+ - `docker run -d --name x11-bridge -e MODE="html" -p 10000:10000 -e XPRA_DISPLAY=:14 -e XPRA_PASSWORD=<PASSWORD> jare/x11-bridge`
+ - `docker run -d --name chat -p 8080:8080 -v <PATH_TO_CONFIG>:/usr/lib/python2.7/site-packages/LalkaChat/conf deforce/lalka-chat`
  - Open chat config at `http://localhost:10000/index.html?encoding=png&password=<PASSWORD>`
  - And chat window at `http://localhost:8080/`
  - You can update the chat with `docker rmi -f czt/lalkachat`
+ - Remove containers with `docker rmi -f x11-bridge chat`
 
 Thanks to ftpud for fixing IE compatibility
+
+
+docker run -ti --name x11-bridge -e MODE="html" -p 10000:10000 -e XPRA_DISPLAY=:14 -e XPRA_PASSWORD=<PASSWORD> jare/x11-bridge
+
+docker run -ti --rm --volumes-from x11-bridge -e DISPLAY=:14 deforce/lalka-chat
+
+
