@@ -8,14 +8,14 @@ def self_heal(conf_file, heal_dict):
     for section, section_value in heal_dict.items():
         if not heal_config.has_section(section):
             heal_config.add_section(section)
+
         if type(section_value) in [OrderedDict, dict]:
             if section_value:
                 for item, value in section_value.items():
                     if not heal_config.has_option(section, item):
                         heal_config.set(section, item, value)
                 for item, value in heal_config.items(section):
-                    if item in heal_dict[section]:
-                        heal_dict[section][item] = return_type(value)
+                    heal_dict[section][item] = return_type(value)
             else:
                 heal_dict[section] = OrderedDict()
                 for item, value in heal_config.items(section):

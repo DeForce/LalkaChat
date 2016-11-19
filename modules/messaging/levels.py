@@ -41,7 +41,9 @@ class levels(MessagingModule):
         conf_dict['config']['exp_for_level'] = 200
         conf_dict['config']['exp_for_message'] = 1
         conf_dict['config']['decrease_window'] = 60
-        conf_gui = {'non_dynamic': ['config.*'],
+        conf_gui = {'non_dynamic': ['config.db', 'config.experience',
+                                    'config.exp_for_level', 'config.exp_for_message',
+                                    'decrease_window'],
                     'config': {
                         'experience': {
                             'view': 'dropdown',
@@ -62,7 +64,6 @@ class levels(MessagingModule):
         self.levels = None
         self.special_levels = None
         self.db_location = None
-        self.message = None
         self.decrease_window = None
         self.threshold_users = None
 
@@ -82,7 +83,6 @@ class levels(MessagingModule):
         self.levels = []
         self.special_levels = {}
         self.db_location = os.path.join(conf_dict['config'].get('db'))
-        self.message = conf_dict['config'].get('message').decode('utf-8')
         self.decrease_window = int(conf_dict['config'].get('decrease_window'))
         self.threshold_users = {}
 
@@ -146,7 +146,12 @@ class levels(MessagingModule):
                 db.commit()
             else:
                 max_level += 1
-            system_message(self.message.format(user, self.levels[max_level]['name']), queue)
+            system_message(
+                self._conf_params['config']['config']['message'].decode('utf-8').format(
+                    user,
+                    self.levels[max_level]['name']),
+                queue
+            )
         cursor.close()
         return self.levels[max_level]
 

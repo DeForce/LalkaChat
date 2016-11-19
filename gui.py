@@ -216,7 +216,7 @@ class SettingsWindow(wx.Frame):
                 else:
                     clear_changes()
             else:
-                if config[split_keys[1]].decode('utf-8') != return_type(value):
+                if config[split_keys[1]].decode('utf-8') != return_type(value).decode('utf-8'):
                     apply_changes()
                 else:
                     clear_changes()
@@ -239,7 +239,7 @@ class SettingsWindow(wx.Frame):
                 else:
                     clear_changes()
             else:
-                if config[split_keys[1]][split_keys[2]].decode('utf-8') != return_type(value):
+                if config[split_keys[1]][split_keys[2]] != return_type(value):
                     apply_changes()
                 else:
                     clear_changes()
@@ -259,7 +259,7 @@ class SettingsWindow(wx.Frame):
 
     def on_textctrl(self, event):
         text_ctrl = event.EventObject
-        self.on_change(IDS[event.GetId()], text_ctrl.GetValue(), item_type='textctrl')
+        self.on_change(IDS[event.GetId()], text_ctrl.GetValue().encode('utf-8'), item_type='textctrl')
         event.Skip()
 
     def on_spinctrl(self, event):
@@ -269,7 +269,8 @@ class SettingsWindow(wx.Frame):
 
     def on_dropdown(self, event):
         drop_ctrl = event.EventObject
-        self.on_change(IDS[event.GetId()], drop_ctrl.GetString(drop_ctrl.GetCurrentSelection()), item_type='dropctrl')
+        self.on_change(IDS[event.GetId()], drop_ctrl.GetString(drop_ctrl.GetCurrentSelection()),
+                       item_type='dropctrl')
         event.Skip()
 
     def on_check_change(self, event):
@@ -703,7 +704,7 @@ class SettingsWindow(wx.Frame):
 
             list_box.AppendRows(1)
             row_count = list_box.GetNumberRows() - 1
-            list_box.SetCellValue(row_count, 0, list_input_value.strip())
+            list_box.SetCellValue(row_count, 0, list_input_value.strip().lower())
 
             list_input2_id = get_id_from_name(MODULE_KEY.join([key, 'list_input2']))
             if list_input2_id:
