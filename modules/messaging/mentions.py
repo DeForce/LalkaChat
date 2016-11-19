@@ -25,25 +25,13 @@ class mentions(MessagingModule):
                 'view': 'list'},
             'address': {
                 'addable': 'true',
-                'view': 'list'},
-            'non_dynamic': ['mentions.*', 'address.*']}
+                'view': 'list'}}
         config = self_heal(conf_file, conf_dict)
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                              'parser': config,
                              'config': conf_dict,
                              'gui': conf_gui}
-        mention_tag = 'mentions'
-        address_tag = 'address'
-        if config.has_section(mention_tag):
-            self.mentions = [item for item, value in config.items(mention_tag)]
-        else:
-            self.mentions = []
-
-        if config.has_section(address_tag):
-            self.addresses = [item.decode('utf-8').lower() for item, value in config.items(address_tag)]
-        else:
-            self.addresses = []
 
     def process_message(self, message, queue, **kwargs):
         # Replacing the message if needed.
@@ -51,13 +39,16 @@ class mentions(MessagingModule):
         if message:
             if message['type'] in IGNORED_TYPES:
                 return message
-            for mention in self.mentions:
+
+            for mention, value in self._conf_params['config']['mentions'].iteritems():
                 if re.search(mention, message['text'].lower()):
                     message['mention'] = True
+                    break
 
-            for address in self.addresses:
+            for address, value in self._conf_params['config']['address'].iteritems():
                 if re.match(address, message['text'].lower()):
                     message['pm'] = True
+                    break
 
             if 'mention' in message and 'pm' in message:
                 message.pop('mention')

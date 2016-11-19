@@ -58,26 +58,19 @@ class c2b(MessagingModule):
                              'config': conf_dict,
                              'gui': conf_gui}
 
-        tag_config = 'config'
-        self.f_items = []
-        for param, value in config.items(tag_config):
-            f_item = {'filter': param.decode('utf-8'), 'replace': value.split('/')}
-            f_item['replace'] = [item.strip().decode('utf-8') for item in f_item['replace']]
-            self.f_items.append(f_item)
-
     def process_message(self, message, queue, **kwargs):
         # Replacing the message if needed.
         # Please do the needful
         if message:
             if message['type'] in IGNORED_TYPES:
                 return message
-            for replace in self.f_items:
-                if replace['filter'] in message['text']:
-                    replace_word = random.choice(replace['replace'])
-                    # Fix twitch emoticons if any
+
+            for item, replace in self._conf_params['config']['config'].iteritems():
+                if item in message['text']:
+                    replace_word = random.choice(replace.split('/'))
                     if message['source'] == 'tw':
-                        message['emotes'] = twitch_replace_indexes(replace['filter'], message['text'],
-                                                                   len(replace['filter']), len(replace_word),
+                        message['emotes'] = twitch_replace_indexes(item, message['text'],
+                                                                   len(item), len(replace_word),
                                                                    message.get('emotes', []))
-                    message['text'] = message['text'].replace(replace['filter'], replace_word)
+                    message['text'] = message['text'].replace(item, replace_word)
             return message

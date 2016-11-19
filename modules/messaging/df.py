@@ -20,7 +20,7 @@ class df(MessagingModule):
         conf_dict['grep'] = OrderedDict()
         conf_dict['grep']['symbol'] = '#'
         conf_dict['grep']['file'] = 'logs/df.txt'
-        conf_dict['prof'] = {'nothing': '([Нн]икто|[Nn]othing|\w*)'}
+        conf_dict['prof'] = OrderedDict()
 
         conf_gui = {
             'prof': {
@@ -28,16 +28,13 @@ class df(MessagingModule):
                 'addable': True},
             'non_dynamic': ['grep.*']}
         config = self_heal(conf_file, conf_dict)
-        grep_tag = 'grep'
-        prof_tag = 'prof'
 
         self._conf_params = {'folder': conf_folder, 'file': conf_file,
                              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                              'parser': config,
                              'config': conf_dict,
                              'gui': conf_gui}
-        self.symbol = config.get(grep_tag, 'symbol')
-        self.file = config.get(grep_tag, 'file')
+        self.file = conf_dict['grep']['file']
 
         dir_name = os.path.dirname(self.file)
         if not os.path.exists(dir_name):
@@ -47,26 +44,21 @@ class df(MessagingModule):
             with open(self.file, 'w'):
                 pass
 
-        self.prof = []
-        for prof, regex in config.items(prof_tag):
-            comp = [prof.capitalize(), self.symbol + regex.decode('utf-8')]
-            self.prof.append(comp)
-
-    def write_to_file(self, message):
+    def write_to_file(self, user, role):
         with open(self.file, 'r') as f:
             for line in f.readlines():
-                if message['user'] == line.split(',')[0]:
+                if user == line.split(',')[0]:
                     return
-            with open(self.file, 'a') as a_file:
-                a_file.write("{0},{1}\n".format(message['user'], message['text']))
+        with open(self.file, 'a') as a_file:
+            a_file.write("{0},{1}\n".format(user, role))
 
     def process_message(self, message, queue, **kwargs):
         if message:
             if message['type'] in IGNORED_TYPES:
                 return message
-            for regexp in self.prof:
-                if re.search(regexp[1], message['text']):
-                    comp = {'user': message['user'], 'text': regexp[0]}
-                    self.write_to_file(comp)
+            for role, regexp in self._conf_params['config']['prof'].iteritems():
+                if re.search('{0}{1}'.format(self._conf_params['config']['grep']['symbol'], regexp).decode('utf-8'),
+                             message['text']):
+                    self.write_to_file(message['user'], role.capitalize())
                     break
             return message
