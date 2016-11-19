@@ -1,3 +1,5 @@
+/*jslint browser: true*/
+
 (function (WebSocket, Vue, Sanitizer) {
     'use strict';
 

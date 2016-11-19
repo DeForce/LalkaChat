@@ -12,9 +12,10 @@ RUN echo "http://nl.alpinelinux.org/alpine/edge/main"         \
     echo "http://nl.alpinelinux.org/alpine/edge/community"    \
       >> /etc/apk/repositories                             && \
 
-    apk --update add libgcc python2 wxgtk               && \
-    apk --update add --virtual build-deps build-base       \
-      bzip2 libstdc++ python2-dev tar wget wxgtk-dev xz && \
+    apk --update add font-misc-misc libgcc mesa-gl python2 wxgtk && \
+
+    apk --update add --virtual build-deps build-base                \
+      bzip2 libstdc++ python2-dev tar wget wxgtk-dev xz          && \
     
     wget -qO- "${WXPY_SRC_URL}" | tar xj -C /tmp/ && \
     cd /tmp/wxPython-src-*                        && \
