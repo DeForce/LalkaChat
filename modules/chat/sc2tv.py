@@ -7,8 +7,8 @@ import os
 import logging
 from collections import OrderedDict
 from ws4py.client.threadedclient import WebSocketClient
-from modules.helper.modules import ChatModule
-from modules.helper.parser import self_heal
+from modules.helper.module import ChatModule
+from modules.helper.parser import load_from_config_file
 from modules.helper.system import system_message, translate_key
 from gui import MODULE_KEY
 
@@ -263,12 +263,14 @@ class sc2tv(ChatModule):
         # Reading config from main directory.
         conf_folder = os.path.join(python_folder, "conf")
         conf_file = os.path.join(conf_folder, "sc2tv.cfg")
-        config = self_heal(conf_file, CONF_DICT)
-        self._conf_params = {'folder': conf_folder, 'file': conf_file,
-                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config,
-                             'config': CONF_DICT,
-                             'gui': CONF_GUI}
+        config = load_from_config_file(conf_file, CONF_DICT)
+        self._conf_params.update(
+            {'folder': conf_folder, 'file': conf_file,
+             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+             'parser': config,
+             'config': CONF_DICT,
+             'gui': CONF_GUI})
+
         self.queue = queue
         self.socket = CONF_DICT['config']['socket']
         self.channel_name = CONF_DICT['config']['channel_name']

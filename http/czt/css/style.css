@@ -52,7 +52,7 @@ body {
 
 .smile {
     margin-top: -4px;
-    height: 20px;
+    height: {{ smile_size }}px;
     width: auto;
     top: 2px;
 }

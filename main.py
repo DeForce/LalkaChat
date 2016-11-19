@@ -12,8 +12,9 @@ import requests
 import semantic_version
 import locale
 from collections import OrderedDict
-from modules.helper.parser import self_heal
+from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys
+from modules.helper.module import BaseModule
 
 VERSION = '0.3.1'
 SEM_VERSION = semantic_version.Version(VERSION)
@@ -65,6 +66,9 @@ def get_language():
 
 def init():
     def close():
+        for l_module, l_module_dict in loaded_modules.iteritems():
+            l_module_dict['class'].apply_settings(system_exit=True)
+
         if window:
             window.gui.on_close('Closing Program from console')
         else:
@@ -118,16 +122,21 @@ def init():
         },
         'non_dynamic': ['language.list_box', 'gui.*']
     }
-    config = self_heal(MAIN_CONF_FILE, main_config_dict)
+    config = load_from_config_file(MAIN_CONF_FILE, main_config_dict)
     # Adding config for main module
-    loaded_modules['main'] = {'folder': CONF_FOLDER,
-                              'file': main_config['main_conf_file_loc'],
-                              'filename': main_config['main_conf_file_name'],
-                              'parser': config,
-                              'root_folder': main_config['root_folder'],
-                              'logs_folder': LOG_FOLDER,
-                              'config': main_config_dict,
-                              'gui': main_config_gui}
+    main_class = BaseModule(
+        conf_params={
+            'folder': CONF_FOLDER,
+            'file': main_config['main_conf_file_loc'],
+            'filename': main_config['main_conf_file_name'],
+            'parser': config,
+            'root_folder': main_config['root_folder'],
+            'logs_folder': LOG_FOLDER,
+            'config': main_config_dict,
+            'gui': main_config_gui
+        }
+    )
+    loaded_modules['main'] = main_class.conf_params()
 
     gui_settings['gui'] = main_config_dict[GUI_TAG].get('gui')
     gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
@@ -157,7 +166,6 @@ def init():
     log.info("Loading Chats")
     # Trying to dynamically load chats that are in config file.
     chat_modules = os.path.join(CONF_FOLDER, "chat_modules.cfg")
-    chat_tag = "chats"
     chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
     chat_conf_dict['gui_information'] = {'category': 'chat'}
@@ -170,14 +178,20 @@ def init():
             'check': os.path.sep.join(['modules', 'chat']),
             'file_extension': False},
         'non_dynamic': ['chats.list_box']}
-    chat_config = self_heal(chat_modules, chat_conf_dict)
-    loaded_modules['chat'] = {'folder': CONF_FOLDER, 'file': chat_modules,
-                              'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
-                              'parser': chat_config,
-                              'config': chat_conf_dict,
-                              'gui': chat_conf_gui}
+    chat_config = load_from_config_file(chat_modules, chat_conf_dict)
 
-    for module, settings in chat_config.items(chat_tag):
+    chat_module = BaseModule(
+        conf_params={
+            'folder': CONF_FOLDER, 'file': chat_modules,
+            'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
+            'parser': chat_config,
+            'config': chat_conf_dict,
+            'gui': chat_conf_gui
+        }
+    )
+    loaded_modules['chat'] = chat_module.conf_params()
+
+    for module, settings in chat_conf_dict['chats'].iteritems():
         log.info("Loading chat module: {0}".format(module))
         module_location = os.path.join(chat_location, module + ".py")
         if os.path.isfile(module_location):
@@ -189,7 +203,9 @@ def init():
 
             tmp = imp.load_source(module, module_location)
             chat_init = getattr(tmp, module)
-            class_module = chat_init(queue, PYTHON_FOLDER)
+            class_module = chat_init(queue, PYTHON_FOLDER,
+                                     conf_folder=CONF_FOLDER,
+                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(module)))
             loaded_modules[module] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")

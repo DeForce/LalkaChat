@@ -102,7 +102,7 @@
                 return message.replace(/(^| )?(\S+)?( |$)/g, function (code, b1, emote_key, b2) {
                     for (var emote in emotes) {
                         if (emotes[emote].emote_id == emote_key && emotes[emote].emote_url) {
-                            return '<img class="btsmile" src="' + emotes[emote]['emote_url'] + '" />';
+                            return '<img class="smile" src="' + emotes[emote]['emote_url'] + '" />';
                         }
                     }
                     return code;

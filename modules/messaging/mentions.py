@@ -4,8 +4,8 @@ import os
 import re
 from collections import OrderedDict
 
-from modules.helper.parser import self_heal
-from modules.helper.modules import MessagingModule
+from modules.helper.parser import load_from_config_file
+from modules.helper.module import MessagingModule
 from modules.helper.system import IGNORED_TYPES
 
 
@@ -26,12 +26,13 @@ class mentions(MessagingModule):
             'address': {
                 'addable': 'true',
                 'view': 'list'}}
-        config = self_heal(conf_file, conf_dict)
-        self._conf_params = {'folder': conf_folder, 'file': conf_file,
-                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config,
-                             'config': conf_dict,
-                             'gui': conf_gui}
+        config = load_from_config_file(conf_file, conf_dict)
+        self._conf_params.update(
+            {'folder': conf_folder, 'file': conf_file,
+             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+             'parser': config,
+             'config': conf_dict,
+             'gui': conf_gui})
 
     def process_message(self, message, queue, **kwargs):
         # Replacing the message if needed.

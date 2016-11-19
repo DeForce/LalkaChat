@@ -3,8 +3,8 @@
 import re
 import os
 from collections import OrderedDict
-from modules.helper.parser import self_heal
-from modules.helper.modules import MessagingModule
+from modules.helper.parser import load_from_config_file
+from modules.helper.module import MessagingModule
 from modules.helper.system import IGNORED_TYPES
 
 DEFAULT_PRIORITY = 30
@@ -41,13 +41,14 @@ class blacklist(MessagingModule):
                 'view': 'list',
                 'addable': 'true'},
             'non_dynamic': ['main.*']}
-        config = self_heal(conf_file, conf_dict)
-        self._conf_params = {'folder': conf_folder, 'file': conf_file,
-                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config,
-                             'id': config.get('gui_information', 'id'),
-                             'config': OrderedDict(conf_dict),
-                             'gui': conf_gui}
+        config = load_from_config_file(conf_file, conf_dict)
+        self._conf_params.update(
+            {'folder': conf_folder, 'file': conf_file,
+             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+             'parser': config,
+             'id': conf_dict['gui_information']['id'],
+             'config': OrderedDict(conf_dict),
+             'gui': conf_gui})
 
     def process_message(self, message, queue, **kwargs):
         if message:

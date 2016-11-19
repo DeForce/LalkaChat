@@ -4,8 +4,8 @@ import os
 import datetime
 from collections import OrderedDict
 
-from modules.helper.parser import self_heal
-from modules.helper.modules import MessagingModule
+from modules.helper.parser import load_from_config_file
+from modules.helper.module import MessagingModule
 from modules.helper.system import IGNORED_TYPES
 
 DEFAULT_PRIORITY = 20
@@ -28,20 +28,19 @@ class logger(MessagingModule):
         conf_dict['config']['rotation'] = 'daily'
         conf_gui = {'non_dynamic': ['config.*']}
 
-        config = self_heal(conf_file, conf_dict)
-        self._conf_params = {'folder': conf_folder, 'file': conf_file,
-                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config,
-                             'id': config.get('gui_information', 'id'),
-                             'config': conf_dict,
-                             'gui': conf_gui}
+        config = load_from_config_file(conf_file, conf_dict)
+        self._conf_params.update(
+            {'folder': conf_folder, 'file': conf_file,
+             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+             'parser': config,
+             'id': conf_dict['gui_information']['id'],
+             'config': conf_dict,
+             'gui': conf_gui})
 
-        tag_config = 'config'
-
-        self.format = config.get(tag_config, 'file_format')
-        self.ts_format = config.get(tag_config, 'message_date_format')
-        self.logging = config.get(tag_config, 'logging')
-        self.rotation = config.get(tag_config, 'logging')
+        self.format = conf_dict['config']['file_format']
+        self.ts_format = conf_dict['config']['message_date_format']
+        self.logging = conf_dict['config']['logging']
+        self.rotation = conf_dict['config']['rotation']
 
         self.folder = 'logs'
 

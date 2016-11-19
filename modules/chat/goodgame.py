@@ -8,9 +8,9 @@ import Queue
 import re
 import logging
 from collections import OrderedDict
-from modules.helper.parser import self_heal
+from modules.helper.parser import load_from_config_file
 from modules.helper.system import system_message, translate_key
-from modules.helper.modules import ChatModule
+from modules.helper.module import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 from gui import MODULE_KEY
 
@@ -252,12 +252,14 @@ class goodgame(ChatModule):
 
         log.info("Initializing goodgame chat")
         conf_file = os.path.join(conf_folder, "goodgame.cfg")
-        config = self_heal(conf_file, CONF_DICT)
-        self._conf_params = {'folder': conf_folder, 'file': conf_file,
-                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config,
-                             'config': CONF_DICT,
-                             'gui': CONF_GUI}
+        config = load_from_config_file(conf_file, CONF_DICT)
+        self._conf_params.update(
+            {'folder': conf_folder, 'file': conf_file,
+             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+             'parser': config,
+             'config': CONF_DICT,
+             'gui': CONF_GUI})
+
         self.queue = queue
         self.host = CONF_DICT['config']['socket']
         self.channel_name = CONF_DICT['config']['channel_name']
