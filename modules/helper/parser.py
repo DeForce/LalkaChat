@@ -28,7 +28,8 @@ def self_heal(conf_file, heal_dict):
             else:
                 heal_dict[section] = heal_config.items(section)[0][0]
 
-    heal_config.write(open(conf_file, 'w'))
+    with open(conf_file, 'w') as f:
+        heal_config.write(f)
     return heal_config
 
 

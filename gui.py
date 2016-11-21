@@ -791,7 +791,8 @@ class ChatGui(wx.Frame):
         size = self.Size
         parser.set('gui_information', 'width', size[0])
         parser.set('gui_information', 'height', size[1])
-        parser.write(open(self.loaded_modules['main']['file'], 'w'))
+        with open(self.loaded_modules['main']['file'], 'w') as f:
+            parser.write(f)
         self.Destroy()
 
     def on_right_down(self, event):
