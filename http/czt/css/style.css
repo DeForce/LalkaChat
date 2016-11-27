@@ -26,6 +26,10 @@ body {
     font-size: {{ font_size }}pt;
 }
 
+.message.sub-message {
+    background-color: rgba( 255, 0, 128, 0.62 )
+}
+
 .message-source,
 .message-level,
 .message-badges {
@@ -39,7 +43,7 @@ body {
 .platform,
 .level,
 .s-level {
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(47, 47, 47, 1);
     border-color: rgba(47, 47, 47, 1);
     border-width: 2px;
     border-style: solid;

@@ -52,6 +52,7 @@ class TwitchMessageHandler(threading.Thread):
         self.twitch_queue = twitch_queue
         self.source = SOURCE
 
+        self.irc_class = kwargs.get('irc_class')  #type: IRC
         self.nick = kwargs.get('nick')
         self.bttv = kwargs.get('bttv')
         self.badges = kwargs.get('badges')
@@ -69,70 +70,107 @@ class TwitchMessageHandler(threading.Thread):
         #  the display-name tag, so we have to check their "real" username
         #  and capitalize it because twitch does so, so we do the same.
         if msg.type in ['pubmsg', 'action']:
-            comp = {'source': self.source,
-                    'source_icon': SOURCE_ICON,
-                    'badges': [],
-                    'emotes': [],
-                    'bttv_emotes': [],
-                    'user': 'TwitchSystem',
-                    'display_name': 'TwitchSystem',
-                    'type': 'message',
-                    'msg_type': msg.type}
-            for tag in msg.tags:
-                tag_value, tag_key = tag.values()
-                if tag_key == 'display-name':
-                    if tag_value:
-                        comp['user'] = msg.source.split('!')[0]
-                        comp['display_name'] = tag_value
-                    else:
-                        # If there is no display-name then we strip the user
-                        #  from the string and use it as it is.
-                        comp['user'] = msg.source.split('!')[0]
-                        comp['display_name'] = comp['user'].capitalize()
-                elif tag_key == 'badges' and tag_value:
-                    for badge in tag_value.split(','):
-                        badge_tag, badge_size = badge.split('/')
-                        # Fix some of the names
-                        badge_tag = badge_tag.replace('moderator', 'mod')
-
-                        if badge_tag in self.badges:
-                            badge_info = self.badges.get(badge_tag)
-                            if 'svg' in badge_info:
-                                url = badge_info.get('svg')
-                            elif 'image' in badge_info:
-                                url = badge_info.get('image')
-                            else:
-                                url = 'none'
-                        elif badge_tag in self.custom_badges:
-                            badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
-                            url = badge_info.get('image_url_4x')
-                        else:
-                            url = NOT_FOUND
-                        comp['badges'].append({'badge': badge_tag, 'size': badge_size, 'url': url})
-
-                elif tag_key == 'emotes' and tag_value:
-                    emotes_split = tag_value.split('/')
-                    for emote in emotes_split:
-                        emote_name, emote_pos_diap = emote.split(':')
-                        emote_pos_list = emote_pos_diap.split(',')
-                        comp['emotes'].append({'emote_id': emote_name, 'emote_pos': emote_pos_list})
-
-            # Then we comp the message and send it to queue for message handling.
-            comp['text'] = msg.arguments.pop()
-
-            for word in comp['text'].split():
-                if word in self.bttv:
-                    bttv_smile = self.bttv.get(word)
-                    comp['bttv_emotes'].append({'emote_id': bttv_smile['regex'],
-                                                'emote_url': 'http:{0}'.format(bttv_smile['url'])})
-
-            if re.match('^@?{0}[ ,]?'.format(self.nick), comp['text'].lower()):
-                comp['pm'] = True
-            self.message_queue.put(comp)
+            self._handle_message(msg)
         elif msg.type in ['clearchat']:
-            self.message_queue.put({'type': 'command',
-                                    'command': 'remove_by_user',
-                                    'user': msg.arguments})
+            self._handle_clearchat(msg)
+        elif msg.type in ['usernotice']:
+            self._handle_usernotice(msg)
+
+    def _handle_badges(self, message, badges):
+        for badge in badges.split(','):
+            badge_tag, badge_size = badge.split('/')
+            # Fix some of the names
+            badge_tag = badge_tag.replace('moderator', 'mod')
+
+            if badge_tag in self.badges:
+                badge_info = self.badges.get(badge_tag)
+                if 'svg' in badge_info:
+                    url = badge_info.get('svg')
+                elif 'image' in badge_info:
+                    url = badge_info.get('image')
+                else:
+                    url = 'none'
+            elif badge_tag in self.custom_badges:
+                badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
+                url = badge_info.get('image_url_4x')
+            else:
+                url = NOT_FOUND
+            message['badges'].append({'badge': badge_tag, 'size': badge_size, 'url': url})
+
+    @staticmethod
+    def _handle_display_name(message, name):
+        message['display_name'] = name if name else message['user']
+
+    @staticmethod
+    def _handle_emotes(message, tag_value):
+        emotes_split = tag_value.split('/')
+        for emote in emotes_split:
+            emote_name, emote_pos_diap = emote.split(':')
+            emote_pos_list = emote_pos_diap.split(',')
+            message['emotes'].append({'emote_id': emote_name, 'emote_pos': emote_pos_list})
+
+    def _handle_bttv_smiles(self, message):
+        for word in message['text'].split():
+            if word in self.bttv:
+                bttv_smile = self.bttv.get(word)
+                message['bttv_emotes'].append({'emote_id': bttv_smile['regex'],
+                                               'emote_url': 'http:{0}'.format(bttv_smile['url'])})
+
+    def _handle_pm(self, message):
+        if re.match('^@?{0}[ ,]?'.format(self.nick), message['text'].lower()):
+            message['pm'] = True
+
+    def _handle_clearchat(self, msg):
+        self.message_queue.put({'type': 'command',
+                                'command': 'remove_by_user',
+                                'user': msg.arguments})
+
+    def _handle_usernotice(self, msg):
+        for tag in msg.tags:
+            tag_value, tag_key = tag.values()
+            if tag_key == 'system-msg':
+                msg_text = tag_value
+                self.irc_class.system_message(msg_text)
+                break
+        if msg.arguments:
+            self._handle_message(msg, sub_message=True)
+
+    def _handle_message(self, msg, sub_message=False):
+        message = {'source': self.source,
+                   'source_icon': SOURCE_ICON,
+                   'badges': [],
+                   'emotes': [],
+                   'bttv_emotes': [],
+                   'user': msg.source.split('!')[0],
+                   'type': 'message',
+                   'msg_type': msg.type}
+
+        if message['user'] == 'twitchnotify':
+            self.irc_class.system_message(msg.arguments.pop())
+            return
+
+        for tag in msg.tags:
+            tag_value, tag_key = tag.values()
+            if tag_key == 'display-name':
+                self._handle_display_name(message, tag_value)
+            elif tag_key == 'badges' and tag_value:
+                self._handle_badges(message, tag_value)
+            elif tag_key == 'emotes' and tag_value:
+                self._handle_emotes(message, tag_value)
+
+        # Then we comp the message and send it to queue for message handling.
+        message['text'] = msg.arguments.pop()
+        self._handle_bttv_smiles(message)
+        self._handle_pm(message)
+
+        if sub_message:
+            self._handle_sub_message(message)
+
+        self.message_queue.put(message)
+
+    @staticmethod
+    def _handle_sub_message(message):
+        message['sub_message'] = True
 
 
 class TwitchPingHandler(threading.Thread):
@@ -159,6 +197,7 @@ class IRC(irc.client.SimpleIRCClient):
         self.main_class = kwargs.get('main_class')
 
         msg_handler = TwitchMessageHandler(queue, self.twitch_queue,
+                                           irc_class=self,
                                            nick=self.nick,
                                            bttv=kwargs.get('bttv_smiles_dict', {}),
                                            badges=kwargs.get('badges', {}),
@@ -212,6 +251,9 @@ class IRC(irc.client.SimpleIRCClient):
         self.twitch_queue.put(event)
 
     def on_clearchat(self, connection, event):
+        self.twitch_queue.put(event)
+
+    def on_usernotice(self, connection, event):
         self.twitch_queue.put(event)
 
 
