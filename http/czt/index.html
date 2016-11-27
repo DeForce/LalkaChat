@@ -27,7 +27,7 @@
                     <img class="badge" :src="badge.url" :class="{ 'broadcaster': badge.badge == 'broadcaster', 'mod': badge.badge == 'mod', 'turbo': badge.badge == 'turbo', 'premium': badge.badge == 'premium' }" />
                 </div>
 
-                <div class="username">{{message.user}}:</div>
+                <div class="username">{{message.display_name || message.user}}:</div>
                 <div class="text" v-html="sanitize(message)" :class="{ 'system': message.source === 'sy', 'private': message.pm, 'mention': message.mention }"></div>
             </div>
         </div>
