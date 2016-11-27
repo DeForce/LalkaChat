@@ -75,17 +75,20 @@ class TwitchMessageHandler(threading.Thread):
                     'emotes': [],
                     'bttv_emotes': [],
                     'user': 'TwitchSystem',
+                    'display_name': 'TwitchSystem',
                     'type': 'message',
                     'msg_type': msg.type}
             for tag in msg.tags:
                 tag_value, tag_key = tag.values()
                 if tag_key == 'display-name':
                     if tag_value:
-                        comp['user'] = tag_value
+                        comp['user'] = msg.source.split('!')[0]
+                        comp['display_name'] = tag_value
                     else:
-                        # If there is not display-name then we strip the user
+                        # If there is no display-name then we strip the user
                         #  from the string and use it as it is.
-                        comp['user'] = msg.source.split('!')[0].capitalize()
+                        comp['user'] = msg.source.split('!')[0]
+                        comp['display_name'] = comp['user'].capitalize()
                 elif tag_key == 'badges' and tag_value:
                     for badge in tag_value.split(','):
                         badge_tag, badge_size = badge.split('/')
