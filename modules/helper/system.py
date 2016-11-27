@@ -1,6 +1,8 @@
 import logging
+import random
 import re
 import os
+import string
 
 log = logging.getLogger('system')
 
@@ -91,3 +93,7 @@ def translate_key(item):
 
 def translate(text):
     pass
+
+
+def random_string(length):
+    return ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(length))

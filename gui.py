@@ -267,6 +267,11 @@ class SettingsWindow(wx.Frame):
         self.on_change(IDS[event.GetId()], str(spin_ctrl.GetValue()), item_type='spinctrl')
         event.Skip()
 
+    def on_sliderctrl(self, event):
+        ctrl = event.EventObject
+        self.on_change(IDS[event.GetId()], str(ctrl.GetValue()), item_type='sliderctrl')
+        event.Skip()
+
     def on_dropdown(self, event):
         drop_ctrl = event.EventObject
         self.on_change(IDS[event.GetId()], drop_ctrl.GetString(drop_ctrl.GetCurrentSelection()),
@@ -382,6 +387,16 @@ class SettingsWindow(wx.Frame):
             sizer.Add(static_sizer, 0, wx.EXPAND)
         page_sc_window.SetSizer(sizer)
         return page_sc_window
+
+    @staticmethod
+    def create_text(parent, key):
+        item_text = wx.StaticText(parent, label=translate_key(key))
+        item_text_box_ver = wx.BoxSizer(wx.VERTICAL)
+        item_text_box_ver.Add(item_text, 0, wx.EXPAND)
+
+        item_text_box_hor = wx.BoxSizer(wx.HORIZONTAL)
+        item_text_box_hor.Add(item_text, 1, wx.ALIGN_CENTER)
+        return item_text_box_hor
 
     def create_items(self, parent, key, section, section_gui):
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -527,8 +542,6 @@ class SettingsWindow(wx.Frame):
         return item_sizer
 
     def create_dropdown(self, parent, view, key, section, section_gui, section_item=False, short_key=None):
-        item_text = wx.StaticText(parent, label=translate_key(key),
-                                  style=wx.ALIGN_RIGHT)
         choices = section_gui.get('choices')
         key = key if section_item else MODULE_KEY.join([key, 'dropdown'])
         item_box = KeyChoice(parent, id=id_renew(key, update=True),
@@ -536,18 +549,28 @@ class SettingsWindow(wx.Frame):
         item_box.Bind(wx.EVT_CHOICE, self.on_dropdown)
         item_value = section[short_key] if section_item else section
         item_box.SetSelection(choices.index(item_value))
-        return item_text, item_box
+        return self.create_text(parent, key), item_box
 
     def create_spin(self, parent, view, key, section, section_gui, section_item=False, short_key=None):
-        item_text = wx.StaticText(parent, label=translate_key(key),
-                                  style=wx.ALIGN_RIGHT)
         key = key if section_item else MODULE_KEY.join([key, 'spin'])
         value = short_key if section_item else section
         item_box = wx.SpinCtrl(parent, id=id_renew(key, update=True), min=section_gui['min'], max=section_gui['max'],
                                initial=int(value))
         item_box.Bind(wx.EVT_SPINCTRL, self.on_spinctrl)
         item_box.Bind(wx.EVT_TEXT, self.on_spinctrl)
-        return item_text, item_box
+        return self.create_text(parent, key), item_box
+
+    def create_slider(self, parent, view, key, section, section_gui, section_item=False, short_key=None):
+        key = key if section_item else MODULE_KEY.join([key, 'slider'])
+        value = short_key if section_item else section
+        item_box = wx.Slider(parent, id=id_renew(key, update=True),
+                             minValue=section_gui['min'], maxValue=section_gui['max'],
+                             value=int(value), style=wx.SL_LABELS | wx.SL_AUTOTICKS)
+        freq = (section_gui['max'] - section_gui['min'])/5
+        item_box.SetTickFreq(freq)
+        item_box.SetLineSize(4)
+        item_box.Bind(wx.EVT_SCROLL, self.on_sliderctrl)
+        return self.create_text(parent, key), item_box
 
     def create_item(self, parent, view, key, section, section_gui):
         flex_grid = wx.FlexGridSizer(0, 2, ITEM_SPACING_VERT, ITEM_SPACING_HORZ)
@@ -574,6 +597,11 @@ class SettingsWindow(wx.Frame):
                                                      section_item=True, short_key=section[item])
                     flex_grid.Add(text)
                     flex_grid.Add(control)
+                elif 'slider' in section_gui[item].get('view'):
+                    text, control = self.create_slider(parent, view, item_name, section, section_gui[item],
+                                                       section_item=True, short_key=section[item])
+                    flex_grid.Add(text, 1, wx.EXPAND | wx.ALIGN_CENTER)
+                    flex_grid.Add(control, 1, wx.EXPAND)
             else:
                 # Checking type of an item
                 style = wx.ALIGN_CENTER_VERTICAL
@@ -594,9 +622,8 @@ class SettingsWindow(wx.Frame):
                     item_box = wx.TextCtrl(parent, id=id_renew(item_name, update=True),
                                            value=str(value).decode('utf-8'))
                     item_box.Bind(wx.EVT_TEXT, self.on_textctrl)
-                    item_text = wx.StaticText(parent, label=translate_key(item_name),
-                                              style=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_HORIZONTAL)
-                    flex_grid.Add(item_text)
+                    item_text = self.create_text(parent, item_name)
+                    flex_grid.Add(item_text, 1, wx.EXPAND | wx.ALIGN_CENTER)
                     flex_grid.Add(item_box)
         flex_grid.Fit(parent)
         return flex_grid
@@ -644,7 +671,6 @@ class SettingsWindow(wx.Frame):
             module_settings = self.main_class.loaded_modules.get(module, {})
             non_dynamic = module_settings.get('gui', {}).get('non_dynamic', [])
             module_config = module_settings.get('config')
-            parser = module_settings['parser']  # type: ConfigParser
 
             for item, change in changed_items.iteritems():
                 item_split = item.split(MODULE_KEY)
@@ -659,36 +685,24 @@ class SettingsWindow(wx.Frame):
                             break
                 change_type = change['type']
                 if change_type in ['gridbox']:
-                    for option in parser.options(section):
-                        parser.remove_option(section, option)
                     module_config[section] = OrderedDict()
                     for change_tuple in change['value']:
                         if len(change_tuple) > 1:
                             change_item, change_value = change_tuple
                         else:
                             change_item, change_value = (change_tuple[0], None)
-                        parser.set(section, change_item, change_value)
                         module_config[section][change_item] = change_value
-                elif change_type in ['checkbox', 'textctrl', 'dropctrl', 'spinctrl']:
+                elif change_type in ['listbox']:
+                    module_config[section] = change['value']
+                elif change_type in ['listbox_check']:
+                    module_config[section] = {}
+                    for value in change['value']:
+                        module_config[section][value] = None
+                else:
                     value = change['value']
                     if item == MODULE_KEY.join(['main', 'gui', 'show_hidden']):
                         self.show_hidden = value
-                    parser.set(section, item_name, value)
                     module_config[section][item_name] = value
-                elif change_type in ['listbox']:
-                    for option in parser.options(section):
-                        parser.remove_option(section, option)
-                    parser.set(section, change['value'])
-                    module_config[section] = change['value']
-                elif change_type in ['listbox_check']:
-                    for option in parser.options(section):
-                        parser.remove_option(section, option)
-                    module_config[section] = {}
-                    for value in change['value']:
-                        parser.set(section, value)
-                        module_config[section][value] = None
-            with open(module_settings['file'], 'w') as config_file:
-                parser.write(config_file)
             if 'class' in module_settings:
                 module_settings['class'].apply_settings()
         return non_dynamic_check
@@ -786,12 +800,17 @@ class ChatGui(wx.Frame):
 
     def on_close(self, event):
         log.info("Exiting...")
+        for module, module_dict in self.loaded_modules.iteritems():
+            module_dict['class'].apply_settings(system_exit=True)
+
         # Saving last window size
         parser = self.loaded_modules['main']['parser']  # type: ConfigParser
         size = self.Size
         parser.set('gui_information', 'width', size[0])
         parser.set('gui_information', 'height', size[1])
-        parser.write(open(self.loaded_modules['main']['file'], 'w'))
+        with open(self.loaded_modules['main']['file'], 'w') as p_file:
+            parser.write(p_file)
+
         self.Destroy()
 
     def on_right_down(self, event):

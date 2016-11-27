@@ -4,8 +4,8 @@ import re
 import os
 from collections import OrderedDict
 
-from modules.helper.parser import self_heal
-from modules.helper.modules import MessagingModule
+from modules.helper.parser import load_from_config_file
+from modules.helper.module import MessagingModule
 from modules.helper.system import IGNORED_TYPES
 
 
@@ -27,13 +27,14 @@ class df(MessagingModule):
                 'view': 'list_dual',
                 'addable': True},
             'non_dynamic': ['grep.*']}
-        config = self_heal(conf_file, conf_dict)
+        config = load_from_config_file(conf_file, conf_dict)
 
-        self._conf_params = {'folder': conf_folder, 'file': conf_file,
-                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config,
-                             'config': conf_dict,
-                             'gui': conf_gui}
+        self._conf_params.update(
+            {'folder': conf_folder, 'file': conf_file,
+             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+             'parser': config,
+             'config': conf_dict,
+             'gui': conf_gui})
         self.file = conf_dict['grep']['file']
 
         dir_name = os.path.dirname(self.file)

@@ -9,9 +9,9 @@ import xml.etree.ElementTree as ElementTree
 from collections import OrderedDict
 import datetime
 
-from modules.helper.parser import self_heal
-from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES
-from modules.helper.modules import MessagingModule
+from modules.helper.parser import load_from_config_file
+from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES, random_string
+from modules.helper.module import MessagingModule
 
 log = logging.getLogger('levels')
 
@@ -48,19 +48,21 @@ class levels(MessagingModule):
                         'experience': {
                             'view': 'dropdown',
                             'choices': ['static', 'geometrical', 'random']}}}
-        config = self_heal(conf_file, conf_dict)
+        config = load_from_config_file(conf_file, conf_dict)
 
-        self._conf_params = {'folder': conf_folder, 'file': conf_file,
-                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config,
-                             'config': conf_dict,
-                             'gui': conf_gui}
+        self._conf_params.update(
+            {'folder': conf_folder, 'file': conf_file,
+             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+             'parser': config,
+             'config': conf_dict,
+             'gui': conf_gui})
+        self.loaded_modules = None
 
         self.conf_folder = None
         self.experience = None
         self.exp_for_level = None
         self.exp_for_message = None
-        self.filename = None
+        self.level_file = None
         self.levels = None
         self.special_levels = None
         self.db_location = None
@@ -71,6 +73,9 @@ class levels(MessagingModule):
         loaded_modules = kwargs.get('loaded_modules')
         if 'webchat' not in loaded_modules:
             raise ModuleLoadException("Unable to find webchat module that is needed for level module")
+        else:
+            loaded_modules['webchat']['class'].add_depend('levels')
+        self.loaded_modules = loaded_modules
 
         conf_folder = self._conf_params['folder']
         conf_dict = self._conf_params['config']
@@ -79,7 +84,11 @@ class levels(MessagingModule):
         self.experience = conf_dict['config'].get('experience')
         self.exp_for_level = float(conf_dict['config'].get('exp_for_level'))
         self.exp_for_message = float(conf_dict['config'].get('exp_for_message'))
-        self.filename = os.path.abspath(os.path.join(loaded_modules['webchat']['style_location'], 'levels.xml'))
+        self.level_file = os.path.abspath(
+            os.path.join(
+                loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
+            )
+        )
         self.levels = []
         self.special_levels = {}
         self.db_location = os.path.join(conf_dict['config'].get('db'))
@@ -87,18 +96,30 @@ class levels(MessagingModule):
         self.threshold_users = {}
 
         # Load levels
-        if not os.path.exists(self.filename):
-            log.error("{0} not found, generating from template".format(self.filename))
-            raise ModuleLoadException("{0} not found, generating from template".format(self.filename))
+        if not os.path.exists(self.level_file):
+            log.error("{0} not found, generating from template".format(self.level_file))
+            raise ModuleLoadException("{0} not found, generating from template".format(self.level_file))
 
         if self.experience == 'random':
             self.db_location += '.random'
         self.create_db(self.db_location)
 
-        tree = ElementTree.parse(os.path.join(conf_folder, self.filename))
-        lvl_xml = tree.getroot()
+        self.load_levels()
 
-        for level_data in lvl_xml:
+    def load_levels(self):
+        if self.levels:
+            self.levels = []
+
+        if self.special_levels:
+            self.special_levels = {}
+
+        self.level_file = os.path.abspath(
+            os.path.join(
+                self.loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
+            )
+        )
+        tree = ElementTree.parse(self.level_file)
+        for level_data in tree.getroot():
             level_count = float(len(self.levels) + 1)
             if 'nick' in level_data.attrib:
                 self.special_levels[level_data.attrib['nick']] = level_data.attrib
@@ -108,7 +129,13 @@ class levels(MessagingModule):
                 else:
                     level_exp = self.exp_for_level * level_count
                 level_data.attrib['exp'] = level_exp
+                level_data.attrib['url'] = '{0}?{1}'.format(level_data.attrib['url'], random_string(5))
                 self.levels.append(level_data.attrib)
+
+    def apply_settings(self, **kwargs):
+        from_depend = kwargs.get('from_depend')
+        if 'webchat' in from_depend:
+            self.load_levels()
 
     def set_level(self, user, queue):
         if user == 'System':
