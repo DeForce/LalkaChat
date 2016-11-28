@@ -18,6 +18,7 @@ logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('goodgame')
 SOURCE = 'gg'
 SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
+FILE_ICON = os.path.join('img', 'gg.png')
 SYSTEM_USER = 'GoodGame'
 ID_PREFIX = 'gg_{0}'
 CONF_DICT = OrderedDict()
@@ -28,8 +29,10 @@ CONF_DICT['config']['socket'] = 'ws://chat.goodgame.ru:8081/chat/websocket'
 
 CONF_GUI = {
     'config': {
-        'hidden': ['socket']},
-    'non_dynamic': ['config.*']}
+        'hidden': ['socket']
+    },
+    'non_dynamic': ['config.*'],
+    'icon': FILE_ICON}
 
 
 class GoodgameMessageHandler(threading.Thread):
@@ -44,6 +47,7 @@ class GoodgameMessageHandler(threading.Thread):
         self.nick = kwargs.get('nick')
         self.smiles = kwargs.get('smiles')
         self.smile_regex = ':(\w+|\d+):'
+        self.chat_module = kwargs.get('chat_module')
         self.kwargs = kwargs
 
     def run(self):
@@ -128,6 +132,11 @@ class GoodgameMessageHandler(threading.Thread):
                     self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'unban'])).format(
                         msg['data']['moder_name'],
                         msg['data']['user_name']))
+        elif msg['type'] == 'channel_counters':
+            try:
+                self.chat_module.set_viewers(self.chat_module.get_viewers())
+            except Exception as exc:
+                log.exception(exc)
 
 
 class GGChat(WebSocketClient):
@@ -140,6 +149,7 @@ class GGChat(WebSocketClient):
         self.gg_queue = Queue.Queue()
 
         self.main_thread = kwargs.get('main_thread')
+        self.chat_module = kwargs.get('chat_module')
         self.crit_error = False
 
         message_handler = GoodgameMessageHandler(self, gg_queue=self.gg_queue, **kwargs)
@@ -148,15 +158,21 @@ class GGChat(WebSocketClient):
     def opened(self):
         success_msg = "Connection Successful"
         log.info(success_msg)
+        self.chat_module.set_online()
+        try:
+            self.chat_module.set_viewers(self.chat_module.get_viewers())
+        except Exception as exc:
+            log.exception(exc)
         self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])))
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
         # self.ggPing()
         log.info("Sent join message")
-        
+
     def closed(self, code, reason=None):
         log.info("Connection Closed Down")
+        self.chat_module.set_offline()
         if 'INV_CH_ID' in reason:
             self.crit_error = True
         else:
@@ -263,22 +279,36 @@ class goodgame(ChatModule):
         self.queue = queue
         self.host = CONF_DICT['config']['socket']
         self.channel_name = CONF_DICT['config']['channel_name']
-        self.loaded_modules = None
+        self.gg = None
 
     def load_module(self, *args, **kwargs):
-        self.loaded_modules = kwargs.get('loaded_modules')
-        if 'webchat' in self.loaded_modules:
-            self.loaded_modules['webchat']['class'].add_depend('goodgame')
+        ChatModule.load_module(self, *args, **kwargs)
+        if 'webchat' in self._loaded_modules:
+            self._loaded_modules['webchat']['class'].add_depend('goodgame')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
         # Creating new thread with queue in place for messaging transfers
-        gg = GGThread(self.queue, self.host, self.channel_name, settings=self._conf_params['settings'])
+        gg = GGThread(self.queue, self.host, self.channel_name,
+                      settings=self._conf_params['settings'], chat_module=self)
+        self.gg = gg
         gg.start()
 
     def get_remove_text(self):
-        if self.loaded_modules['webchat']['style_settings']['keys'].get('remove_message'):
-            return self.loaded_modules['webchat']['style_settings']['keys'].get('remove_text')
+        if self._loaded_modules['webchat']['style_settings']['keys'].get('remove_message'):
+            return self._loaded_modules['webchat']['style_settings']['keys'].get('remove_text')
         return None
 
+    def get_viewers(self):
+        streams_url = 'http://api2.goodgame.ru/streams/{0}'.format(self.gg.ch_id)
+        try:
+            request = requests.get(streams_url)
+            if request.status_code == 200:
+                return request.json().get('player_viewers')
+            else:
+                raise Exception("Not successful status code: {0}".format(request.status_code))
+        except Exception as exc:
+            log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
+
     def apply_settings(self, **kwargs):
+        ChatModule.apply_settings(self, **kwargs)
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()

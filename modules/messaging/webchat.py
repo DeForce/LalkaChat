@@ -36,8 +36,6 @@ class MessagingThread(threading.Thread):
     def run(self):
         while self.running:
             message = s_queue.get()
-            if 'text' in message:
-                message['text'] = escape(message['text'])
 
             if message['type'] in HISTORY_TYPES:
                 cherrypy.engine.publish('add-history', message)
@@ -80,7 +78,7 @@ class WebChatSocketServer(WebSocket):
 
     def opened(self):
         cherrypy.engine.publish('add-client', self.peer_address, self)
-        timer = threading.Timer(0.2, self.fire_history)
+        timer = threading.Timer(0.3, self.fire_history)
         timer.start()
 
     def closed(self, code, reason=None):
@@ -354,15 +352,14 @@ class webchat(MessagingModule):
 
         self.s_thread = None
         self.queue = None
-        self.loaded_modules = None
         self.message_threads = []
 
         # Rest Api Settings
         self._rest_api['GET'] = self.rest_get
 
     def load_module(self, *args, **kwargs):
+        MessagingModule.load_module(self, *args, **kwargs)
         self.queue = kwargs.get('queue')
-        self.loaded_modules = kwargs.get('loaded_modules')
         self.start_webserver()
 
     def start_webserver(self):
@@ -371,7 +368,7 @@ class webchat(MessagingModule):
         if socket_open(host, port):
             self.s_thread = SocketThread(host, port, CONF_FOLDER,
                                          style_settings=self._conf_params['style_settings'],
-                                         modules=self.loaded_modules)
+                                         modules=self._loaded_modules)
             self.s_thread.start()
 
             for thread in range(THREADS+5):
@@ -411,7 +408,7 @@ class webchat(MessagingModule):
 
         if self._conf_params['dependencies']:
             for module in self._conf_params['dependencies']:
-                self.loaded_modules[module]['class'].apply_settings(from_depend='webchat')
+                self._loaded_modules[module]['class'].apply_settings(from_depend='webchat')
 
     def gui_button_press(self, gui_module, event, list_keys):
         log.debug("Received button press for id {0}".format(event.GetId()))

@@ -1,15 +1,16 @@
 import threading
 from collections import OrderedDict
 
+import os
+import logging
 import webbrowser
 import wx
 import wx.grid
-import os
-import logging
 from ConfigParser import ConfigParser
 from cefpython3.wx import chromectrl
 from modules.helper.system import MODULE_KEY, translate_key
 from modules.helper.parser import return_type
+from modules.helper.module import BaseModule
 # ToDO: Support customization of borders/spacings
 # ToDO: Exit by cancel button
 
@@ -749,6 +750,79 @@ class SettingsWindow(wx.Frame):
         self.on_change(key, grid_elements, item_type='gridbox')
 
 
+class StatusFrame(wx.Panel):
+    def __init__(self, parent, **kwargs):
+        self.chat_modules = kwargs.get('chat_modules')
+        wx.Panel.__init__(self, parent, size=wx.Size(-1, 24))
+        self.SetBackgroundColour('cream')
+
+        self.chats = {}
+        self._create_items()
+
+        self.Fit()
+        self.Layout()
+        self.Show(True)
+
+    def _create_items(self):
+        border_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        border_sizer.AddSpacer(5)
+        item_sizer = wx.FlexGridSizer(0, 0, 10, 10)
+        for module, settings in self.chat_modules.iteritems():
+            if module not in ['chat']:
+                self.chats[module] = {}
+                item_sizer.Add(self._create_item(module, settings), 0, wx.EXPAND)
+
+        border_sizer.Add(item_sizer, 0, wx.EXPAND)
+        border_sizer.AddSpacer(5)
+        self.SetSizer(border_sizer)
+
+    def _create_item(self, module, settings):
+        item_sizer = wx.BoxSizer(wx.VERTICAL)
+        module_sizer = wx.FlexGridSizer(0, 0, 5, 5)
+
+        chat_icon = wx.Image(settings['gui'].get('icon'), wx.BITMAP_TYPE_ANY)
+        chat_icon = chat_icon.Scale(16, 16)
+        bitmap = wx.StaticBitmap(self, wx.ID_ANY,
+                                 wx.BitmapFromImage(chat_icon),
+                                 size=wx.Size(16, 16))
+        label = wx.StaticText(self, id=wx.ID_ANY, label='N/A')
+        self.chats[module]['label'] = label
+        module_sizer.Add(bitmap, 0, wx.EXPAND)
+        module_sizer.Add(label, 1, wx.EXPAND)
+        module_sizer.AddSpacer(2)
+
+        item_sizer.Add(module_sizer)
+
+        status_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        status_item = wx.Panel(self, size=wx.Size(-1, 5))
+        status_item.SetBackgroundColour('gray')
+        self.chats[module]['status'] = status_item
+
+        status_sizer.Add(status_item, 1, wx.EXPAND)
+
+        item_sizer.AddSpacer(3)
+        item_sizer.Add(status_sizer, 1, wx.EXPAND)
+        item_sizer.AddSpacer(2)
+
+        return item_sizer
+
+    def set_online(self, module):
+        self.chats[module]['status'].SetBackgroundColour(wx.Colour(0, 128, 0))
+        self.Refresh()
+
+    def set_offline(self, module):
+        self.chats[module]['status'].SetBackgroundColour('red')
+        self.Refresh()
+
+    def set_viewers(self, module, viewers):
+        if isinstance(viewers, int):
+            viewers = str(viewers)
+        if len(viewers) >= 5:
+            viewers = '{0}k'.format(viewers[:2])
+        self.chats[module]['label'].SetLabel(str(viewers))
+        self.Layout()
+
+
 class ChatGui(wx.Frame):
     def __init__(self, parent, title, url, **kwargs):
         # Setting the settings
@@ -757,6 +831,7 @@ class ChatGui(wx.Frame):
         self.loaded_modules = kwargs.get('loaded_modules')
         self.queue = kwargs.get('queue')
         self.settings_window = None
+        self.status_frame = None
 
         wx.Frame.__init__(self, parent, title=title, size=self.gui_settings.get('size'))
         # Set window style
@@ -776,6 +851,9 @@ class ChatGui(wx.Frame):
         self.toolbar = MainMenuToolBar(self, main_class=self)
 
         vbox.Add(self.toolbar, 0, wx.EXPAND)
+        if self.main_config['config']['gui']['show_counters']:
+            self.status_frame = StatusFrame(self, chat_modules=self.sorted_categories['chat'])
+            vbox.Add(self.status_frame, 0, wx.EXPAND)
         if self.gui_settings['show_browser']:
             vbox.Add(chromectrl.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False), 1, wx.EXPAND)
         else:
@@ -813,7 +891,8 @@ class ChatGui(wx.Frame):
 
         self.Destroy()
 
-    def on_right_down(self, event):
+    @staticmethod
+    def on_right_down(event):
         log.info(event)
         event.Skip()
 
@@ -832,7 +911,8 @@ class ChatGui(wx.Frame):
                                                   main_class=self,
                                                   categories=self.sorted_categories)
 
-    def button_clicked(self, event):
+    @staticmethod
+    def button_clicked(event):
         button_id = event.GetId()
         keys = IDS[event.GetId()].split(MODULE_KEY)
         log.debug("[ChatGui] Button clicked: {0}, {1}".format(keys, button_id))
@@ -851,13 +931,14 @@ class ChatGui(wx.Frame):
         event.Skip()
 
 
-class GuiThread(threading.Thread):
+class GuiThread(threading.Thread, BaseModule):
     title = 'LalkaChat'
     url = 'http://localhost'
     port = '8080'
 
     def __init__(self, **kwargs):
         threading.Thread.__init__(self)
+        BaseModule.__init__(self, **kwargs)
         self.daemon = True
         self.gui = None
         self.kwargs = kwargs
