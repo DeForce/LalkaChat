@@ -9,7 +9,7 @@ import re
 import logging
 from collections import OrderedDict
 from modules.helper.parser import load_from_config_file
-from modules.helper.system import system_message, translate_key
+from modules.helper.system import system_message, translate_key, remove_message_by_id
 from modules.helper.module import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 from gui import MODULE_KEY
@@ -44,6 +44,7 @@ class GoodgameMessageHandler(threading.Thread):
         self.nick = kwargs.get('nick')
         self.smiles = kwargs.get('smiles')
         self.smile_regex = ':(\w+|\d+):'
+        self.kwargs = kwargs
 
     def run(self):
         while True:
@@ -110,9 +111,7 @@ class GoodgameMessageHandler(threading.Thread):
                 msg['data']['moder_name'], msg['data']['user_name']))
         elif msg['type'] == 'remove_message':
             remove_id = ID_PREFIX.format(msg['data']['message_id'])
-            self.message_queue.put({'type': 'command',
-                                    'command': 'remove_by_id',
-                                    'ids': [remove_id]})
+            self.message_queue.put(remove_message_by_id([remove_id], text=self.kwargs['settings'].get('remove_text')))
         elif msg['type'] == 'user_ban':
             if msg['data']['duration']:
                 self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'ban'])).format(
@@ -175,7 +174,7 @@ class GGChat(WebSocketClient):
 
 
 class GGThread(threading.Thread):
-    def __init__(self, queue, address, nick):
+    def __init__(self, queue, address, nick, **kwargs):
         threading.Thread.__init__(self)
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -185,7 +184,7 @@ class GGThread(threading.Thread):
         self.address = address
         self.nick = nick
         self.ch_id = None
-        self.kwargs = {}
+        self.kwargs = kwargs
 
     def load_config(self):
         try:
@@ -222,7 +221,7 @@ class GGThread(threading.Thread):
             log.warning("Unable to get channel name, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
         return True
-        
+
     def run(self):
         self.connect()
 
@@ -258,13 +257,28 @@ class goodgame(ChatModule):
              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
              'parser': config,
              'config': CONF_DICT,
-             'gui': CONF_GUI})
+             'gui': CONF_GUI,
+             'settings': {}})
 
         self.queue = queue
         self.host = CONF_DICT['config']['socket']
         self.channel_name = CONF_DICT['config']['channel_name']
+        self.loaded_modules = None
 
     def load_module(self, *args, **kwargs):
+        self.loaded_modules = kwargs.get('loaded_modules')
+        if 'webchat' in self.loaded_modules:
+            self.loaded_modules['webchat']['class'].add_depend('goodgame')
+        self._conf_params['settings']['remove_text'] = self.get_remove_text()
         # Creating new thread with queue in place for messaging transfers
-        gg = GGThread(self.queue, self.host, self.channel_name)
+        gg = GGThread(self.queue, self.host, self.channel_name, settings=self._conf_params['settings'])
         gg.start()
+
+    def get_remove_text(self):
+        if self.loaded_modules['webchat']['style_settings']['keys'].get('remove_message'):
+            return self.loaded_modules['webchat']['style_settings']['keys'].get('remove_text')
+        return None
+
+    def apply_settings(self, **kwargs):
+        if 'webchat' in kwargs.get('from_depend', []):
+            self._conf_params['settings']['remove_text'] = self.get_remove_text()
