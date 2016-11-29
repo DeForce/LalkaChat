@@ -30,6 +30,7 @@ body {
     background-color: rgba( 255, 0, 128, 0.62 )
 }
 
+.message-remove,
 .message-source,
 .message-level,
 .message-badges {
@@ -39,6 +40,7 @@ body {
     left: 3px;
 }
 
+.delete,
 .badge,
 .platform,
 .level,
@@ -93,4 +95,11 @@ body {
 
 .premium {
     background-color: #009CDC;
+}
+
+.show-del-enter-active, .show-del-leave-active {
+  transition: opacity .5s
+}
+.show-del-enter, .show-del-leave-active {
+  opacity: 0
 }

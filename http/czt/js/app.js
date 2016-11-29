@@ -35,6 +35,12 @@
             });
         },
         methods: {
+            mouseenter: function (message) {
+                message.deleteButton = true;
+            },
+            mouseleave: function (message) {
+                message.deleteButton = false;
+            },
             clear: function () {
                 var that = this;
                 var time = new Date();
@@ -42,6 +48,12 @@
                 this.messages = this.messages.filter(function (message) {
                     return Math.abs(time - message.time) < that.messagesInterval;
                 });
+            },
+            remove: function (message) {
+                var index = this.messages.indexOf(message);
+                if (index >= 0) {
+                    this.messages.splice(index, 1);
+                }
             },
             sanitize: function (message) {
                 var html = '';
@@ -134,6 +146,27 @@
                     return usernames.indexOf(user) < 0;
                 });
             },
+            replaceByUsernames: function (command) {
+                var usernames = command.user.map(function(value) {
+                    return value.toLowerCase();
+                });
+
+                this.messages = this.messages.map(function (message) {
+                    var user = message.user.toLowerCase();
+                    var index = usernames.indexOf(user);
+
+                    if (index >= 0)
+                        message.text = command.text;
+                });
+            },
+            replaceByIds: function (command) {
+                this.messages = this.messages.map(function (message) {
+                    var index = command.ids.indexOf(message.id);
+
+                    if (index >= 0)
+                        message.text = command.text;
+                });
+            },
             run: function (message) {
                 if (!message.command)
                     return;
@@ -147,6 +180,12 @@
                         break;
                     case 'remove_by_id':
                         this.removeByIds(message.ids);
+                        break;
+                    case 'replace_by_id':
+                        this.replaceByIds(message);
+                        break;
+                    case 'replace_by_user':
+                        this.replaceByUsernames(message);
                         break;
                     default:
                         console.log('Got unknown command ', message.command);
@@ -163,6 +202,7 @@
                         break;
                     default:
                         message.time = new Date();
+                        message.deleteButton = false;
                         this.messages.push(message);
                 }
             },
