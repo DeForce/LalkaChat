@@ -18,6 +18,9 @@ RUN apk --update add --virtual build-deps build-base bzip2 git           \
    mv /usr/lib/python2.7/site-packages/ /usr/lib/python2.7/~site-packages/ && \
    apk del build-deps                                                      && \
    mv /usr/lib/python2.7/~site-packages/ /usr/lib/python2.7/site-packages/ && \
-   rm -rf /var/cache/* /tmp/* /var/log/* ~/.cache
+   rm -rf /var/cache/* /tmp/* /var/log/* ~/.cache                          && \
+   mkdir -p /var/cache/apk
+
+VOLUME /usr/lib/python2.7/site-packages/LalkaChat
 
 CMD /usr/local/bin/run

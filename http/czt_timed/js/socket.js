@@ -1,3 +1,5 @@
+/*jslint browser: true*/
+
 var MAX_MESSAGES = 70;
 var find_location = window.location.href;
 var RegExp = /:(\d+)/;

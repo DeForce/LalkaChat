@@ -1,9 +1,9 @@
-# LalkaChat
+# LalkaChat [![Build Status](https://travis-ci.org/DeForce/LalkaChat.svg?branch=develop)](https://travis-ci.org/DeForce/LalkaChat)
 
 ## Usage(GNU/Linux macOS Windows):
  - [Install docker](https://docs.docker.com/engine/installation/)
  - `docker run -d --name x11-bridge -e MODE="html" -p 10000:10000 -e XPRA_DISPLAY=:14 -e XPRA_PASSWORD=<PASSWORD> jare/x11-bridge`
- - `docker run -d --name chat -p 8080:8080 -v <PATH_TO_CONFIG>:/usr/lib/python2.7/site-packages/LalkaChat/conf deforce/lalka-chat`
+ - `docker run -d --name chat -p 8080:8080 -v <PATH_TO_CONFIG>:/usr/lib/python2.7/site-packages/LalkaChat/conf deforce/lalkachat`
  - Open chat config at `http://localhost:10000/index.html?encoding=png&password=<PASSWORD>`
  - And chat window at `http://localhost:8080/`
  - You can update the chat with `docker rmi -f czt/lalkachat`
@@ -14,12 +14,13 @@ Thanks to ftpud for fixing IE compatibility
 ### Production docker build:
 
  - `docker build -t deforce/alpine-wxpython:latest docker/Dockerfiles/alpine-wxpython`
- - `docker build -t deforce/lalka-chat:latest .`
+ - `docker build -t deforce/lalkachat:latest .`
 
 ### Testing docker build:
  - `docker build -t deforce/alpine-wxpython:latest docker/Dockerfiles/alpine-wxpython`
- - `docker build -t deforce/alpine-wxpython:latest docker/Dockerfiles/lalkachat-build-deps`
+ - `docker build -t deforce/lalkachat-build-deps:latest docker/Dockerfiles/lalkachat-build-deps`
+ - `docker run -d --name x11-bridge -e MODE="html" -p 10000:10000 -e XPRA_DISPLAY=:14 -e XPRA_PASSWORD=<PASSWORD> jare/x11-bridge`
  - (on source change)
-  - `docker build -t deforce/lalka-chat:testing -f Dockerfile_test .`
-  - `docker run -rm --name chat-test -p 8080:8080 -v <PATH_TO_CONFIG>:/usr/lib/python2.7/site-packages/LalkaChat/conf deforce/lalka-chat:testing`
+  - `docker build -t deforce/lalkachat:testing -f Dockerfile_test .`
+  - `docker run -rm --name chat-test -p 8080:8080 -v <PATH_TO_CONFIG>:/usr/lib/python2.7/site-packages/LalkaChat/conf deforce/lalkachat:testing`
 

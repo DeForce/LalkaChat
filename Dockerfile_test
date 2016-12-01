@@ -1,4 +1,4 @@
-FROM deforce/lalka-chat-build-deps:latest
+FROM deforce/lalkachat-build-deps:latest
 
 MAINTAINER CzT/DeForce <vlad@czt.lv>
 
