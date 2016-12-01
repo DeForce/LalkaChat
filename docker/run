@@ -7,22 +7,22 @@ if [ -f $webchatCF ];
 then
 	sed -i 's/^host =.*$/host = 0.0.0.0/' $webchatCF
 else
-	cat << EOF | tee > ${webchatCF}
-	[server]
-	host = 0.0.0.0
+	cat <<-EOF | tee > ${webchatCF}
+[server]
+host = 0.0.0.0
 
-	EOF
+EOF
 fi
 
 if [ -f $globCF ];
 then
 	sed -i 's/^show_browser =.*$/show_browser = False/' $globCF
 else
-	cat << EOF | tee > ${globCF}
-	[gui]
-	show_browser = False
+	cat <<-EOF | tee > ${globCF}
+[gui]
+show_browser = False
 
-	EOF
+EOF
 fi
 
 cd /usr/lib/python2.7/site-packages/LalkaChat
