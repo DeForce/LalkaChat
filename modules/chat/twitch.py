@@ -10,7 +10,7 @@ from collections import OrderedDict
 import time
 from modules.helper.parser import load_from_config_file
 from modules.helper.module import ChatModule
-from modules.helper.system import system_message, translate_key
+from modules.helper.system import system_message, translate_key, remove_message_by_user
 from gui import MODULE_KEY
 
 logging.getLogger('irc').setLevel(logging.ERROR)
@@ -54,9 +54,10 @@ class TwitchMessageHandler(threading.Thread):
 
         self.irc_class = kwargs.get('irc_class')  #type: IRC
         self.nick = kwargs.get('nick')
-        self.bttv = kwargs.get('bttv')
+        self.bttv = kwargs.get('bttv_smiles_dict', {})
         self.badges = kwargs.get('badges')
         self.custom_badges = kwargs.get('custom_badges')
+        self.kwargs = kwargs
 
     def run(self):
         while True:
@@ -121,9 +122,8 @@ class TwitchMessageHandler(threading.Thread):
             message['pm'] = True
 
     def _handle_clearchat(self, msg):
-        self.message_queue.put({'type': 'command',
-                                'command': 'remove_by_user',
-                                'user': msg.arguments})
+        self.message_queue.put(remove_message_by_user(msg.arguments,
+                                                      text=self.kwargs['settings'].get('remove_text')))
 
     def _handle_usernotice(self, msg):
         for tag in msg.tags:
@@ -199,9 +199,7 @@ class IRC(irc.client.SimpleIRCClient):
         msg_handler = TwitchMessageHandler(queue, self.twitch_queue,
                                            irc_class=self,
                                            nick=self.nick,
-                                           bttv=kwargs.get('bttv_smiles_dict', {}),
-                                           badges=kwargs.get('badges', {}),
-                                           custom_badges=kwargs.get('custom_badges', {}))
+                                           **kwargs)
         msg_handler.start()
 
     def system_message(self, message):
@@ -258,7 +256,7 @@ class IRC(irc.client.SimpleIRCClient):
 
 
 class twThread(threading.Thread):
-    def __init__(self, queue, host, port, channel, bttv_smiles, anon=True):
+    def __init__(self, queue, host, port, channel, bttv_smiles, anon=True, **kwargs):
         threading.Thread.__init__(self)
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -270,7 +268,7 @@ class twThread(threading.Thread):
         self.port = port
         self.channel = channel
         self.bttv_smiles = bttv_smiles
-        self.kwargs = {}
+        self.kwargs = kwargs
         if bttv_smiles:
             self.kwargs['bttv_smiles_dict'] = {}
 
@@ -383,15 +381,31 @@ class twitch(ChatModule):
              'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
              'parser': config,
              'config': CONF_DICT,
-             'gui': CONF_GUI})
+             'gui': CONF_GUI,
+             'settings': {}})
 
         self.queue = queue
         self.host = CONF_DICT['config']['host']
         self.port = int(CONF_DICT['config']['port'])
         self.channel = CONF_DICT['config']['channel']
         self.bttv = CONF_DICT['config']['bttv']
+        self.loaded_modules = None
 
     def load_module(self, *args, **kwargs):
         # Creating new thread with queue in place for messaging transfers
-        tw = twThread(self.queue, self.host, self.port, self.channel, self.bttv)
+        self.loaded_modules = kwargs.get('loaded_modules')
+        if 'webchat' in self.loaded_modules:
+            self.loaded_modules['webchat']['class'].add_depend('twitch')
+        self._conf_params['settings']['remove_text'] = self.get_remove_text()
+        tw = twThread(self.queue, self.host, self.port, self.channel, self.bttv,
+                      settings=self._conf_params['settings'])
         tw.start()
+
+    def get_remove_text(self):
+        if self.loaded_modules['webchat']['style_settings']['keys'].get('remove_message'):
+            return self.loaded_modules['webchat']['style_settings']['keys'].get('remove_text')
+        return None
+
+    def apply_settings(self, **kwargs):
+        if 'webchat' in kwargs.get('from_depend', []):
+            self._conf_params['settings']['remove_text'] = self.get_remove_text()

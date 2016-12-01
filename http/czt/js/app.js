@@ -111,6 +111,9 @@
                 });
             },
             replaceBttvEmoticons: function (message, emotes) {
+                if (!emotes || emotes.length <= 0) {
+                    return message;
+                }
                 return message.replace(/(^| )?(\S+)?( |$)/g, function (code, b1, emote_key, b2) {
                     for (var emote in emotes) {
                         if (emotes[emote].emote_id == emote_key && emotes[emote].emote_url) {
@@ -121,6 +124,9 @@
                 });
             },
             replaceDefaultEmotions: function (message, emotes) {
+                if (!emotes || emotes.length <= 0) {
+                    return message;
+                }
                 return message.replace(/:(\w+|\d+):/g, function (code, emote_key) {
                     for (var emote in emotes) {
                         if (!!emotes[emote] && emotes[emote]['emote_id'] == emote_key) {
@@ -155,16 +161,24 @@
                     var user = message.user.toLowerCase();
                     var index = usernames.indexOf(user);
 
-                    if (index >= 0)
+                    if (index >= 0) {
                         message.text = command.text;
+                        delete message.emotes;
+                        delete message.bttv_emotes;
+                    }
+                    return message;
                 });
             },
             replaceByIds: function (command) {
                 this.messages = this.messages.map(function (message) {
                     var index = command.ids.indexOf(message.id);
 
-                    if (index >= 0)
+                    if (index >= 0) {
                         message.text = command.text;
+                        delete message.emotes;
+                        delete message.bttv_emotes;
+                    }
+                    return message;
                 });
             },
             run: function (message) {

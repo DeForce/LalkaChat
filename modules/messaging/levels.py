@@ -133,8 +133,7 @@ class levels(MessagingModule):
                 self.levels.append(level_data.attrib)
 
     def apply_settings(self, **kwargs):
-        from_depend = kwargs.get('from_depend')
-        if 'webchat' in from_depend:
+        if 'webchat' in kwargs.get('from_depend', []):
             self.load_levels()
 
     def set_level(self, user, queue):

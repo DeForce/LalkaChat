@@ -20,12 +20,14 @@ TRANSLATION_FILETYPE = '.key'
 DEFAULT_LANGUAGE = 'en'
 ACTIVE_LANGUAGE = None
 
+REPLACE_SYMBOLS = '<>'
+
 
 def system_message(message, queue, source=SOURCE, icon=SOURCE_ICON, from_user=SOURCE_USER):
     queue.put({'source': source,
                'source_icon': icon,
                'user': from_user,
-               'text': message,
+               'text': cleanup_tags(message),
                'type': 'system_message'})
 
 
@@ -95,5 +97,31 @@ def translate(text):
     pass
 
 
+def cleanup_tags(message):
+    for symbol in REPLACE_SYMBOLS:
+        message.replace(symbol, '\{0}'.format(symbol))
+    return message
+
+
 def random_string(length):
     return ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(length))
+
+
+def remove_message_by_user(user, text=None):
+    command = {'type': 'command',
+               'command': 'remove_by_user',
+               'user': user}
+    if text:
+        command['text'] = text
+        command['command'] = 'replace_by_user'
+    return command
+
+
+def remove_message_by_id(ids, text=None):
+    command = {'type': 'command',
+               'command': 'remove_by_id',
+               'ids': ids}
+    if text:
+        command['text'] = text
+        command['command'] = 'replace_by_id'
+    return command

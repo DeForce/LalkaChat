@@ -5,13 +5,14 @@ import Queue
 import socket
 import cherrypy
 import logging
+from xml.sax.saxutils import escape
 from collections import OrderedDict
 from jinja2 import Template
 from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from modules.helper.parser import load_from_config_file, save_settings
-from modules.helper.system import THREADS
+from modules.helper.system import THREADS, cleanup_tags
 from modules.helper.module import MessagingModule
 from gui import MODULE_KEY
 from main import PYTHON_FOLDER, CONF_FOLDER
@@ -35,12 +36,18 @@ class MessagingThread(threading.Thread):
     def run(self):
         while self.running:
             message = s_queue.get()
+            if 'text' in message:
+                message['text'] = escape(message['text'])
+
+            if message['type'] in HISTORY_TYPES:
+                cherrypy.engine.publish('add-history', message)
+            elif message['type'] == 'command':
+                cherrypy.engine.publish('process-command', message['command'], message)
+
             if message['type'] == 'system_message' and not self.settings['show_system_msg']:
                 continue
 
             cherrypy.engine.publish('websocket-broadcast', json.dumps(message))
-            if message['type'] in HISTORY_TYPES:
-                cherrypy.engine.publish('add-history', message)
         log.info("Messaging thread stopping")
 
     def stop(self):
@@ -61,7 +68,7 @@ class FireFirstMessages(threading.Thread):
             for item in self.history:
                 if item['type'] == 'system_message' and not show_system_msg:
                     continue
-                self.ws.send(json.dumps(item))
+                self.ws.send(escape(json.dumps(item)))
 
 
 class WebChatSocketServer(WebSocket):
@@ -101,6 +108,7 @@ class WebChatPlugin(WebSocketPlugin):
         self.bus.subscribe('del-client', self.del_client)
         self.bus.subscribe('add-history', self.add_history)
         self.bus.subscribe('get-history', self.get_history)
+        self.bus.subscribe('process-command', self.process_command)
 
     def stop(self):
         WebSocketPlugin.stop(self)
@@ -109,6 +117,7 @@ class WebChatPlugin(WebSocketPlugin):
         self.bus.unsubscribe('del-client', self.del_client)
         self.bus.unsubscribe('add-history', self.add_history)
         self.bus.unsubscribe('get-history', self.get_history)
+        self.bus.ubsubscribe('process-command', self.process_command)
 
     def add_client(self, addr, websocket):
         self.clients.append({'ip': addr[0], 'port': addr[1], 'websocket': websocket})
@@ -120,7 +129,6 @@ class WebChatPlugin(WebSocketPlugin):
             pass
 
     def add_history(self, message):
-        message['history'] = True
         self.history.append(message)
         if len(self.history) > self.history_size:
             self.history.pop(0)
@@ -130,6 +138,48 @@ class WebChatPlugin(WebSocketPlugin):
 
     def get_history(self):
         return self.history
+
+    def process_command(self, command, values):
+        if command == 'remove_by_id':
+            self._remove_by_id(values['ids'])
+        elif command == 'remove_by_user':
+            self._remove_by_user(values['user'])
+        elif command == 'replace_by_id':
+            self._replace_by_id(values['ids'])
+        elif command == 'replace_by_user':
+            self._replace_by_user(values['user'])
+
+    def _remove_by_id(self, ids):
+        for item in ids:
+            for message in self.history:
+                if message.get('id') == item:
+                    self.history.remove(message)
+
+    def _remove_by_user(self, users):
+        for item in users:
+            for message in reversed(self.history):
+                if message.get('item') == item:
+                    self.history.remove(message)
+
+    def _replace_by_id(self, ids):
+        for item in ids:
+            for index, message in enumerate(self.history):
+                if message.get('id') == item:
+                    self.history[index]['text'] = self.style_settings['keys']['remove_text']
+                    if 'emotes' in self.history[index]:
+                        del self.history[index]['emotes']
+                    if 'bttv_emotes' in self.history[index]:
+                        del self.history[index]['bttv_emotes']
+
+    def _replace_by_user(self, users):
+        for item in users:
+            for index, message in enumerate(self.history):
+                if message.get('user') == item:
+                    self.history[index]['text'] = self.style_settings['keys']['remove_text']
+                    if 'emotes' in self.history[index]:
+                        del self.history[index]['emotes']
+                    if 'bttv_emotes' in self.history[index]:
+                        del self.history[index]['bttv_emotes']
 
 
 class RestRoot(object):
@@ -386,6 +436,7 @@ class webchat(MessagingModule):
         if os.path.exists(file_path):
             with open(file_path, 'r') as style_file:
                 self._conf_params['style_settings']['keys'].update(json.loads(style_file.read()))
+
         self._conf_params['style_settings']['keys'].update(self._conf_params['config']['style_settings'])
         self._conf_params['config']['style_settings'].update(self._conf_params['style_settings']['keys'])
 
