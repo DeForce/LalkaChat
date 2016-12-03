@@ -9,7 +9,7 @@ import re
 import logging
 from collections import OrderedDict
 from modules.helper.parser import load_from_config_file
-from modules.helper.system import system_message, translate_key, remove_message_by_id
+from modules.helper.system import system_message, translate_key, remove_message_by_id, EMOTE_FORMAT
 from modules.helper.module import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 from gui import MODULE_KEY
@@ -79,46 +79,14 @@ class GoodgameMessageHandler(threading.Thread):
                 'source_icon': SOURCE_ICON,
                 'user': msg['data']['user_name'],
                 'text': msg['data']['text'],
-                'emotes': [],
+                'emotes': {},
                 'type': 'message'}
 
-        smiles_array = re.findall(self.smile_regex, comp['text'])
-        for smile in smiles_array:
-            if smile in self.smiles:
-                smile_info = self.smiles.get(smile)
-                allow = False
-                gif = False
-                if msg['data']['user_rights'] >= 40:
-                    allow = True
-                elif msg['data']['user_rights'] >= 20 \
-                        and (smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603'):
-                    allow = True
-                elif smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603':
-                    if not smile_info['is_premium']:
-                        if smile_info['donate_lvl'] == 0:
-                            allow = True
-                        elif smile_info['donate_lvl'] <= int(msg['data']['payments']):
-                            allow = True
-                    else:
-                        if msg['data']['premium']:
-                            allow = True
-
-                for premium in msg['data']['premiums']:
-                    if smile_info['channel_id'] == str(premium):
-                        if smile_info['is_premium']:
-                            allow = True
-                            gif = True
-
-                if allow:
-                    if smile not in comp['emotes']:
-                        if gif and smile_info['urls']['gif']:
-                            comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['gif']})
-                        else:
-                            comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['big']})
+        self._process_smiles(comp, msg)
 
         if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):
             comp['pm'] = True
-        self.message_queue.put(comp)
+        self._send_message(comp)
 
     def _process_join(self):
         self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'join_success'])).format(self.nick))
@@ -159,6 +127,54 @@ class GoodgameMessageHandler(threading.Thread):
             self.chat_module.set_viewers(self.chat_module.get_viewers())
         except Exception as exc:
             log.exception(exc)
+
+    def _send_message(self, comp):
+        self._post_process_emotes(comp)
+        self.message_queue.put(comp)
+
+    @staticmethod
+    def _post_process_emotes(comp):
+        comp['text'] = re.sub(':(\w+|\d+):', EMOTE_FORMAT.format('\\1'), comp['text'])
+
+    def _process_smiles(self, comp, msg):
+        smiles_array = re.findall(self.smile_regex, comp['text'])
+        for smile in smiles_array:
+            if smile in self.smiles:
+                smile_info = self.smiles.get(smile)
+                allow = False
+                gif = False
+                if msg['data']['user_rights'] >= 40:
+                    allow = True
+                elif msg['data']['user_rights'] >= 20 \
+                        and (smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603'):
+                    allow = True
+                elif smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603':
+                    if not smile_info['is_premium']:
+                        if smile_info['donate_lvl'] == 0:
+                            allow = True
+                        elif smile_info['donate_lvl'] <= int(msg['data']['payments']):
+                            allow = True
+                    else:
+                        if msg['data']['premium']:
+                            allow = True
+
+                for premium in msg['data']['premiums']:
+                    if smile_info['channel_id'] == str(premium):
+                        if smile_info['is_premium']:
+                            allow = True
+                            gif = True
+
+                if allow:
+                    if smile not in comp['emotes']:
+                        if gif and smile_info['urls']['gif']:
+                            comp['emotes'][smile] = {'emote_url': smile_info['urls']['gif']}
+                        else:
+                            comp['emotes'][smile] = {'emote_url': smile_info['urls']['big']}
+        emotes_list = []
+        for emote, data in comp['emotes'].iteritems():
+            emotes_list.append({'emote_id': emote,
+                                'emote_url': data['emote_url']})
+        comp['emotes'] = emotes_list
 
 
 class GGChat(WebSocketClient):

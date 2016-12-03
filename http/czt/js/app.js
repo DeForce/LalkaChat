@@ -58,78 +58,14 @@
                 }
             },
             sanitize: function (message) {
-                var html = '';
-
-                switch (message.source) {
-                    case 'tw':
-                        html = this.replaceTwitchEmotions(message.text, message.emotes);
-
-                        if (message.hasOwnProperty('bttv_emotes')) {
-                            html = this.replaceBttvEmoticons(html, message.bttv_emotes);
-                        }
-                        break;
-                    case 'gg':
-                    case 'fs':
-                        html = this.replaceDefaultEmotions(message.text, message.emotes);
-                        break;
-                    default:
-                        html = message.text;
-                        break;
-                }
-
+                var html = this.replaceDefaultEmotions(message.text, message.emotes);
                 return Sanitizer.sanitize(html);
-            },
-            replaceTwitchEmotions: function (message, emotes) {
-                if (!emotes || emotes.length <= 0) {
-                    return message;
-                }
-                var placesToReplace = [];
-                for (var emote in emotes) {
-                    if (Array.isArray(emotes[emote]['emote_pos'])) {
-                        for (var i = 0; i < emotes[emote]['emote_pos'].length; ++i) {
-                            var range = emotes[emote]['emote_pos'][i];
-                            var rangeParts = range.split('-');
-                            placesToReplace.push({
-                                "emote_id": emotes[emote]['emote_id'],
-                                "from": parseInt(rangeParts[0]),
-                                "to": parseInt(rangeParts[1]) + 1
-                            });
-                        }
-                    }
-                }
-
-                placesToReplace.sort(function (first, second) {
-                    return second.from - first.from;
-                });
-
-                for (var iPlace = 0; iPlace < placesToReplace.length; iPlace++) {
-                    var place = placesToReplace[iPlace];
-                    message = message.substring(0, place.from) + "$emoticon#" + place.emote_id + "$" + message.substring(place.to);
-                }
-
-                return message.replace(/\$emoticon#(\d+)\$/g, function (code, emoteId) {
-                    var url = 'http://static-cdn.jtvnw.net/emoticons/v1/' + emoteId + '/1.0';
-                    return '<img class="smile" src="' + url + '" />';
-                });
-            },
-            replaceBttvEmoticons: function (message, emotes) {
-                if (!emotes || emotes.length <= 0) {
-                    return message;
-                }
-                return message.replace(/(^| )?(\S+)?( |$)/g, function (code, b1, emote_key, b2) {
-                    for (var emote in emotes) {
-                        if (emotes[emote].emote_id == emote_key && emotes[emote].emote_url) {
-                            return '<img class="smile" src="' + emotes[emote]['emote_url'] + '" />';
-                        }
-                    }
-                    return code;
-                });
             },
             replaceDefaultEmotions: function (message, emotes) {
                 if (!emotes || emotes.length <= 0) {
                     return message;
                 }
-                return message.replace(/:(\w+|\d+):/g, function (code, emote_key) {
+                return message.replace(/:emote;(\w+|\d+):/g, function (code, emote_key) {
                     for (var emote in emotes) {
                         if (!!emotes[emote] && emotes[emote]['emote_id'] == emote_key) {
                             return '<img class="smile" src="' + emotes[emote]['emote_url'] + '" />';

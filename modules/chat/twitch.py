@@ -10,7 +10,7 @@ from collections import OrderedDict
 import time
 from modules.helper.parser import load_from_config_file
 from modules.helper.module import ChatModule
-from modules.helper.system import system_message, translate_key, remove_message_by_user
+from modules.helper.system import system_message, translate_key, remove_message_by_user, EMOTE_FORMAT
 from gui import MODULE_KEY
 
 logging.getLogger('irc').setLevel(logging.ERROR)
@@ -20,6 +20,7 @@ headers = {'Client-ID': '5jwove9dketiiz2kozapz8rhjdsxqxc'}
 emote_bits_theme = 'dark'
 emote_bits_type = 'static'
 emote_bits_url = 'static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
+emote_smile_url = 'http://static-cdn.jtvnw.net/emoticons/v1/{id}/1.0'
 NOT_FOUND = 'none'
 SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
@@ -106,18 +107,20 @@ class TwitchMessageHandler(threading.Thread):
 
     @staticmethod
     def _handle_emotes(message, tag_value):
-        emotes_split = tag_value.split('/')
-        for emote in emotes_split:
-            emote_name, emote_pos_diap = emote.split(':')
-            emote_pos_list = emote_pos_diap.split(',')
-            message['emotes'].append({'emote_id': emote_name, 'emote_pos': emote_pos_list})
+        for emote in tag_value.split('/'):
+            emote_id, emote_pos_diap = emote.split(':')
+            message['emotes'].append({'emote_id': emote_id,
+                                      'positions': emote_pos_diap.split(','),
+                                      'emote_url': emote_smile_url.format(id=emote_id)})
 
     def _handle_bttv_smiles(self, message):
         for word in message['text'].split():
             if word in self.bttv:
                 bttv_smile = self.bttv.get(word)
-                message['bttv_emotes'].append({'emote_id': bttv_smile['regex'],
-                                               'emote_url': 'http:{0}'.format(bttv_smile['url'])})
+                message['bttv_emotes'][bttv_smile['regex']] = {
+                    'emote_id': bttv_smile['regex'],
+                    'emote_url': 'https:{0}'.format(bttv_smile['url'])
+                }
 
     def _handle_pm(self, message):
         if re.match('^@?{0}[ ,]?'.format(self.nick), message['text'].lower()):
@@ -142,7 +145,7 @@ class TwitchMessageHandler(threading.Thread):
                    'source_icon': SOURCE_ICON,
                    'badges': [],
                    'emotes': [],
-                   'bttv_emotes': [],
+                   'bttv_emotes': {},
                    'user': msg.source.split('!')[0],
                    'type': 'message',
                    'msg_type': msg.type}
@@ -150,6 +153,8 @@ class TwitchMessageHandler(threading.Thread):
         if message['user'] == 'twitchnotify':
             self.irc_class.system_message(msg.arguments.pop())
             return
+
+        message['text'] = msg.arguments.pop()
 
         for tag in msg.tags:
             tag_value, tag_key = tag.values()
@@ -160,19 +165,45 @@ class TwitchMessageHandler(threading.Thread):
             elif tag_key == 'emotes' and tag_value:
                 self._handle_emotes(message, tag_value)
 
-        # Then we comp the message and send it to queue for message handling.
-        message['text'] = msg.arguments.pop()
         self._handle_bttv_smiles(message)
         self._handle_pm(message)
 
         if sub_message:
             self._handle_sub_message(message)
 
-        self.message_queue.put(message)
+        self._send_message(message)
 
     @staticmethod
     def _handle_sub_message(message):
         message['sub_message'] = True
+
+    def _send_message(self, message):
+        self._post_process_emotes(message)
+        self._post_process_bttv_emotes(message)
+        self.message_queue.put(message)
+
+    @staticmethod
+    def _post_process_emotes(message):
+        conveyor_emotes = []
+        for emote in message['emotes']:
+            for position in emote['positions']:
+                start, end = position.split('-')
+                conveyor_emotes.append({'emote_id': emote['emote_id'],
+                                        'start': int(start),
+                                        'end': int(end)})
+        conveyor_emotes = sorted(conveyor_emotes, key=lambda k: k['start'], reverse=True)
+
+        for emote in conveyor_emotes:
+            message['text'] = u'{start}{emote}{end}'.format(start=message['text'][:emote['start']],
+                                                            end=message['text'][emote['end'] + 1:],
+                                                            emote=EMOTE_FORMAT.format(emote['emote_id']))
+
+    @staticmethod
+    def _post_process_bttv_emotes(message):
+        for emote, data in message['bttv_emotes'].iteritems():
+            message['text'] = message['text'].replace(emote, EMOTE_FORMAT.format(emote))
+            message['emotes'].append(data)
+        pass
 
 
 class TwitchPingHandler(threading.Thread):
