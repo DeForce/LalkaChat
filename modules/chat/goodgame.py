@@ -55,88 +55,110 @@ class GoodgameMessageHandler(threading.Thread):
             self.process_message(self.gg_queue.get())
 
     def process_message(self, msg):
-        if msg['type'] == "message":
-            # Getting all needed data from received message
-            # and sending it to queue for further message handling
-            comp = {'id': ID_PREFIX.format(msg['data']['message_id']),
-                    'source': self.source,
-                    'source_icon': SOURCE_ICON,
-                    'user': msg['data']['user_name'],
-                    'text': msg['data']['text'],
-                    'emotes': [],
-                    'type': 'message'}
+        message_type = msg['type']
+        if message_type == "message":
+            self._process_message(msg)
+        elif message_type == 'success_join':
+            self._process_join()
+        elif message_type == 'error':
+            self._process_error(msg)
+        elif message_type == 'user_warn':
+            self._process_user_warn(msg)
+        elif message_type == 'remove_message':
+            self._process_remove_message(msg)
+        elif message_type == 'user_ban':
+            self._process_user_ban(msg)
+        elif message_type == 'channel_counters':
+            self._process_channel_counters()
 
-            smiles_array = re.findall(self.smile_regex, comp['text'])
-            for smile in smiles_array:
-                if smile in self.smiles:
-                    smile_info = self.smiles.get(smile)
-                    allow = False
-                    gif = False
-                    if msg['data']['user_rights'] >= 40:
-                        allow = True
-                    elif msg['data']['user_rights'] >= 20 \
-                            and (smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603'):
-                        allow = True
-                    elif smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603':
-                        if not smile_info['is_premium']:
-                            if smile_info['donate_lvl'] == 0:
-                                allow = True
-                            elif smile_info['donate_lvl'] <= int(msg['data']['payments']):
-                                allow = True
+    def _process_message(self, msg):
+        # Getting all needed data from received message
+        # and sending it to queue for further message handling
+        comp = {'id': ID_PREFIX.format(msg['data']['message_id']),
+                'source': self.source,
+                'source_icon': SOURCE_ICON,
+                'user': msg['data']['user_name'],
+                'text': msg['data']['text'],
+                'emotes': [],
+                'type': 'message'}
+
+        smiles_array = re.findall(self.smile_regex, comp['text'])
+        for smile in smiles_array:
+            if smile in self.smiles:
+                smile_info = self.smiles.get(smile)
+                allow = False
+                gif = False
+                if msg['data']['user_rights'] >= 40:
+                    allow = True
+                elif msg['data']['user_rights'] >= 20 \
+                        and (smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603'):
+                    allow = True
+                elif smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603':
+                    if not smile_info['is_premium']:
+                        if smile_info['donate_lvl'] == 0:
+                            allow = True
+                        elif smile_info['donate_lvl'] <= int(msg['data']['payments']):
+                            allow = True
+                    else:
+                        if msg['data']['premium']:
+                            allow = True
+
+                for premium in msg['data']['premiums']:
+                    if smile_info['channel_id'] == str(premium):
+                        if smile_info['is_premium']:
+                            allow = True
+                            gif = True
+
+                if allow:
+                    if smile not in comp['emotes']:
+                        if gif and smile_info['urls']['gif']:
+                            comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['gif']})
                         else:
-                            if msg['data']['premium']:
-                                allow = True
+                            comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['big']})
 
-                    for premium in msg['data']['premiums']:
-                        if smile_info['channel_id'] == str(premium):
-                            if smile_info['is_premium']:
-                                allow = True
-                                gif = True
+        if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):
+            comp['pm'] = True
+        self.message_queue.put(comp)
 
-                    if allow:
-                        if smile not in comp['emotes']:
-                            if gif and smile_info['urls']['gif']:
-                                comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['gif']})
-                            else:
-                                comp['emotes'].append({'emote_id': smile, 'emote_url': smile_info['urls']['big']})
+    def _process_join(self):
+        self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'join_success'])).format(self.nick))
 
-            if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):
-                comp['pm'] = True
-            self.message_queue.put(comp)
-        elif msg['type'] == 'success_join':
-            self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'join_success'])).format(self.nick))
-        elif msg['type'] == 'error':
-            log.info("Received error message: {0}".format(msg))
-            if msg['data']['errorMsg'] == 'Invalid channel id':
-                self.ws_class.close(reason='INV_CH_ID')
-                log.error("Failed to find channel on GoodGame, please check channel name")
-        elif msg['type'] == 'user_warn':
-            self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'warning'])).format(
-                msg['data']['moder_name'], msg['data']['user_name']))
-        elif msg['type'] == 'remove_message':
-            remove_id = ID_PREFIX.format(msg['data']['message_id'])
-            self.message_queue.put(remove_message_by_id([remove_id], text=self.kwargs['settings'].get('remove_text')))
-        elif msg['type'] == 'user_ban':
-            if msg['data']['duration']:
-                self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'ban'])).format(
-                    msg['data']['moder_name'],
-                    msg['data']['user_name'],
-                    msg['data']['duration']/60,
-                    msg['data']['reason']))
+    def _process_error(self, msg):
+        log.info("Received error message: {0}".format(msg))
+        if msg['data']['errorMsg'] == 'Invalid channel id':
+            self.ws_class.close(reason='INV_CH_ID')
+            log.error("Failed to find channel on GoodGame, please check channel name")
+
+    def _process_user_warn(self, msg):
+        self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'warning'])).format(
+            msg['data']['moder_name'], msg['data']['user_name']))
+
+    def _process_remove_message(self, msg):
+        remove_id = ID_PREFIX.format(msg['data']['message_id'])
+        self.message_queue.put(remove_message_by_id([remove_id], text=self.kwargs['settings'].get('remove_text')))
+
+    def _process_user_ban(self, msg):
+        if msg['data']['duration']:
+            self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'ban'])).format(
+                msg['data']['moder_name'],
+                msg['data']['user_name'],
+                msg['data']['duration']/60,
+                msg['data']['reason']))
+        else:
+            if msg['data']['permanent']:
+                self.ws_class.system_message(
+                    translate_key(MODULE_KEY.join(['goodgame', 'ban_permanent'])).format(msg['data']['moder_name'],
+                                                                                         msg['data']['user_name']))
             else:
-                if msg['data']['permanent']:
-                    self.ws_class.system_message(
-                        translate_key(MODULE_KEY.join(['goodgame', 'ban_permanent'])).format(msg['data']['moder_name'],
-                                                                                             msg['data']['user_name']))
-                else:
-                    self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'unban'])).format(
-                        msg['data']['moder_name'],
-                        msg['data']['user_name']))
-        elif msg['type'] == 'channel_counters':
-            try:
-                self.chat_module.set_viewers(self.chat_module.get_viewers())
-            except Exception as exc:
-                log.exception(exc)
+                self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'unban'])).format(
+                    msg['data']['moder_name'],
+                    msg['data']['user_name']))
+
+    def _process_channel_counters(self):
+        try:
+            self.chat_module.set_viewers(self.chat_module.get_viewers())
+        except Exception as exc:
+            log.exception(exc)
 
 
 class GGChat(WebSocketClient):
