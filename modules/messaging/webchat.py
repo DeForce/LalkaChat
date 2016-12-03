@@ -5,6 +5,7 @@ import Queue
 import socket
 import cherrypy
 import logging
+import datetime
 from xml.sax.saxutils import escape
 from collections import OrderedDict
 from jinja2 import Template
@@ -36,6 +37,8 @@ class MessagingThread(threading.Thread):
     def run(self):
         while self.running:
             message = s_queue.get()
+            if 'timestamp' not in message:
+                message['timestamp'] = datetime.datetime.now().isoformat()
 
             if message['type'] in HISTORY_TYPES:
                 cherrypy.engine.publish('add-history', message)
@@ -66,6 +69,12 @@ class FireFirstMessages(threading.Thread):
             for item in self.history:
                 if item['type'] == 'system_message' and not show_system_msg:
                     continue
+                timestamp = datetime.datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S.%f")
+                timedelta = datetime.datetime.now() - timestamp
+                timer = self.settings['timer']
+                if timer > 0:
+                    if timedelta > datetime.timedelta(seconds=int(self.settings['timer'])):
+                        continue
                 self.ws.send(escape(json.dumps(item)))
 
 
