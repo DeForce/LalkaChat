@@ -44,7 +44,7 @@ LANGUAGE_DICT = {
 def get_update():
     github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"
     try:
-        update_json = requests.get(github_url)
+        update_json = requests.get(github_url, timeout=1)
         if update_json.status_code == 200:
             update = False
             update_url = None
@@ -111,6 +111,7 @@ def init():
     main_config_dict['gui']['gui'] = True
     main_config_dict['gui']['on_top'] = True
     main_config_dict['gui']['show_browser'] = True
+    main_config_dict['gui']['show_counters'] = True
     main_config_dict['gui']['reload'] = None
     main_config_dict['language'] = get_language()
 
@@ -226,6 +227,7 @@ def init():
                                main_config=loaded_modules['main'],
                                loaded_modules=loaded_modules,
                                queue=queue)
+        loaded_modules['gui'] = window.conf_params()
         window.start()
     try:
         while True:

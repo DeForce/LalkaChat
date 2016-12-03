@@ -16,9 +16,10 @@ logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
+FILE_ICON = os.path.join('img', 'fs.png')
 SYSTEM_USER = 'Funstream'
 
-PING_DELAY = 30
+PING_DELAY = 10
 
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
@@ -29,7 +30,8 @@ CONF_DICT['config']['socket'] = 'ws://funstream.tv/socket.io/'
 CONF_GUI = {
     'config': {
         'hidden': ['socket']},
-    'non_dynamic': ['config.*']}
+    'non_dynamic': ['config.*'],
+    'icon': FILE_ICON}
 
 
 class FsChat(WebSocketClient):
@@ -40,6 +42,7 @@ class FsChat(WebSocketClient):
         self.queue = queue
         self.channel_name = channel_name
         self.main_thread = kwargs.get('main_thread')  # type: FsThread
+        self.chat_module = kwargs.get('chat_module')
         self.crit_error = False
 
         self.channel_id = self.fs_get_id()
@@ -70,6 +73,7 @@ class FsChat(WebSocketClient):
         self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_success'])))
 
     def closed(self, code, reason=None):
+        self.chat_module.set_offline()
         if reason == 'INV_CH_ID':
             self.crit_error = True
         else:
@@ -122,8 +126,14 @@ class FsChat(WebSocketClient):
                         self.fs_join()
                         self.fs_ping()
                     elif dict_item == 'status':
-                        self.fs_system_message(
-                            translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.channel_name))
+                        if message['result']:
+                            result = message['result']
+                            if 'amount' in result:
+                                self.chat_module.set_viewers(result['amount'])
+                        else:
+                            self.chat_module.set_online()
+                            self.fs_system_message(
+                                translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.channel_name))
                     elif dict_item == 'id':
                         try:
                             self.duplicates.index(message[dict_item])
@@ -175,19 +185,26 @@ class FsChat(WebSocketClient):
         return None
 
     def fs_join(self):
-        # Because we need to iterate each message we iterate it!
-        iter_sio = "42"+str(self.iter)
-        self.iter += 1
-
         # Then we send the message acording to needed format and
         #  hope it joins us
         if self.channel_id:
-            join = str(iter_sio) + "[\"/chat/join\", " + json.dumps({'channel': "stream/" + str(self.channel_id)},
-                                                                    sort_keys=False) + "]"
-            self.send(join)
+            payload = [
+                '/chat/join',
+                {
+                    'channel': 'stream/{0}'.format(str(self.channel_id))
+                }
+            ]
+            self.fs_send(payload)
+
             msg_joining = translate_key(MODULE_KEY.join(['sc2tv', 'joining']))
             self.fs_system_message(msg_joining.format(self.channel_name))
             log.info(msg_joining.format(self.channel_id))
+
+    def fs_send(self, payload):
+        iter_sio = "42"+str(self.iter)
+        self.iter += 1
+        self.send('{iter}{payload}'.format(iter=iter_sio,
+                                           payload=json.dumps(payload)))
 
     def fs_ping(self):
         # Because funstream is not your normal websocket they
@@ -211,11 +228,12 @@ class FsPingThread(threading.Thread):
     def run(self):
         while not self.ws.terminated:
             self.ws.send("2")
+            self.ws.chat_module.get_viewers(self.ws)
             time.sleep(PING_DELAY)
 
 
 class FsThread(threading.Thread):
-    def __init__(self, queue, socket, channel_name):
+    def __init__(self, queue, socket, channel_name, **kwargs):
         threading.Thread.__init__(self)
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -225,6 +243,8 @@ class FsThread(threading.Thread):
         self.socket = socket
         self.channel_name = channel_name
         self.smiles = []
+        self.ws = None
+        self.kwargs = kwargs
 
     def run(self):
         self.connect()
@@ -244,14 +264,14 @@ class FsThread(threading.Thread):
                             self.smiles.append(smile)
                 except requests.ConnectionError:
                     log.error("Unable to get smiles")
-            ws = FsChat(self.socket, self.queue, self.channel_name, protocols=['websocket'], smiles=self.smiles,
-                        main_thread=self)
-            if ws.crit_error:
+            self.ws = FsChat(self.socket, self.queue, self.channel_name, protocols=['websocket'], smiles=self.smiles,
+                             main_thread=self, **self.kwargs)
+            if self.ws.crit_error:
                 log.critical("Got critical error, halting")
                 break
-            elif ws.channel_id and self.smiles:
-                ws.connect()
-                ws.run_forever()
+            elif self.ws.channel_id and self.smiles:
+                self.ws.connect()
+                self.ws.run_forever()
                 break
 
 
@@ -274,8 +294,21 @@ class sc2tv(ChatModule):
         self.queue = queue
         self.socket = CONF_DICT['config']['socket']
         self.channel_name = CONF_DICT['config']['channel_name']
+        self.fs_thread = None
 
     def load_module(self, *args, **kwargs):
+        ChatModule.load_module(self, *args, **kwargs)
         # Creating new thread with queue in place for messaging transfers
-        fs = FsThread(self.queue, self.socket, self.channel_name)
+        fs = FsThread(self.queue, self.socket, self.channel_name, chat_module=self)
+        self.fs_thread = fs
         fs.start()
+
+    @staticmethod
+    def get_viewers(ws):
+        request = [
+            '/chat/channel/list',
+            {
+                'channel': 'stream/{0}'.format(str(ws.channel_id))
+            }
+        ]
+        ws.fs_send(request)

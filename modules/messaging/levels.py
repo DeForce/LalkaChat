@@ -56,7 +56,6 @@ class levels(MessagingModule):
              'parser': config,
              'config': conf_dict,
              'gui': conf_gui})
-        self.loaded_modules = None
 
         self.conf_folder = None
         self.experience = None
@@ -70,12 +69,11 @@ class levels(MessagingModule):
         self.threshold_users = None
 
     def load_module(self, *args, **kwargs):
-        loaded_modules = kwargs.get('loaded_modules')
-        if 'webchat' not in loaded_modules:
+        MessagingModule.load_module(self, *args, **kwargs)
+        if 'webchat' not in self._loaded_modules:
             raise ModuleLoadException("Unable to find webchat module that is needed for level module")
         else:
-            loaded_modules['webchat']['class'].add_depend('levels')
-        self.loaded_modules = loaded_modules
+            self._loaded_modules['webchat']['class'].add_depend('levels')
 
         conf_folder = self._conf_params['folder']
         conf_dict = self._conf_params['config']
@@ -86,7 +84,7 @@ class levels(MessagingModule):
         self.exp_for_message = float(conf_dict['config'].get('exp_for_message'))
         self.level_file = os.path.abspath(
             os.path.join(
-                loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
+                self._loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
             )
         )
         self.levels = []
@@ -115,7 +113,7 @@ class levels(MessagingModule):
 
         self.level_file = os.path.abspath(
             os.path.join(
-                self.loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
+                self._loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
             )
         )
         tree = ElementTree.parse(self.level_file)

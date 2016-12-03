@@ -4,7 +4,9 @@ from parser import save_settings
 class BaseModule:
     def __init__(self, *args, **kwargs):
         self._conf_params = kwargs.get('conf_params', {})
+        self._loaded_modules = None
         self._rest_api = {}
+        self._module_name = self.__class__.__name__
 
     def conf_params(self):
         params = self._conf_params
@@ -12,7 +14,7 @@ class BaseModule:
         return params
 
     def load_module(self, *args, **kwargs):
-        pass
+        self._loaded_modules = kwargs.get('loaded_modules')
 
     def gui_button_press(self, *args):
         pass
@@ -47,3 +49,21 @@ class MessagingModule(BaseModule):
 class ChatModule(BaseModule):
     def __init__(self, *args, **kwargs):
         BaseModule.__init__(self, *args, **kwargs)
+
+    def set_viewers(self, viewers):
+        if 'gui' in self._loaded_modules:
+            gui_class = self._loaded_modules['gui']['class']
+            if gui_class.gui.status_frame:
+                gui_class.gui.status_frame.set_viewers(self._module_name, viewers)
+
+    def set_online(self):
+        if 'gui' in self._loaded_modules:
+            gui_class = self._loaded_modules['gui']['class']
+            if gui_class.gui.status_frame:
+                gui_class.gui.status_frame.set_online(self._module_name)
+
+    def set_offline(self):
+        if 'gui' in self._loaded_modules:
+            gui_class = self._loaded_modules['gui']['class']
+            if gui_class.gui.status_frame:
+                gui_class.gui.status_frame.set_offline(self._module_name)
