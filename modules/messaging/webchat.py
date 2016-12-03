@@ -71,9 +71,9 @@ class FireFirstMessages(threading.Thread):
                     continue
                 timestamp = datetime.datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S.%f")
                 timedelta = datetime.datetime.now() - timestamp
-                timer = self.settings['timer']
+                timer = int(self.settings['timer'])
                 if timer > 0:
-                    if timedelta > datetime.timedelta(seconds=int(self.settings['timer'])):
+                    if timedelta > datetime.timedelta(seconds=timer):
                         continue
                 self.ws.send(escape(json.dumps(item)))
 
