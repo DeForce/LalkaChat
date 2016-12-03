@@ -3,6 +3,6 @@
   "remove_text": "<message removed>", 
   "remove_message": true, 
   "font_size": "15", 
-  "timer": -1, 
+  "timer": "-1", 
   "smile_size": "20"
 }
