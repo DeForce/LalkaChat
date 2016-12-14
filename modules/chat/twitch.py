@@ -32,6 +32,7 @@ PING_DELAY = 10
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
+CONF_DICT['config']['show_pm'] = True
 CONF_DICT['config']['channel'] = 'CHANGE_ME'
 CONF_DICT['config']['bttv'] = True
 CONF_DICT['config']['host'] = 'irc.twitch.tv'
@@ -60,6 +61,7 @@ class TwitchMessageHandler(threading.Thread):
         self.bttv = kwargs.get('bttv_smiles_dict', {})
         self.badges = kwargs.get('badges')
         self.custom_badges = kwargs.get('custom_badges')
+        self.chat_module = kwargs.get('chat_module')
         self.kwargs = kwargs
 
     def run(self):
@@ -124,7 +126,8 @@ class TwitchMessageHandler(threading.Thread):
 
     def _handle_pm(self, message):
         if re.match('^@?{0}[ ,]?'.format(self.nick), message['text'].lower()):
-            message['pm'] = True
+            if self.chat_module.conf_params()['config']['config'].get('show_pm'):
+                message['pm'] = True
 
     def _handle_clearchat(self, msg):
         self.message_queue.put(remove_message_by_user(msg.arguments,

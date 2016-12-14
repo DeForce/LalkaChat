@@ -24,6 +24,7 @@ ID_PREFIX = 'gg_{0}'
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
+CONF_DICT['config']['show_pm'] = True
 CONF_DICT['config']['channel_name'] = 'CHANGE_ME'
 CONF_DICT['config']['socket'] = 'ws://chat.goodgame.ru:8081/chat/websocket'
 
@@ -85,7 +86,8 @@ class GoodgameMessageHandler(threading.Thread):
         self._process_smiles(comp, msg)
 
         if re.match('^{0},'.format(self.nick).lower(), comp['text'].lower()):
-            comp['pm'] = True
+            if self.chat_module.conf_params()['config']['config'].get('show_pm'):
+                comp['pm'] = True
         self._send_message(comp)
 
     def _process_join(self):
