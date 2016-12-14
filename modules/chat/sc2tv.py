@@ -24,6 +24,7 @@ PING_DELAY = 10
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
+CONF_DICT['config']['show_pm'] = True
 CONF_DICT['config']['channel_name'] = 'CHANGE_ME'
 CONF_DICT['config']['socket'] = 'ws://funstream.tv/socket.io/'
 
@@ -197,7 +198,8 @@ class FsChat(WebSocketClient):
             if message['to'] is not None:
                 comp['to'] = message['to']['name']
                 if comp['to'] == self.channel_name:
-                    comp['pm'] = True
+                    if self.chat_module.conf_params()['config']['config'].get('show_pm'):
+                        comp['pm'] = True
             else:
                 comp['to'] = None
 
