@@ -1,4 +1,5 @@
 import os
+import re
 import threading
 import json
 import Queue
@@ -6,7 +7,7 @@ import socket
 import cherrypy
 import logging
 import datetime
-from xml.sax.saxutils import escape
+from cgi import escape
 from collections import OrderedDict
 from jinja2 import Template
 from cherrypy.lib.static import serve_file
@@ -75,7 +76,7 @@ class FireFirstMessages(threading.Thread):
                 if timer > 0:
                     if timedelta > datetime.timedelta(seconds=timer):
                         continue
-                self.ws.send(escape(json.dumps(item)))
+                self.ws.send(json.dumps(item))
 
 
 class WebChatSocketServer(WebSocket):

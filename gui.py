@@ -815,6 +815,8 @@ class StatusFrame(wx.Panel):
         self.Refresh()
 
     def set_viewers(self, module, viewers):
+        if not viewers:
+            return
         if isinstance(viewers, int):
             viewers = str(viewers)
         if len(viewers) >= 5:

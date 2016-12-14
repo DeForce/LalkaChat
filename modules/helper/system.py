@@ -16,6 +16,7 @@ IGNORED_TYPES = ['command', 'system_message']
 TRANSLATIONS = {}
 SPLIT_TRANSLATION = '='
 MODULE_KEY = '.'
+EMOTE_FORMAT = u':emote;{0}:'
 TRANSLATION_FILETYPE = '.key'
 DEFAULT_LANGUAGE = 'en'
 ACTIVE_LANGUAGE = None
