@@ -1,3 +1,4 @@
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 from parser import save_settings
 
 

@@ -1,3 +1,4 @@
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import json
 import threading
 import time

@@ -1,5 +1,5 @@
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
-import re
 import threading
 import json
 import Queue
@@ -7,14 +7,13 @@ import socket
 import cherrypy
 import logging
 import datetime
-from cgi import escape
 from collections import OrderedDict
 from jinja2 import Template
 from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from modules.helper.parser import load_from_config_file, save_settings
-from modules.helper.system import THREADS, cleanup_tags
+from modules.helper.system import THREADS
 from modules.helper.module import MessagingModule
 from gui import MODULE_KEY
 from main import PYTHON_FOLDER, CONF_FOLDER

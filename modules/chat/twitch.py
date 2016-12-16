@@ -1,3 +1,4 @@
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import irc.client
 import threading
 import os
