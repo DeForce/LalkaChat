@@ -59,7 +59,7 @@ class FsChat(WebSocketClient):
 
     def opened(self):
         log.info("Websocket Connection Succesfull")
-        self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_success'])))
+        self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_success'])), category='connection')
 
     def closed(self, code, reason=None):
         self.chat_module.set_offline()
@@ -67,12 +67,12 @@ class FsChat(WebSocketClient):
             self.crit_error = True
         else:
             log.info("Websocket Connection Closed Down")
-            self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])))
+            self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])), category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
-    def fs_system_message(self, message):
-        system_message(message, self.queue, source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
+    def fs_system_message(self, message, category='system'):
+        system_message(message, self.queue, source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
 
     @staticmethod
     def allow_smile(smile, subscriptions):
@@ -139,7 +139,7 @@ class FsChat(WebSocketClient):
             self.fs_send(payload)
 
             msg_joining = translate_key(MODULE_KEY.join(['sc2tv', 'joining']))
-            self.fs_system_message(msg_joining.format(self.channel_name))
+            self.fs_system_message(msg_joining.format(self.channel_name), category='connection')
             log.info(msg_joining.format(self.channel_id))
 
     def fs_send(self, payload):
@@ -218,7 +218,7 @@ class FsChat(WebSocketClient):
     def _process_joined(self):
         self.chat_module.set_online()
         self.fs_system_message(
-            translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.channel_name))
+            translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.channel_name), category='connection')
 
     def _process_channel_list(self, message):
         self.chat_module.set_viewers(message['result']['amount'])

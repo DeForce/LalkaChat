@@ -91,7 +91,8 @@ class GoodgameMessageHandler(threading.Thread):
         self._send_message(comp)
 
     def _process_join(self):
-        self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'join_success'])).format(self.nick))
+        self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'join_success'])).format(self.nick),
+                                     category='connection')
 
     def _process_error(self, msg):
         log.info("Received error message: {0}".format(msg))
@@ -101,7 +102,7 @@ class GoodgameMessageHandler(threading.Thread):
 
     def _process_user_warn(self, msg):
         self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'warning'])).format(
-            msg['data']['moder_name'], msg['data']['user_name']))
+            msg['data']['moder_name'], msg['data']['user_name']), category='chat')
 
     def _process_remove_message(self, msg):
         remove_id = ID_PREFIX.format(msg['data']['message_id'])
@@ -113,16 +114,19 @@ class GoodgameMessageHandler(threading.Thread):
                 msg['data']['moder_name'],
                 msg['data']['user_name'],
                 msg['data']['duration']/60,
-                msg['data']['reason']))
+                msg['data']['reason']),
+                category='chat')
         else:
             if msg['data']['permanent']:
                 self.ws_class.system_message(
                     translate_key(MODULE_KEY.join(['goodgame', 'ban_permanent'])).format(msg['data']['moder_name'],
-                                                                                         msg['data']['user_name']))
+                                                                                         msg['data']['user_name']),
+                    category='chat'
+                )
             else:
                 self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'unban'])).format(
                     msg['data']['moder_name'],
-                    msg['data']['user_name']))
+                    msg['data']['user_name']), category='chat')
 
     def _process_channel_counters(self):
         try:
@@ -203,7 +207,7 @@ class GGChat(WebSocketClient):
             self.chat_module.set_viewers(self.chat_module.get_viewers())
         except Exception as exc:
             log.exception(exc)
-        self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])))
+        self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])), category='connection')
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
@@ -216,7 +220,7 @@ class GGChat(WebSocketClient):
         if 'INV_CH_ID' in reason:
             self.crit_error = True
         else:
-            self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_died'])))
+            self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_died'])), category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
@@ -224,9 +228,9 @@ class GGChat(WebSocketClient):
         # Deserialize message to json for easier parsing
         self.gg_queue.put(json.loads(str(mes)))
 
-    def system_message(self, msg):
+    def system_message(self, msg, category='system'):
         system_message(msg, self.queue, SOURCE,
-                       icon=SOURCE_ICON, from_user=SYSTEM_USER)
+                       icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
 
 
 class GGThread(threading.Thread):

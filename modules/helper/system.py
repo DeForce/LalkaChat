@@ -24,11 +24,12 @@ ACTIVE_LANGUAGE = None
 REPLACE_SYMBOLS = '<>'
 
 
-def system_message(message, queue, source=SOURCE, icon=SOURCE_ICON, from_user=SOURCE_USER):
+def system_message(message, queue, source=SOURCE, icon=SOURCE_ICON, from_user=SOURCE_USER, category='system'):
     queue.put({'source': source,
                'source_icon': icon,
                'user': from_user,
                'text': cleanup_tags(message),
+               'category': category,
                'type': 'system_message'})
 
 
