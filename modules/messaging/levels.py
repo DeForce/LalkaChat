@@ -174,7 +174,7 @@ class levels(MessagingModule):
                 self._conf_params['config']['config']['message'].decode('utf-8').format(
                     user,
                     self.levels[max_level]['name']),
-                queue
+                queue, category='module'
             )
         cursor.close()
         return self.levels[max_level]

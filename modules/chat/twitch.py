@@ -138,7 +138,7 @@ class TwitchMessageHandler(threading.Thread):
             tag_value, tag_key = tag.values()
             if tag_key == 'system-msg':
                 msg_text = tag_value
-                self.irc_class.system_message(msg_text)
+                self.irc_class.system_message(msg_text, category='chat')
                 break
         if msg.arguments:
             self._handle_message(msg, sub_message=True)
@@ -154,7 +154,7 @@ class TwitchMessageHandler(threading.Thread):
                    'msg_type': msg.type}
 
         if message['user'] == 'twitchnotify':
-            self.irc_class.system_message(msg.arguments.pop())
+            self.irc_class.system_message(msg.arguments.pop(), category='chat')
             return
 
         message['text'] = msg.arguments.pop()
@@ -244,14 +244,14 @@ class IRC(irc.client.SimpleIRCClient):
                                                 **kwargs)
         self.msg_handler.start()
 
-    def system_message(self, message):
+    def system_message(self, message, category='system'):
         system_message(message, self.queue,
-                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER)
+                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
 
     def on_disconnect(self, connection, event):
         log.info("Connection lost")
         self.chat_module.set_offline()
-        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'connection_died'])))
+        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'connection_died'])), category='connection')
         timer = threading.Timer(5.0, self.reconnect,
                                 args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
         timer.start()
@@ -270,7 +270,8 @@ class IRC(irc.client.SimpleIRCClient):
     def on_welcome(self, connection, event):
         log.info("Welcome Received, joining {0} channel".format(self.channel))
         self.tw_connection = connection
-        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'joining'])).format(self.channel))
+        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'joining'])).format(self.channel),
+                            category='connection')
         self.chat_module.set_online()
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilities (Twitch color, Display Name,
@@ -284,7 +285,7 @@ class IRC(irc.client.SimpleIRCClient):
     def on_join(self, connection, event):
         msg = translate_key(MODULE_KEY.join(['twitch', 'join_success'])).format(self.channel)
         log.info(msg)
-        self.system_message(msg)
+        self.system_message(msg, category='connection')
 
     def on_pubmsg(self, connection, event):
         self.twitch_queue.put(event)
