@@ -12,7 +12,7 @@ body {
 }
 
 .message {
-    background-color: rgba( 35, 35, 37, 0.627451);
+    background-color: rgba( 35, 35, 37, {{ message_opacity|float / 100.00 }});
     word-wrap: break-word;
     text-shadow: 0 1px 1px black;
     font-family: 'Consolas', serif;
@@ -50,8 +50,8 @@ body {
     border-width: 2px;
     border-style: solid;
     /*margin: -3px;*/
-    width: 16px;
-    height: 16px;
+    width: {{ badge_size }}px;
+    height: {{ badge_size }}px;
     /*padding: 2px;*/
     border-radius: 5px;
 }

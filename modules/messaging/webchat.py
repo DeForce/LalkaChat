@@ -442,7 +442,8 @@ class webchat(MessagingModule):
         file_path = self._conf_params['style_settings']['settings_location']
         if os.path.exists(file_path):
             with open(file_path, 'r') as style_file:
-                self._conf_params['style_settings']['keys'].update(json.loads(style_file.read()))
+                self._conf_params['style_settings']['keys'].update(json.loads(style_file.read(),
+                                                                              object_pairs_hook=OrderedDict))
 
         self._conf_params['style_settings']['keys'].update(self._conf_params['config']['style_settings'])
         self._conf_params['config']['style_settings'].update(self._conf_params['style_settings']['keys'])
