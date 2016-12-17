@@ -59,7 +59,11 @@
             },
             sanitize: function (message) {
                 var html = this.replaceDefaultEmotions(message.text, message.emotes);
-                return Sanitizer.sanitize(html);
+                var clean = Sanitizer.sanitize(html);
+
+                if (!clean) this.remove(message);
+
+                return clean;
             },
             replaceDefaultEmotions: function (message, emotes) {
                 if (!emotes || emotes.length <= 0) {
@@ -196,4 +200,6 @@
         },
         filters: {}
     });
+
+    window.Model = viewModel;
 })(window.WebSocket, window.Vue, window.DOMPurify);
