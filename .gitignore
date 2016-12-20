@@ -1,5 +1,5 @@
 *.pyc
-.idea/*
+.idea/
 /logs
 levels.db*
 /build
@@ -9,6 +9,4 @@ levels.db*
 *.spec
 *.log
 govno_rutony.py
-http/**/js/purify.min.js
-http/**/js/vue.min.js
-
+/node_modules/
