@@ -318,12 +318,25 @@ class sc2tv(ChatModule):
         self.fs_thread = fs
         fs.start()
 
-    @staticmethod
-    def get_viewers(ws):
-        request = [
-            '/chat/channel/list',
-            {
-                'channel': 'stream/{0}'.format(str(ws.channel_id))
-            }
-        ]
-        ws.fs_send(request)
+    def get_viewers(self, ws):
+        user_data = {'name': ws.channel_name}
+        status_data = {'slug': ws.channel_name}
+        request = ['/chat/channel/list', {'channel': 'stream/{0}'.format(str(ws.channel_id))}]
+
+        try:
+            user_request = requests.post('http://funstream.tv/api/user', timeout=5, data=user_data)
+            if user_request.status_code == 200:
+                status_data['slug'] = user_request.json()['slug']
+        except requests.ConnectionError:
+            log.error("Unable to get smiles")
+
+        try:
+            status_request = requests.post('http://funstream.tv/api/stream', timeout=5, data=status_data)
+            if status_request.status_code == 200:
+                if status_request.json()['online']:
+                    ws.fs_send(request)
+                else:
+                    self.set_viewers('N/A')
+
+        except requests.ConnectionError:
+            log.error("Unable to get smiles")

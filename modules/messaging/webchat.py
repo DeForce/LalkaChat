@@ -18,6 +18,7 @@ from modules.helper.module import MessagingModule
 from gui import MODULE_KEY
 from main import PYTHON_FOLDER, CONF_FOLDER
 
+DEFAULT_STYLE = 'default'
 DEFAULT_PRIORITY = 9001
 HISTORY_SIZE = 20
 HISTORY_TYPES = ['system_message', 'message']
@@ -388,12 +389,11 @@ class webchat(MessagingModule):
 
     @staticmethod
     def get_style_path(style):
-        fallback_style = 'czt'
         path = os.path.abspath(os.path.join(HTTP_FOLDER, style))
         if os.path.exists(path):
             style_location = path
         else:
-            style_location = os.path.join(HTTP_FOLDER, fallback_style)
+            style_location = os.path.join(HTTP_FOLDER, DEFAULT_STYLE)
         return style_location
 
     def reload_chat(self):

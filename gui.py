@@ -226,9 +226,9 @@ class SettingsWindow(wx.Frame):
             main_tuple = []
             for item, i_value in self.main_class.loaded_modules[split_keys[0]]['config'][split_keys[1]].iteritems():
                 if i_value:
-                    main_tuple.append((item, i_value))
+                    main_tuple.append((item.decode('utf-8'), i_value.decode('utf-8')))
                 else:
-                    main_tuple.append((item,))
+                    main_tuple.append((item.decode('utf-8'),))
 
             if compare_2d_lists(value, main_tuple):
                 clear_changes()
@@ -821,7 +821,7 @@ class StatusFrame(wx.Panel):
         if isinstance(viewers, int):
             viewers = str(viewers)
         if len(viewers) >= 5:
-            viewers = '{0}k'.format(viewers[:2])
+            viewers = '{0}k'.format(viewers[:-3])
         self.chats[module]['label'].SetLabel(str(viewers))
         self.Layout()
 
@@ -859,14 +859,17 @@ class ChatGui(wx.Frame):
             vbox.Add(self.status_frame, 0, wx.EXPAND)
         if self.gui_settings['show_browser']:
             vbox.Add(chromectrl.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False), 1, wx.EXPAND)
-        else:
-            self.Fit()
 
         # Set events
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
         # Show window after creation
         self.SetSizer(vbox)
+
+        if not self.gui_settings['show_browser']:
+            self.Layout()
+            self.Fit()
+
         self.Show(True)
 
         # Show update dialog if new version found

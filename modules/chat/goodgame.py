@@ -10,7 +10,7 @@ import re
 import logging
 from collections import OrderedDict
 from modules.helper.parser import load_from_config_file
-from modules.helper.system import system_message, translate_key, remove_message_by_id, EMOTE_FORMAT
+from modules.helper.system import system_message, translate_key, remove_message_by_id, EMOTE_FORMAT, NA_MESSAGE
 from modules.helper.module import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 from gui import MODULE_KEY
@@ -347,7 +347,11 @@ class goodgame(ChatModule):
         try:
             request = requests.get(streams_url)
             if request.status_code == 200:
-                return request.json().get('player_viewers')
+                json_data = request.json()
+                if json_data['status'] == 'Live':
+                    return request.json().get('player_viewers')
+                else:
+                    return NA_MESSAGE
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:

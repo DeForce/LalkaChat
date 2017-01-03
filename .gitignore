@@ -10,3 +10,4 @@ levels.db*
 *.log
 govno_rutony.py
 /node_modules/
+/http
