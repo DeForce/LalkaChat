@@ -10,7 +10,7 @@
 
     <body>
         <div id="chat-container">
-            <div class="message" v-for="message in messages" :class="{ 'sub-message': message && message.sub_message }" @mouseenter="mouseenter(message)" @mouseleave="mouseleave(message)">
+            <div class="message" v-for="message in messages" v-if="message" :class="{ 'sub-message': message && message.sub_message }" @mouseenter="mouseenter(message)" @mouseleave="mouseleave(message)">
                 <transition name="show-del">
                     <div class="message-remove" v-if="message && message.deleteButton">
                         <img class="delete" @click="remove(message)" :src="'img/gui/delete.png'" />

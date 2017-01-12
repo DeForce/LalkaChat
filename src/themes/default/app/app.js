@@ -17,7 +17,8 @@ const DOMPurify = require('dompurify');
                 socket: socket,
                 attempts: 0,
                 socketInterval: null,
-                messagesInterval: -1
+                messagesInterval: -1,
+                messagesLimit: 30
             }
         },
         created: function () {
@@ -106,9 +107,10 @@ const DOMPurify = require('dompurify');
 
                     if (index >= 0) {
                         message.text = command.text;
-                        delete message.emotes;
-                        delete message.bttv_emotes;
+                        message.emotes = [];
+                        message.bttv_emotes = {};
                     }
+
                     return message;
                 });
             },
@@ -161,6 +163,9 @@ const DOMPurify = require('dompurify');
                         message.time = new Date();
                         message.deleteButton = false;
                         this.messages.push(message);
+                        if (this.messages.length > this.messagesLimit) {
+                            this.remove(this.messages[0]);
+                        }
                 }
             },
             onopen: function () {
