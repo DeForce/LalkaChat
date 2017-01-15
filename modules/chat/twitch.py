@@ -11,7 +11,7 @@ from collections import OrderedDict
 import time
 from modules.helper.parser import load_from_config_file
 from modules.helper.module import ChatModule
-from modules.helper.system import system_message, translate_key, remove_message_by_user, EMOTE_FORMAT
+from modules.helper.system import system_message, translate_key, remove_message_by_user, EMOTE_FORMAT, NA_MESSAGE
 from gui import MODULE_KEY
 
 logging.getLogger('irc').setLevel(logging.ERROR)
@@ -452,7 +452,10 @@ class twitch(ChatModule):
         try:
             request = requests.get(streams_url, headers=headers)
             if request.status_code == 200:
-                return request.json()['stream'].get('viewers')
+                json_data = request.json()
+                if json_data['stream']:
+                    return request.json()['stream'].get('viewers', NA_MESSAGE)
+                return NA_MESSAGE
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:
