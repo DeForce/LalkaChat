@@ -17,7 +17,7 @@ from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys
 from modules.helper.module import BaseModule
 
-VERSION = '0.3.1'
+VERSION = '0.3.5'
 SEM_VERSION = semantic_version.Version(VERSION)
 if hasattr(sys, 'frozen'):
     PYTHON_FOLDER = os.path.dirname(sys.executable)
