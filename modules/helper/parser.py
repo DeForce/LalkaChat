@@ -1,47 +1,37 @@
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
 from ConfigParser import RawConfigParser
-from collections import OrderedDict
 
 
-def self_heal(conf_file, heal_dict):
-    heal_config = get_config(conf_file)
-    for section, section_value in heal_dict.items():
-        if not heal_config.has_section(section):
-            heal_config.add_section(section)
-        if type(section_value) in [OrderedDict, dict]:
-            if section_value:
-                for item, value in section_value.items():
-                    if not heal_config.has_option(section, item):
-                        heal_config.set(section, item, value)
-                for item, value in heal_config.items(section):
-                    heal_dict[section][item] = return_type(value)
-            else:
-                heal_dict[section] = OrderedDict()
-                for item, value in heal_config.items(section):
-                    heal_dict[section][item] = value
+def load_from_config_file(conf_file, conf_dict):
+    config_parser = get_config(conf_file)
+
+    for section in config_parser.sections():
+        if section not in conf_dict.keys():
+            continue
+
+        if isinstance(conf_dict[section], dict):
+            tmp_dict = {}
+            for item, value in config_parser.items(section):
+                tmp_dict[item] = return_type(value)
+            conf_dict[section].update(tmp_dict)
+        elif isinstance(conf_dict[section], list):
+            pass
         else:
-            if len(heal_config.items(section)) != 1:
-                for r_item, r_value in heal_config.items(section):
-                    heal_config.remove_option(section, r_item)
-                heal_config.set(section, section_value)
-            else:
-                heal_dict[section] = heal_config.items(section)[0][0]
-
-    heal_config.write(open(conf_file, 'w'))
-    return heal_config
+            conf_dict[section] = return_type(config_parser.items(section)[0][0])
+    return config_parser
 
 
 def return_type(item):
     if item:
-        try:
-            if isinstance(item, bool):
-                return item
-            return int(item)
-        except:
-            if item.lower() == 'true':
-                return True
-            elif item.lower() == 'false':
-                return False
+        if isinstance(item, bool):
+            return item
+        elif isinstance(item, int):
+            return str(item)
+        elif item.lower() == 'true':
+            return True
+        elif item.lower() == 'false':
+            return False
     return item
 
 
@@ -54,3 +44,30 @@ def get_config(conf_file):
     if os.path.exists(conf_file):
         heal_config.read(conf_file)
     return heal_config
+
+
+def save_settings(conf_dict, ignored_sections=()):
+    if 'parser' not in conf_dict:
+        return
+    if 'config' not in conf_dict:
+        return
+
+    parser = conf_dict.get('parser')  # type: RawConfigParser
+    config = conf_dict.get('config')
+
+    for section, section_object in config.iteritems():
+        if section in ignored_sections:
+            continue
+
+        if parser.has_section(section):
+            parser.remove_section(section)
+        parser.add_section(section)
+
+        if isinstance(section_object, dict):
+            for item, value in section_object.iteritems():
+                parser.set(section, item, value)
+        else:
+            parser.set(section, section_object)
+
+    with open(conf_dict.get('file'), 'w+') as conf_file:
+        parser.write(conf_file)

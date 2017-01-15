@@ -1,5 +1,6 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
 import imp
 import Queue
@@ -12,10 +13,11 @@ import requests
 import semantic_version
 import locale
 from collections import OrderedDict
-from modules.helper.parser import self_heal
+from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys
+from modules.helper.module import BaseModule
 
-VERSION = '0.3.1'
+VERSION = '0.3.5'
 SEM_VERSION = semantic_version.Version(VERSION)
 if hasattr(sys, 'frozen'):
     PYTHON_FOLDER = os.path.dirname(sys.executable)
@@ -43,7 +45,7 @@ LANGUAGE_DICT = {
 def get_update():
     github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"
     try:
-        update_json = requests.get(github_url)
+        update_json = requests.get(github_url, timeout=1)
         if update_json.status_code == 200:
             update = False
             update_url = None
@@ -65,6 +67,9 @@ def get_language():
 
 def init():
     def close():
+        for l_module, l_module_dict in loaded_modules.iteritems():
+            l_module_dict['class'].apply_settings(system_exit=True)
+
         if window:
             window.gui.on_close('Closing Program from console')
         else:
@@ -100,12 +105,14 @@ def init():
     main_config_dict = OrderedDict()
     main_config_dict['gui_information'] = OrderedDict()
     main_config_dict['gui_information']['category'] = 'main'
-    main_config_dict['gui_information']['width'] = 450
-    main_config_dict['gui_information']['height'] = 500
+    main_config_dict['gui_information']['width'] = '450'
+    main_config_dict['gui_information']['height'] = '500'
     main_config_dict['gui'] = OrderedDict()
     main_config_dict['gui']['show_hidden'] = False
     main_config_dict['gui']['gui'] = True
     main_config_dict['gui']['on_top'] = True
+    main_config_dict['gui']['show_browser'] = True
+    main_config_dict['gui']['show_counters'] = True
     main_config_dict['gui']['reload'] = None
     main_config_dict['language'] = get_language()
 
@@ -117,23 +124,29 @@ def init():
         },
         'non_dynamic': ['language.list_box', 'gui.*']
     }
-    config = self_heal(MAIN_CONF_FILE, main_config_dict)
+    config = load_from_config_file(MAIN_CONF_FILE, main_config_dict)
     # Adding config for main module
-    loaded_modules['main'] = {'folder': CONF_FOLDER,
-                              'file': main_config['main_conf_file_loc'],
-                              'filename': main_config['main_conf_file_name'],
-                              'parser': config,
-                              'root_folder': main_config['root_folder'],
-                              'logs_folder': LOG_FOLDER,
-                              'config': main_config_dict,
-                              'gui': main_config_gui}
+    main_class = BaseModule(
+        conf_params={
+            'folder': CONF_FOLDER,
+            'file': main_config['main_conf_file_loc'],
+            'filename': main_config['main_conf_file_name'],
+            'parser': config,
+            'root_folder': main_config['root_folder'],
+            'logs_folder': LOG_FOLDER,
+            'config': main_config_dict,
+            'gui': main_config_gui
+        }
+    )
+    loaded_modules['main'] = main_class.conf_params()
 
     gui_settings['gui'] = main_config_dict[GUI_TAG].get('gui')
     gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
     gui_settings['language'] = main_config_dict.get('language')
     gui_settings['show_hidden'] = main_config_dict[GUI_TAG].get('show_hidden')
-    gui_settings['size'] = (main_config_dict['gui_information'].get('width'),
-                            main_config_dict['gui_information'].get('height'))
+    gui_settings['size'] = (int(main_config_dict['gui_information'].get('width')),
+                            int(main_config_dict['gui_information'].get('height')))
+    gui_settings['show_browser'] = main_config_dict['gui'].get('show_browser')
 
     # Checking updates
     log.info("Checking for updates")
@@ -155,7 +168,6 @@ def init():
     log.info("Loading Chats")
     # Trying to dynamically load chats that are in config file.
     chat_modules = os.path.join(CONF_FOLDER, "chat_modules.cfg")
-    chat_tag = "chats"
     chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
     chat_conf_dict['gui_information'] = {'category': 'chat'}
@@ -168,14 +180,20 @@ def init():
             'check': os.path.sep.join(['modules', 'chat']),
             'file_extension': False},
         'non_dynamic': ['chats.list_box']}
-    chat_config = self_heal(chat_modules, chat_conf_dict)
-    loaded_modules['chat'] = {'folder': CONF_FOLDER, 'file': chat_modules,
-                              'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
-                              'parser': chat_config,
-                              'config': chat_conf_dict,
-                              'gui': chat_conf_gui}
+    chat_config = load_from_config_file(chat_modules, chat_conf_dict)
 
-    for module, settings in chat_config.items(chat_tag):
+    chat_module = BaseModule(
+        conf_params={
+            'folder': CONF_FOLDER, 'file': chat_modules,
+            'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
+            'parser': chat_config,
+            'config': chat_conf_dict,
+            'gui': chat_conf_gui
+        }
+    )
+    loaded_modules['chat'] = chat_module.conf_params()
+
+    for module, settings in chat_conf_dict['chats'].iteritems():
         log.info("Loading chat module: {0}".format(module))
         module_location = os.path.join(chat_location, module + ".py")
         if os.path.isfile(module_location):
@@ -187,7 +205,9 @@ def init():
 
             tmp = imp.load_source(module, module_location)
             chat_init = getattr(tmp, module)
-            class_module = chat_init(queue, PYTHON_FOLDER)
+            class_module = chat_init(queue, PYTHON_FOLDER,
+                                     conf_folder=CONF_FOLDER,
+                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(module)))
             loaded_modules[module] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")
@@ -208,6 +228,7 @@ def init():
                                main_config=loaded_modules['main'],
                                loaded_modules=loaded_modules,
                                queue=queue)
+        loaded_modules['gui'] = window.conf_params()
         window.start()
     try:
         while True:

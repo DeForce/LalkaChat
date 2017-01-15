@@ -1,14 +1,17 @@
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import threading
 from collections import OrderedDict
 
+import os
+import logging
 import webbrowser
 import wx
 import wx.grid
-import os
-import logging
 from ConfigParser import ConfigParser
 from cefpython3.wx import chromectrl
 from modules.helper.system import MODULE_KEY, translate_key
+from modules.helper.parser import return_type
+from modules.helper.module import BaseModule
 # ToDO: Support customization of borders/spacings
 # ToDO: Exit by cancel button
 
@@ -18,7 +21,7 @@ INFORMATION_TAG = 'gui_information'
 SECTION_GUI_TAG = '__gui'
 SKIP_TAGS = [INFORMATION_TAG]
 SKIP_TXT_CONTROLS = ['list_input', 'list_input2']
-SKIP_BUTTONS = ['list_add', 'list_remove', 'apply_button', 'cancel_button']
+SKIP_BUTTONS = ['list_add', 'list_remove', 'apply_button', 'cancel_button', 'ok_button']
 ITEM_SPACING_VERT = 6
 ITEM_SPACING_HORZ = 30
 
@@ -27,8 +30,6 @@ def get_id_from_name(name, error=False):
     for item, item_id in IDS.iteritems():
         if item_id == name:
             return item
-    if error:
-        raise ReferenceError
     return None
 
 
@@ -146,14 +147,16 @@ class SettingsWindow(wx.Frame):
         self.settings_saved = True
         self.tree_ctrl = None
         self.content_page = None
-        self.sizer_dict = {}
+        self.sizer_list = []
+        self.changes = {}
+        self.buttons = {}
 
         # Setting up the window
         self.SetBackgroundColour('cream')
         self.show_hidden = self.main_class.gui_settings.get('show_hidden')
 
         # Setting up events
-        self.Bind(wx.EVT_CLOSE, self.on_close_save)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
 
         styles = wx.DEFAULT_FRAME_STYLE
         if wx.STAY_ON_TOP & self.main_class.GetWindowStyle() == wx.STAY_ON_TOP:
@@ -168,31 +171,7 @@ class SettingsWindow(wx.Frame):
         self.Destroy()
 
     def on_close(self, event):
-        dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['main', 'quit'])),
-                                  caption="Caption",
-                                  style=wx.YES_NO | wx.CANCEL,
-                                  pos=wx.DefaultPosition)
-        response = dialog.ShowModal()
-
-        if response == wx.ID_YES:
-            self.on_exit(event)
-        else:
-            event.StopPropagation()
-
-    def on_close_save(self, event):
-        if not self.settings_saved:
-            dialog = wx.MessageDialog(self, message=translate_key(MODULE_KEY.join(['main', 'quit', 'nosave'])),
-                                      caption="Caption",
-                                      style=wx.YES_NO,
-                                      pos=wx.DefaultPosition)
-            response = dialog.ShowModal()
-
-            if response == wx.ID_YES:
-                self.on_exit(event)
-            else:
-                event.StopPropagation()
-        else:
-            self.on_exit(event)
+        self.on_exit(event)
 
     def on_listbox_change(self, event):
         item_object = event.EventObject
@@ -202,21 +181,118 @@ class SettingsWindow(wx.Frame):
         item_key = IDS[event.GetId()].split(MODULE_KEY)
         show_description = self.main_class.loaded_modules[item_key[0]]['gui'][item_key[1]].get('description', False)
 
+        if isinstance(item_object, KeyListBox):
+            self.on_change(IDS[event.GetId()], selection, item_type='listbox', section=True)
+
         if show_description:
             item_id_key = MODULE_KEY.join(item_key[:-1])
             descr_static_text = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([item_id_key, 'descr_explain'])))
             descr_static_text.SetLabel(description)
             descr_static_text.Wrap(descr_static_text.GetSize()[0])
 
+    def on_checklist_box_change(self, event):
+        window = event.EventObject
+        item_ids = window.GetChecked()
+        items_values = [window.get_key_from_index(item_id) for item_id in item_ids]
+        self.on_change(IDS[event.GetId()], items_values, item_type='listbox_check', section=True)
+
+    def on_change(self, key, value, item_type=None, section=False):
+        def compare_2d_lists(list1, list2):
+            return not set(map(tuple, list1)) ^ set(map(tuple, list2))
+
+        def apply_changes():
+            self.changes[key] = {'value': value, 'type': item_type}
+            self.buttons[MODULE_KEY.join(['settings', 'apply_button'])].Enable()
+
+        def clear_changes():
+            if key in self.changes:
+                self.changes.pop(key)
+            if not self.changes:
+                self.buttons[MODULE_KEY.join(['settings', 'apply_button'])].Disable()
+        split_keys = key.split(MODULE_KEY)
+        config = self.main_class.loaded_modules[split_keys[0]]['config']
+        if section:
+            if isinstance(value, list):
+                if set(config[split_keys[1]].keys()) != set(value):
+                    apply_changes()
+                else:
+                    clear_changes()
+            else:
+                if config[split_keys[1]].decode('utf-8') != return_type(value).decode('utf-8'):
+                    apply_changes()
+                else:
+                    clear_changes()
+        elif item_type == 'gridbox':
+            main_tuple = []
+            for item, i_value in self.main_class.loaded_modules[split_keys[0]]['config'][split_keys[1]].iteritems():
+                if i_value:
+                    main_tuple.append((item.decode('utf-8'), i_value.decode('utf-8')))
+                else:
+                    main_tuple.append((item.decode('utf-8'),))
+
+            if compare_2d_lists(value, main_tuple):
+                clear_changes()
+            else:
+                apply_changes()
+        else:
+            if isinstance(value, bool):
+                if config[split_keys[1]][split_keys[2]] != value:
+                    apply_changes()
+                else:
+                    clear_changes()
+            else:
+                if config[split_keys[1]][split_keys[2]] != return_type(value):
+                    apply_changes()
+                else:
+                    clear_changes()
+
+    def on_tree_ctrl_changed(self, event):
+        self.settings_saved = False
+        tree_ctrl = event.EventObject  # type: wx.TreeCtrl
+        selection = tree_ctrl.GetFocusedItem()
+        selection_text = tree_ctrl.GetItemData(selection).GetData()
+        key_list = selection_text.split(MODULE_KEY)
+
+        # Drawing page
+        self.fill_page_with_content(self.content_page, key_list[1], key_list[-1],
+                                    self.main_class.loaded_modules[key_list[-1]])
+
+        event.Skip()
+
+    def on_textctrl(self, event):
+        text_ctrl = event.EventObject
+        self.on_change(IDS[event.GetId()], text_ctrl.GetValue().encode('utf-8'), item_type='textctrl')
+        event.Skip()
+
+    def on_spinctrl(self, event):
+        spin_ctrl = event.EventObject
+        self.on_change(IDS[event.GetId()], str(spin_ctrl.GetValue()), item_type='spinctrl')
+        event.Skip()
+
+    def on_sliderctrl(self, event):
+        ctrl = event.EventObject
+        self.on_change(IDS[event.GetId()], str(ctrl.GetValue()), item_type='sliderctrl')
+        event.Skip()
+
+    def on_dropdown(self, event):
+        drop_ctrl = event.EventObject
+        self.on_change(IDS[event.GetId()], drop_ctrl.GetString(drop_ctrl.GetCurrentSelection()),
+                       item_type='dropctrl')
+        event.Skip()
+
+    def on_check_change(self, event):
+        check_ctrl = event.EventObject
+        self.on_change(IDS[event.GetId()], check_ctrl.IsChecked(), item_type='checkbox')
+        event.Skip()
+
     def create_layout(self):
         self.main_grid = wx.BoxSizer(wx.HORIZONTAL)
-        tree_ctrl_size = wx.Size(220, -1)
         style = wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_TWIST_BUTTONS | wx.TR_NO_LINES
         # style = wx.TR_HAS_BUTTONS | wx.TR_SINGLE | wx.TR_HIDE_ROOT
 
         tree_ctrl_id = id_renew('settings.tree', update=True)
         tree_ctrl = wx.TreeCtrl(self, id=tree_ctrl_id, style=style)
-        tree_ctrl.SetMinSize(tree_ctrl_size)
+        tree_ctrl.SetQuickBestSize(False)
         root_key = MODULE_KEY.join(['settings', 'tree', 'root'])
         root_node = tree_ctrl.AddRoot(translate_key(root_key))
         for item, value in self.categories.iteritems():
@@ -232,9 +308,10 @@ class SettingsWindow(wx.Frame):
                     f_item_data.SetData(f_item_key)
                     tree_ctrl.AppendItem(item_node, translate_key(f_item), data=f_item_data)
         tree_ctrl.ExpandAll()
+        tree_ctrl.SetMinSize(wx.Size(tree_ctrl.GetSize()[0] + 70, -1))
 
         self.tree_ctrl = tree_ctrl
-        self.Bind(wx.EVT_TREE_SEL_CHANGED, self.tree_ctrl_changed, id=tree_ctrl_id)
+        self.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_tree_ctrl_changed, id=tree_ctrl_id)
         self.main_grid.Add(self.tree_ctrl, 0, wx.EXPAND | wx.ALL, 7)
 
         content_page_id = id_renew(MODULE_KEY.join(['settings', 'content']))
@@ -246,31 +323,48 @@ class SettingsWindow(wx.Frame):
         tree_ctrl.SelectItem(tree_ctrl.GetFirstChild(root_node)[0])
 
     def fill_page_with_content(self, panel, setting_category, category_item, category_config):
-        def create_button(button_key, function):
+        def create_button(button_key, function, enabled=True):
             button_id = id_renew(button_key, update=True)
             c_button = wx.Button(panel, id=button_id, label=translate_key(button_key))
+            if not enabled:
+                c_button.Disable()
+            self.buttons[button_key] = c_button
             self.Bind(wx.EVT_BUTTON, function, id=button_id)
             return c_button
 
         page_sizer = panel.GetSizer()  # type: wx.Sizer
         if not page_sizer:
             page_sizer = wx.BoxSizer(wx.VERTICAL)
-        else:
-            page_sizer.DeleteWindows()
-
-        # Creating sizer for page
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        # Window for settings
-        sizer.Add(self.fill_sc_with_config(panel, category_config, category_item), 1, wx.EXPAND)
-        # Buttons
-        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        for button_name in ['apply_button', 'cancel_button']:
-            button_sizer.Add(create_button(MODULE_KEY.join([setting_category, category_item, button_name]),
+            panel.SetSizer(page_sizer)
+            # Buttons
+            button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            button_sizer.Add(create_button(MODULE_KEY.join(['settings', 'ok_button']),
                                            self.button_clicked), 0, wx.ALIGN_RIGHT)
-        sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT)
-        page_sizer.Add(sizer, 1, wx.EXPAND)
+            button_sizer.Add(create_button(MODULE_KEY.join(['settings', 'apply_button']),
+                                           self.button_clicked, enabled=False), 0, wx.ALIGN_RIGHT)
+            button_sizer.Add(create_button(MODULE_KEY.join(['settings', 'cancel_button']),
+                                           self.button_clicked), 0, wx.ALIGN_RIGHT)
+            page_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 4)
+        else:
+            children = page_sizer.GetChildren()
+            children_len = len(children)
+            for index, child in enumerate(children):
+                window = child.GetWindow() if child.GetWindow() else child.GetSizer()
+                if index < children_len - 1:
+                    page_sizer.Hide(window)
+
+        if category_item in self.sizer_list:
+            # +1 because we have button sizer
+            sizer_index = self.sizer_list.index(category_item)
+            page_sizer.Show(sizer_index)
+        else:
+            # Creating sizer for page
+            sizer = wx.BoxSizer(wx.VERTICAL)
+            # Window for settings
+            sizer.Add(self.fill_sc_with_config(panel, category_config, category_item), 1, wx.EXPAND)
+            page_sizer.Prepend(sizer, 1, wx.EXPAND)
+            self.sizer_list.insert(0, category_item)
         page_sizer.Layout()
-        panel.SetSizer(page_sizer)
         panel.Layout()
 
     def fill_sc_with_config(self, panel, category_config, category_item):
@@ -295,6 +389,16 @@ class SettingsWindow(wx.Frame):
             sizer.Add(static_sizer, 0, wx.EXPAND)
         page_sc_window.SetSizer(sizer)
         return page_sc_window
+
+    @staticmethod
+    def create_text(parent, key):
+        item_text = wx.StaticText(parent, label=translate_key(key))
+        item_text_box_ver = wx.BoxSizer(wx.VERTICAL)
+        item_text_box_ver.Add(item_text, 0, wx.EXPAND)
+
+        item_text_box_hor = wx.BoxSizer(wx.HORIZONTAL)
+        item_text_box_hor.Add(item_text, 1, wx.ALIGN_CENTER)
+        return item_text_box_hor
 
     def create_items(self, parent, key, section, section_gui):
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -403,14 +507,20 @@ class SettingsWindow(wx.Frame):
         if is_single:
             item_list_box = KeyListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
                                        choices=translated_items if translated_items else list_items, style=style)
+            item_list_box.Bind(wx.EVT_LISTBOX, self.on_listbox_change)
         else:
             item_list_box = KeyCheckListBox(parent, id=id_renew(item_key, update=True), keys=list_items,
                                             choices=translated_items if translated_items else list_items)
-        self.Bind(wx.EVT_LISTBOX, self.on_listbox_change, item_list_box)
+            item_list_box.Bind(wx.EVT_LISTBOX, self.on_listbox_change)
+            item_list_box.Bind(wx.EVT_CHECKLISTBOX, self.on_checklist_box_change)
 
         section_for = section if not is_single else {section: None}
         if is_single:
-            [item_list_box.SetSelection(list_items.index(item)) for item, value in section_for.items()]
+            item, value = section_for.items()[0]
+            if item not in item_list_box.GetItems():
+                item_list_box.SetSelection(0)
+            else:
+                item_list_box.SetSelection(list_items.index(item))
         else:
             check_items = [list_items.index(item) for item, value in section_for.items()]
             item_list_box.SetChecked(check_items)
@@ -434,24 +544,35 @@ class SettingsWindow(wx.Frame):
         return item_sizer
 
     def create_dropdown(self, parent, view, key, section, section_gui, section_item=False, short_key=None):
-        item_text = wx.StaticText(parent, label=translate_key(key),
-                                  style=wx.ALIGN_RIGHT)
         choices = section_gui.get('choices')
         key = key if section_item else MODULE_KEY.join([key, 'dropdown'])
         item_box = KeyChoice(parent, id=id_renew(key, update=True),
                              keys=choices, choices=choices)
+        item_box.Bind(wx.EVT_CHOICE, self.on_dropdown)
         item_value = section[short_key] if section_item else section
         item_box.SetSelection(choices.index(item_value))
-        return item_text, item_box
+        return self.create_text(parent, key), item_box
 
     def create_spin(self, parent, view, key, section, section_gui, section_item=False, short_key=None):
-        item_text = wx.StaticText(parent, label=translate_key(key),
-                                  style=wx.ALIGN_RIGHT)
         key = key if section_item else MODULE_KEY.join([key, 'spin'])
         value = short_key if section_item else section
         item_box = wx.SpinCtrl(parent, id=id_renew(key, update=True), min=section_gui['min'], max=section_gui['max'],
-                               initial=value)
-        return item_text, item_box
+                               initial=int(value))
+        item_box.Bind(wx.EVT_SPINCTRL, self.on_spinctrl)
+        item_box.Bind(wx.EVT_TEXT, self.on_spinctrl)
+        return self.create_text(parent, key), item_box
+
+    def create_slider(self, parent, view, key, section, section_gui, section_item=False, short_key=None):
+        key = key if section_item else MODULE_KEY.join([key, 'slider'])
+        value = short_key if section_item else section
+        item_box = wx.Slider(parent, id=id_renew(key, update=True),
+                             minValue=section_gui['min'], maxValue=section_gui['max'],
+                             value=int(value), style=wx.SL_LABELS | wx.SL_AUTOTICKS)
+        freq = (section_gui['max'] - section_gui['min'])/5
+        item_box.SetTickFreq(freq)
+        item_box.SetLineSize(4)
+        item_box.Bind(wx.EVT_SCROLL, self.on_sliderctrl)
+        return self.create_text(parent, key), item_box
 
     def create_item(self, parent, view, key, section, section_gui):
         flex_grid = wx.FlexGridSizer(0, 2, ITEM_SPACING_VERT, ITEM_SPACING_HORZ)
@@ -478,6 +599,11 @@ class SettingsWindow(wx.Frame):
                                                      section_item=True, short_key=section[item])
                     flex_grid.Add(text)
                     flex_grid.Add(control)
+                elif 'slider' in section_gui[item].get('view'):
+                    text, control = self.create_slider(parent, view, item_name, section, section_gui[item],
+                                                       section_item=True, short_key=section[item])
+                    flex_grid.Add(text, 1, wx.EXPAND | wx.ALIGN_CENTER)
+                    flex_grid.Add(control, 1, wx.EXPAND)
             else:
                 # Checking type of an item
                 style = wx.ALIGN_CENTER_VERTICAL
@@ -491,14 +617,15 @@ class SettingsWindow(wx.Frame):
                     item_box = wx.CheckBox(parent, id=id_renew(item_name, update=True),
                                            label=translate_key(item_name), style=style)
                     item_box.SetValue(value)
+                    item_box.Bind(wx.EVT_CHECKBOX, self.on_check_change)
                     flex_grid.Add(item_box, 0, wx.ALIGN_LEFT)
                     flex_grid.AddSpacer(wx.Size(0, 0))
                 else:  # TextCtrl
                     item_box = wx.TextCtrl(parent, id=id_renew(item_name, update=True),
                                            value=str(value).decode('utf-8'))
-                    item_text = wx.StaticText(parent, label=translate_key(item_name),
-                                              style=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_HORIZONTAL)
-                    flex_grid.Add(item_text)
+                    item_box.Bind(wx.EVT_TEXT, self.on_textctrl)
+                    item_text = self.create_text(parent, item_name)
+                    flex_grid.Add(item_text, 1, wx.EXPAND | wx.ALIGN_CENTER)
                     flex_grid.Add(item_box)
         flex_grid.Fit(parent)
         return flex_grid
@@ -509,56 +636,47 @@ class SettingsWindow(wx.Frame):
         keys = IDS[button_id].split(MODULE_KEY)
         if keys[-1] in ['list_add', 'list_remove']:
             self.list_operation(MODULE_KEY.join(keys[:-1]), action=keys[-1])
-        elif keys[-1] == 'apply_button':
-            module_name = MODULE_KEY.join(keys[1:-1])
-            if self.save_settings(module_name):
+        elif keys[-1] in ['ok_button', 'apply_button']:
+            if self.save_settings():
                 log.debug('Got non-dynamic changes')
                 dialog = wx.MessageDialog(self,
                                           message=translate_key(MODULE_KEY.join(['main', 'save', 'non_dynamic'])),
                                           caption="Caption",
                                           style=wx.OK_DEFAULT,
                                           pos=wx.DefaultPosition)
-                response = dialog.ShowModal()
-
-                if response == wx.ID_YES:
-                    self.on_exit(event)
-                else:
-                    event.StopPropagation()
-            module_class = self.main_class.loaded_modules[module_name].get('class')
-            if module_class:
-                module_class.apply_settings()
+                dialog.ShowModal()
+            if keys[-1] == 'ok_button':
+                self.on_exit(event)
             self.settings_saved = True
         elif keys[-1] == 'cancel_button':
             self.on_close(event)
         event.Skip()
 
-    def tree_ctrl_changed(self, event):
-        self.settings_saved = False
-        tree_ctrl = event.EventObject  # type: wx.TreeCtrl
-        selection = tree_ctrl.GetFocusedItem()
-        selection_text = tree_ctrl.GetItemData(selection).GetData()
-        key_list = selection_text.split(MODULE_KEY)
+    def save_settings(self):
+        dynamic_check = False
+        for module in self.main_class.loaded_modules.keys():
+            change_list = {}
+            for item, change in self.changes.iteritems():
+                if module == item.split(MODULE_KEY)[0]:
+                    change_list[item] = change
+            for key in change_list.keys():
+                self.changes.pop(key)
 
-        # Drawing page
-        self.fill_page_with_content(self.content_page, key_list[1], key_list[-1],
-                                    self.main_class.loaded_modules[key_list[-1]])
+            if self.save_module(module, change_list):
+                dynamic_check = True
+        self.buttons[MODULE_KEY.join(['settings', 'apply_button'])].Disable()
+        return dynamic_check
 
-        event.Skip()
-
-    def save_settings(self, module):
-        module_settings = self.main_class.loaded_modules.get(module, {})
-        non_dynamic = module_settings.get('gui', {}).get('non_dynamic', [])
-        module_config = module_settings.get('config')
+    def save_module(self, module, changed_items):
         non_dynamic_check = False
-        if module_settings:
-            parser = module_settings['parser']  # type: ConfigParser
-            items = get_list_of_ids_from_module_name(module, return_tuple=True)
-            for item, name in items:
-                module_name, section, item_name = name.split(MODULE_KEY)
+        if changed_items:
+            module_settings = self.main_class.loaded_modules.get(module, {})
+            non_dynamic = module_settings.get('gui', {}).get('non_dynamic', [])
+            module_config = module_settings.get('config')
 
-                if not parser.has_section(section):
-                    continue
-                # Check for non-dynamic items
+            for item, change in changed_items.iteritems():
+                item_split = item.split(MODULE_KEY)
+                section, item_name = item_split[1:] if len(item_split) > 2 else (item_split[1], None)
                 for d_item in non_dynamic:
                     if section in d_item:
                         if MODULE_KEY.join([section, '*']) in d_item:
@@ -567,84 +685,28 @@ class SettingsWindow(wx.Frame):
                         elif MODULE_KEY.join([section, item_name]) in d_item:
                             non_dynamic_check = True
                             break
-                # Saving
-                wx_window = wx.FindWindowById(item)
-                if isinstance(wx_window, wx.CheckBox):
-                    if name == MODULE_KEY.join(['main', 'gui', 'show_hidden']):
-                        self.show_hidden = wx_window.IsChecked()
-                    parser.set(section, item_name, wx_window.IsChecked())
-                    module_config[section][item_name] = wx_window.IsChecked()
-                elif isinstance(wx_window, wx.TextCtrl):
-                    if item_name not in SKIP_TXT_CONTROLS:
-                        parser.set(section, item_name, wx_window.GetValue().encode('utf-8').strip())
-                        module_config[section][item_name] = wx_window.GetValue().encode('utf-8').strip()
-                elif isinstance(wx_window, wx.grid.Grid):
-                    col_count = wx_window.GetNumberCols()
-                    row_count = wx_window.GetNumberRows()
-                    parser_options = parser.options(section)
-                    grid_elements = [[wx_window.GetCellValue(row, col).encode('utf-8').strip()
-                                      for col in range(col_count)]
-                                     for row in range(row_count)]
-                    if not grid_elements:
-                        for option in parser_options:
-                            parser.remove_option(section, option)
-                            module_config[section].pop(option)
-                    else:
-                        item_list = [item[0] for item in grid_elements]
-                        for option in parser_options:
-                            if option not in item_list:
-                                module_config[section].pop(option)
-                                parser.remove_option(section, option)
-                        for elements in grid_elements:
-                            parser.set(section, *elements)
-                            if len(elements) == 1:
-                                module_config[section][elements[0]] = None
-                            elif len(elements) == 2:
-                                module_config[section][elements[0]] = elements[1]
-                elif isinstance(wx_window, wx.Button):
-                    if item_name not in SKIP_BUTTONS:
-                        parser.set(section, item_name)
-                        module_config[section][item_name] = None
-                elif isinstance(wx_window, KeyListBox):
-                    item_id = wx_window.GetSelection()
-                    parser_options = parser.options(section)
-                    item_value = wx_window.get_key_from_index(item_id)
-                    if not item_value:
-                        for option in parser_options:
-                            parser.remove_option(section, option)
-                            module_config[section] = None
-                    else:
-                        for option in parser_options:
-                            parser.remove_option(section, option)
-                        parser.set(section, item_value)
-                        module_config[section] = item_value
-                elif isinstance(wx_window, KeyCheckListBox):
-                    item_ids = wx_window.GetChecked()
-                    parser_options = parser.options(section)
-                    items_values = [wx_window.get_key_from_index(item_id) for item_id in item_ids]
-                    if not items_values:
-                        for option in parser_options:
-                            parser.remove_option(section, option)
-                            module_config[section].pop(option)
-                    else:
-                        for option in parser_options:
-                            if option not in items_values:
-                                parser.remove_option(section, option)
-                                module_config[section].pop(option)
-                        for value in items_values:
-                            parser.set(section, value)
-                            module_config[section][value] = None
-                elif isinstance(wx_window, KeyChoice):
-                    item_id = wx_window.GetSelection()
-                    item_value = wx_window.get_key_from_index(item_id)
-                    parser.set(section, item_name, item_value)
-                    module_config[section][item_name] = item_value
-                elif isinstance(wx_window, wx.SpinCtrl):
-                    item_value = wx_window.GetValue()
-                    parser.set(section, item_name, item_value)
-                    module_config[section][item_name] = item_value
-            with open(module_settings['file'], 'w') as config_file:
-                parser.write(config_file)
+                change_type = change['type']
+                if change_type in ['gridbox']:
+                    module_config[section] = OrderedDict()
+                    for change_tuple in change['value']:
+                        if len(change_tuple) > 1:
+                            change_item, change_value = change_tuple
+                        else:
+                            change_item, change_value = (change_tuple[0], None)
+                        module_config[section][change_item] = change_value
+                elif change_type in ['listbox']:
+                    module_config[section] = change['value']
+                elif change_type in ['listbox_check']:
+                    module_config[section] = {}
+                    for value in change['value']:
+                        module_config[section][value] = None
+                else:
+                    value = change['value']
+                    if item == MODULE_KEY.join(['main', 'gui', 'show_hidden']):
+                        self.show_hidden = value
+                    module_config[section][item_name] = value
+            if 'class' in module_settings:
+                module_settings['class'].apply_settings()
         return non_dynamic_check
 
     def select_cell(self, event):
@@ -652,24 +714,20 @@ class SettingsWindow(wx.Frame):
         event.Skip()
 
     def list_operation(self, key, action):
+        list_box = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
         if action == 'list_add':
             list_input_value = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_input']))).GetValue()
 
-            try:
-                list_input2 = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_input2']), error=True))
-                list_input2_value = list_input2.GetValue() if list_input2 else None
-            except ReferenceError:
-                list_input2_value = None
-
-            list_box = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
             list_box.AppendRows(1)
             row_count = list_box.GetNumberRows() - 1
-            list_box.SetCellValue(row_count, 0, list_input_value.strip())
-            if list_input2_value:
+            list_box.SetCellValue(row_count, 0, list_input_value.strip().lower())
+
+            list_input2_id = get_id_from_name(MODULE_KEY.join([key, 'list_input2']))
+            if list_input2_id:
+                list_input2_value = wx.FindWindowById(list_input2_id).GetValue()
                 list_box.SetCellValue(row_count, 1, list_input2_value.strip())
 
         elif action == 'list_remove':
-            list_box = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
             top = list_box.GetSelectionBlockTopLeft()
             bot = list_box.GetSelectionBlockBottomRight()
             if top and bot:
@@ -684,6 +742,88 @@ class SettingsWindow(wx.Frame):
                 for select in del_rows:
                     list_box.DeleteRows(select - ids_deleted)
                     ids_deleted += 1
+        rows = list_box.GetNumberRows()
+        cols = list_box.GetNumberCols()
+        grid_elements = [tuple([list_box.GetCellValue(row, col).encode('utf-8').strip()
+                                for col in range(cols)])
+                         for row in range(rows)]
+
+        self.on_change(key, grid_elements, item_type='gridbox')
+
+
+class StatusFrame(wx.Panel):
+    def __init__(self, parent, **kwargs):
+        self.chat_modules = kwargs.get('chat_modules')
+        wx.Panel.__init__(self, parent, size=wx.Size(-1, 24))
+        self.SetBackgroundColour('cream')
+
+        self.chats = {}
+        self._create_items()
+
+        self.Fit()
+        self.Layout()
+        self.Show(True)
+
+    def _create_items(self):
+        border_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        border_sizer.AddSpacer(5)
+        item_sizer = wx.FlexGridSizer(0, 0, 10, 10)
+        for module, settings in self.chat_modules.iteritems():
+            if module not in ['chat']:
+                self.chats[module] = {}
+                item_sizer.Add(self._create_item(module, settings), 0, wx.EXPAND)
+
+        border_sizer.Add(item_sizer, 0, wx.EXPAND)
+        border_sizer.AddSpacer(5)
+        self.SetSizer(border_sizer)
+
+    def _create_item(self, module, settings):
+        item_sizer = wx.BoxSizer(wx.VERTICAL)
+        module_sizer = wx.FlexGridSizer(0, 0, 5, 5)
+
+        chat_icon = wx.Image(settings['gui'].get('icon'), wx.BITMAP_TYPE_ANY)
+        chat_icon = chat_icon.Scale(16, 16)
+        bitmap = wx.StaticBitmap(self, wx.ID_ANY,
+                                 wx.BitmapFromImage(chat_icon),
+                                 size=wx.Size(16, 16))
+        label = wx.StaticText(self, id=wx.ID_ANY, label='N/A')
+        self.chats[module]['label'] = label
+        module_sizer.Add(bitmap, 0, wx.EXPAND)
+        module_sizer.Add(label, 1, wx.EXPAND)
+        module_sizer.AddSpacer(2)
+
+        item_sizer.Add(module_sizer)
+
+        status_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        status_item = wx.Panel(self, size=wx.Size(-1, 5))
+        status_item.SetBackgroundColour('gray')
+        self.chats[module]['status'] = status_item
+
+        status_sizer.Add(status_item, 1, wx.EXPAND)
+
+        item_sizer.AddSpacer(3)
+        item_sizer.Add(status_sizer, 1, wx.EXPAND)
+        item_sizer.AddSpacer(2)
+
+        return item_sizer
+
+    def set_online(self, module):
+        self.chats[module]['status'].SetBackgroundColour(wx.Colour(0, 128, 0))
+        self.Refresh()
+
+    def set_offline(self, module):
+        self.chats[module]['status'].SetBackgroundColour('red')
+        self.Refresh()
+
+    def set_viewers(self, module, viewers):
+        if not viewers:
+            return
+        if isinstance(viewers, int):
+            viewers = str(viewers)
+        if len(viewers) >= 5:
+            viewers = '{0}k'.format(viewers[:-3])
+        self.chats[module]['label'].SetLabel(str(viewers))
+        self.Layout()
 
 
 class ChatGui(wx.Frame):
@@ -694,6 +834,7 @@ class ChatGui(wx.Frame):
         self.loaded_modules = kwargs.get('loaded_modules')
         self.queue = kwargs.get('queue')
         self.settings_window = None
+        self.status_frame = None
 
         wx.Frame.__init__(self, parent, title=title, size=self.gui_settings.get('size'))
         # Set window style
@@ -711,16 +852,24 @@ class ChatGui(wx.Frame):
         # Creating main gui window
         vbox = wx.BoxSizer(wx.VERTICAL)
         self.toolbar = MainMenuToolBar(self, main_class=self)
-        self.browser_window = chromectrl.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False)
 
         vbox.Add(self.toolbar, 0, wx.EXPAND)
-        vbox.Add(self.browser_window, 1, wx.EXPAND)
+        if self.main_config['config']['gui']['show_counters']:
+            self.status_frame = StatusFrame(self, chat_modules=self.sorted_categories['chat'])
+            vbox.Add(self.status_frame, 0, wx.EXPAND)
+        if self.gui_settings['show_browser']:
+            vbox.Add(chromectrl.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False), 1, wx.EXPAND)
 
         # Set events
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
         # Show window after creation
         self.SetSizer(vbox)
+
+        if not self.gui_settings['show_browser']:
+            self.Layout()
+            self.Fit()
+
         self.Show(True)
 
         # Show update dialog if new version found
@@ -735,15 +884,21 @@ class ChatGui(wx.Frame):
 
     def on_close(self, event):
         log.info("Exiting...")
+        for module, module_dict in self.loaded_modules.iteritems():
+            module_dict['class'].apply_settings(system_exit=True)
+
         # Saving last window size
         parser = self.loaded_modules['main']['parser']  # type: ConfigParser
         size = self.Size
         parser.set('gui_information', 'width', size[0])
         parser.set('gui_information', 'height', size[1])
-        parser.write(open(self.loaded_modules['main']['file'], 'w'))
+        with open(self.loaded_modules['main']['file'], 'w') as p_file:
+            parser.write(p_file)
+
         self.Destroy()
 
-    def on_right_down(self, event):
+    @staticmethod
+    def on_right_down(event):
         log.info(event)
         event.Skip()
 
@@ -762,7 +917,8 @@ class ChatGui(wx.Frame):
                                                   main_class=self,
                                                   categories=self.sorted_categories)
 
-    def button_clicked(self, event):
+    @staticmethod
+    def button_clicked(event):
         button_id = event.GetId()
         keys = IDS[event.GetId()].split(MODULE_KEY)
         log.debug("[ChatGui] Button clicked: {0}, {1}".format(keys, button_id))
@@ -781,13 +937,14 @@ class ChatGui(wx.Frame):
         event.Skip()
 
 
-class GuiThread(threading.Thread):
+class GuiThread(threading.Thread, BaseModule):
     title = 'LalkaChat'
     url = 'http://localhost'
     port = '8080'
 
     def __init__(self, **kwargs):
         threading.Thread.__init__(self)
+        BaseModule.__init__(self, **kwargs)
         self.daemon = True
         self.gui = None
         self.kwargs = kwargs

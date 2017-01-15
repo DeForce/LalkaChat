@@ -1,6 +1,9 @@
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import logging
+import random
 import re
 import os
+import string
 
 log = logging.getLogger('system')
 
@@ -10,20 +13,27 @@ SOURCE = 'sy'
 SOURCE_USER = 'System'
 SOURCE_ICON = '/img/sources/lalka_cup.png'
 
+NA_MESSAGE = 'N/A'
+
+IGNORED_TYPES = ['command', 'system_message']
 TRANSLATIONS = {}
 SPLIT_TRANSLATION = '='
 MODULE_KEY = '.'
+EMOTE_FORMAT = u':emote;{0}:'
 TRANSLATION_FILETYPE = '.key'
 DEFAULT_LANGUAGE = 'en'
 ACTIVE_LANGUAGE = None
 
+REPLACE_SYMBOLS = '<>'
 
-def system_message(message, queue, source=SOURCE, icon=SOURCE_ICON, from_user=SOURCE_USER):
+
+def system_message(message, queue, source=SOURCE, icon=SOURCE_ICON, from_user=SOURCE_USER, category='system'):
     queue.put({'source': source,
                'source_icon': icon,
                'user': from_user,
-               'text': message,
-               'system_msg': True})
+               'text': cleanup_tags(message),
+               'category': category,
+               'type': 'system_message'})
 
 
 class ModuleLoadException(Exception):
@@ -61,8 +71,9 @@ def load_translations_keys(translation_folder, language):
 def find_key_translation(item):
     translation = TRANSLATIONS.get(item)
     if translation is None:
-        if len(item.split(MODULE_KEY)) > 2:
-            wildcard_item = MODULE_KEY.join([split for split in item.split(MODULE_KEY) if split != '*'][1:])
+        split_item = [f_item for f_item in item.split(MODULE_KEY) if f_item != '*']
+        if len(split_item) > 1:
+            wildcard_item = MODULE_KEY.join(split_item[1:])
             return find_key_translation('*{0}{1}'.format(MODULE_KEY, wildcard_item))
         else:
             return item
@@ -89,3 +100,33 @@ def translate_key(item):
 
 def translate(text):
     pass
+
+
+def cleanup_tags(message):
+    for symbol in REPLACE_SYMBOLS:
+        message.replace(symbol, '\{0}'.format(symbol))
+    return message
+
+
+def random_string(length):
+    return ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(length))
+
+
+def remove_message_by_user(user, text=None):
+    command = {'type': 'command',
+               'command': 'remove_by_user',
+               'user': user}
+    if text:
+        command['text'] = text
+        command['command'] = 'replace_by_user'
+    return command
+
+
+def remove_message_by_id(ids, text=None):
+    command = {'type': 'command',
+               'command': 'remove_by_id',
+               'ids': ids}
+    if text:
+        command['text'] = text
+        command['command'] = 'replace_by_id'
+    return command

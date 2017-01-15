@@ -1,5 +1,6 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
 import threading
 import imp
@@ -7,8 +8,11 @@ import operator
 import logging
 from collections import OrderedDict
 
+from main import CONF_FOLDER
+from modules.helper.module import BaseModule
 from modules.helper.system import ModuleLoadException, THREADS
-from modules.helper.parser import self_heal
+from modules.helper.parser import load_from_config_file
+
 
 log = logging.getLogger('messaging')
 MODULE_PRI_DEFAULT = '100'
@@ -52,17 +56,21 @@ class Message(threading.Thread):
                           'view': 'choose_multiple',
                           'description': True},
             'non_dynamic': ['messaging.*']}
-        config = self_heal(conf_file, conf_dict)
-        modules_list['messaging'] = {'folder': main_config['conf_folder'], 'file': conf_file,
-                                     'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                                     'parser': config,
-                                     'config': conf_dict,
-                                     'gui': conf_gui}
+        config = load_from_config_file(conf_file, conf_dict)
+        messaging_module = BaseModule(
+            conf_params={
+                'folder': main_config['conf_folder'], 'file': conf_file,
+                'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+                'parser': config,
+                'config': conf_dict,
+                'gui': conf_gui})
+
+        modules_list['messaging'] = messaging_module.conf_params()
 
         modules = {}
         # Loading modules from cfg.
-        if config.items("messaging") > 0:
-            for module, item in config.items("messaging"):
+        if len(conf_dict['messaging']) > 0:
+            for module, item in conf_dict['messaging'].iteritems():
                 log.info("Loading %s" % module)
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
@@ -73,8 +81,10 @@ class Message(threading.Thread):
                 try:
                     tmp = imp.load_source(module, file_path)
                     class_init = getattr(tmp, module)
-                    class_module = class_init(main_config['conf_folder'], root_folder=main_config['root_folder'],
-                                              main_settings=settings)
+                    class_module = class_init(main_config['conf_folder'],
+                                              root_folder=main_config['root_folder'],
+                                              main_settings=settings,
+                                              conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(module)))
 
                     params = class_module.conf_params()
                     if 'id' in params:

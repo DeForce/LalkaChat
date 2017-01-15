@@ -1,5 +1,6 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import logging
 import math
 import os
@@ -9,9 +10,9 @@ import xml.etree.ElementTree as ElementTree
 from collections import OrderedDict
 import datetime
 
-from modules.helper.parser import self_heal
-from modules.helper.system import system_message, ModuleLoadException
-from modules.helper.modules import MessagingModule
+from modules.helper.parser import load_from_config_file
+from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES, random_string
+from modules.helper.module import MessagingModule
 
 log = logging.getLogger('levels')
 
@@ -41,36 +42,39 @@ class levels(MessagingModule):
         conf_dict['config']['exp_for_level'] = 200
         conf_dict['config']['exp_for_message'] = 1
         conf_dict['config']['decrease_window'] = 60
-        conf_gui = {'non_dynamic': ['config.*'],
+        conf_gui = {'non_dynamic': ['config.db', 'config.experience',
+                                    'config.exp_for_level', 'config.exp_for_message',
+                                    'decrease_window'],
                     'config': {
                         'experience': {
                             'view': 'dropdown',
                             'choices': ['static', 'geometrical', 'random']}}}
-        config = self_heal(conf_file, conf_dict)
+        config = load_from_config_file(conf_file, conf_dict)
 
-        self._conf_params = {'folder': conf_folder, 'file': conf_file,
-                             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                             'parser': config,
-                             'config': conf_dict,
-                             'gui': conf_gui}
+        self._conf_params.update(
+            {'folder': conf_folder, 'file': conf_file,
+             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+             'parser': config,
+             'config': conf_dict,
+             'gui': conf_gui})
 
         self.conf_folder = None
         self.experience = None
         self.exp_for_level = None
         self.exp_for_message = None
-        self.filename = None
+        self.level_file = None
         self.levels = None
         self.special_levels = None
         self.db_location = None
-        self.message = None
         self.decrease_window = None
         self.threshold_users = None
 
     def load_module(self, *args, **kwargs):
-        main_settings = kwargs.get('main_settings')
-        loaded_modules = kwargs.get('loaded_modules')
-        if 'webchat' not in loaded_modules:
+        MessagingModule.load_module(self, *args, **kwargs)
+        if 'webchat' not in self._loaded_modules:
             raise ModuleLoadException("Unable to find webchat module that is needed for level module")
+        else:
+            self._loaded_modules['webchat']['class'].add_depend('levels')
 
         conf_folder = self._conf_params['folder']
         conf_dict = self._conf_params['config']
@@ -79,27 +83,42 @@ class levels(MessagingModule):
         self.experience = conf_dict['config'].get('experience')
         self.exp_for_level = float(conf_dict['config'].get('exp_for_level'))
         self.exp_for_message = float(conf_dict['config'].get('exp_for_message'))
-        self.filename = os.path.abspath(os.path.join(loaded_modules['webchat']['style_location'], 'levels.xml'))
+        self.level_file = os.path.abspath(
+            os.path.join(
+                self._loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
+            )
+        )
         self.levels = []
         self.special_levels = {}
         self.db_location = os.path.join(conf_dict['config'].get('db'))
-        self.message = conf_dict['config'].get('message').decode('utf-8')
         self.decrease_window = int(conf_dict['config'].get('decrease_window'))
         self.threshold_users = {}
 
         # Load levels
-        if not os.path.exists(self.filename):
-            log.error("{0} not found, generating from template".format(self.filename))
-            raise ModuleLoadException("{0} not found, generating from template".format(self.filename))
+        if not os.path.exists(self.level_file):
+            log.error("{0} not found, generating from template".format(self.level_file))
+            raise ModuleLoadException("{0} not found, generating from template".format(self.level_file))
 
         if self.experience == 'random':
             self.db_location += '.random'
         self.create_db(self.db_location)
 
-        tree = ElementTree.parse(os.path.join(conf_folder, self.filename))
-        lvl_xml = tree.getroot()
+        self.load_levels()
 
-        for level_data in lvl_xml:
+    def load_levels(self):
+        if self.levels:
+            self.levels = []
+
+        if self.special_levels:
+            self.special_levels = {}
+
+        self.level_file = os.path.abspath(
+            os.path.join(
+                self._loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
+            )
+        )
+        tree = ElementTree.parse(self.level_file)
+        for level_data in tree.getroot():
             level_count = float(len(self.levels) + 1)
             if 'nick' in level_data.attrib:
                 self.special_levels[level_data.attrib['nick']] = level_data.attrib
@@ -109,7 +128,12 @@ class levels(MessagingModule):
                 else:
                     level_exp = self.exp_for_level * level_count
                 level_data.attrib['exp'] = level_exp
+                level_data.attrib['url'] = '{0}?{1}'.format(level_data.attrib['url'], random_string(5))
                 self.levels.append(level_data.attrib)
+
+    def apply_settings(self, **kwargs):
+        if 'webchat' in kwargs.get('from_depend', []):
+            self.load_levels()
 
     def set_level(self, user, queue):
         if user == 'System':
@@ -147,13 +171,18 @@ class levels(MessagingModule):
                 db.commit()
             else:
                 max_level += 1
-            system_message(self.message.format(user, self.levels[max_level]['name']), queue)
+            system_message(
+                self._conf_params['config']['config']['message'].decode('utf-8').format(
+                    user,
+                    self.levels[max_level]['name']),
+                queue, category='module'
+            )
         cursor.close()
         return self.levels[max_level]
 
     def process_message(self, message, queue, **kwargs):
         if message:
-            if 'command' in message:
+            if message['type'] in IGNORED_TYPES:
                 return message
             if 'system_msg' not in message or not message['system_msg']:
                 if 'user' in message and message['user'] in self.special_levels:

@@ -1,5 +1,5 @@
 *.pyc
-.idea/*
+.idea/
 /logs
 levels.db*
 /build
@@ -9,3 +9,5 @@ levels.db*
 *.spec
 *.log
 govno_rutony.py
+/node_modules/
+/http
