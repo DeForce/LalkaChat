@@ -1,4 +1,5 @@
 from distutils.core import setup
+
 from main import VERSION
 
 setup(
