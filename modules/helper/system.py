@@ -1,9 +1,30 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
+import locale
 import logging
 import random
 import re
 import os
 import string
+import sys
+
+import requests
+import semantic_version
+
+if hasattr(sys, 'frozen'):
+    PYTHON_FOLDER = os.path.dirname(sys.executable)
+else:
+    PYTHON_FOLDER = os.path.dirname(os.path.abspath('__file__'))
+TRANSLATION_FOLDER = os.path.join(PYTHON_FOLDER, "translations")
+CONF_FOLDER = os.path.join(PYTHON_FOLDER, "conf")
+MODULE_FOLDER = os.path.join(PYTHON_FOLDER, "modules")
+MAIN_CONF_FILE = os.path.join(CONF_FOLDER, "config.cfg")
+GUI_TAG = 'gui'
+
+LOG_FOLDER = os.path.join(PYTHON_FOLDER, "logs")
+if not os.path.exists(LOG_FOLDER):
+    os.makedirs(LOG_FOLDER)
+LOG_FILE = os.path.join(LOG_FOLDER, 'chat_log.log')
+LOG_FORMAT = logging.Formatter("%(asctime)s [%(name)s] [%(levelname)s]  %(message)s")
 
 log = logging.getLogger('system')
 
@@ -25,6 +46,12 @@ DEFAULT_LANGUAGE = 'en'
 ACTIVE_LANGUAGE = None
 
 REPLACE_SYMBOLS = '<>'
+
+LANGUAGE_DICT = {
+    'en_US': 'en',
+    'en_GB': 'en',
+    'ru_RU': 'ru'
+}
 
 
 def system_message(message, queue, source=SOURCE, icon=SOURCE_ICON, from_user=SOURCE_USER, category='system'):
@@ -130,3 +157,26 @@ def remove_message_by_id(ids, text=None):
         command['text'] = text
         command['command'] = 'replace_by_id'
     return command
+
+
+def get_update(SEM_VERSION):
+    github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"
+    try:
+        update_json = requests.get(github_url, timeout=1)
+        if update_json.status_code == 200:
+            update = False
+            update_url = None
+            update_list = update_json.json()
+            for update_item in update_list:
+                if semantic_version.Version.coerce(update_item['tag_name'].lstrip('v')) > SEM_VERSION:
+                    update = True
+                    update_url = update_item['html_url']
+            return update, update_url
+    except Exception as exc:
+        log.info("Got exception: {0}".format(exc))
+    return False, None
+
+
+def get_language():
+    local_name, local_encoding = locale.getdefaultlocale()
+    return LANGUAGE_DICT.get(local_name, 'en')

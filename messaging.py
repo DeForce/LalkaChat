@@ -8,9 +8,8 @@ import operator
 import logging
 from collections import OrderedDict
 
-from main import CONF_FOLDER
 from modules.helper.module import BaseModule
-from modules.helper.system import ModuleLoadException, THREADS
+from modules.helper.system import ModuleLoadException, THREADS, CONF_FOLDER
 from modules.helper.parser import load_from_config_file
 
 

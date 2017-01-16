@@ -13,10 +13,9 @@ from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from modules.helper.parser import load_from_config_file, save_settings
-from modules.helper.system import THREADS
+from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER
 from modules.helper.module import MessagingModule
 from gui import MODULE_KEY
-from main import PYTHON_FOLDER, CONF_FOLDER
 
 DEFAULT_STYLE = 'default'
 DEFAULT_PRIORITY = 9001
