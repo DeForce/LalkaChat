@@ -18,7 +18,7 @@ log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
 FILE_ICON = os.path.join('img', 'fs.png')
-SYSTEM_USER = 'Funstream'
+SYSTEM_USER = 'Peka2.tv'
 
 PING_DELAY = 10
 
