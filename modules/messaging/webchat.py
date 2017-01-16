@@ -7,6 +7,7 @@ import socket
 import cherrypy
 import logging
 import datetime
+import copy
 from collections import OrderedDict
 from jinja2 import Template
 from cherrypy.lib.static import serve_file
@@ -27,6 +28,15 @@ logging.getLogger('ws4py').setLevel(logging.ERROR)
 log = logging.getLogger('webchat')
 
 
+def prepare_message(msg, theme_name):
+    message = copy.deepcopy(msg)
+
+    if 'levels' in message:
+        message['levels']['url'] = '{}?{}'.format(message['levels']['url'], theme_name)
+
+    return message
+
+
 class MessagingThread(threading.Thread):
     def __init__(self, settings):
         super(self.__class__, self).__init__()
@@ -45,10 +55,12 @@ class MessagingThread(threading.Thread):
             elif message['type'] == 'command':
                 cherrypy.engine.publish('process-command', message['command'], message)
 
-            if message['type'] == 'system_message' and not self.settings['show_system_msg']:
+            if message['type'] == 'system_message' and not self.settings['keys']['show_system_msg']:
                 continue
 
-            cherrypy.engine.publish('websocket-broadcast', json.dumps(message))
+            send_message = prepare_message(message, self.settings['name'])
+
+            cherrypy.engine.publish('websocket-broadcast', json.dumps(send_message))
         log.info("Messaging thread stopping")
 
     def stop(self):
@@ -64,18 +76,20 @@ class FireFirstMessages(threading.Thread):
         self.settings = settings
 
     def run(self):
-        show_system_msg = cherrypy.engine.publish('get-settings')[0]['show_system_msg']
+        show_system_msg = cherrypy.engine.publish('get-settings')[0]['keys']['show_system_msg']
         if self.ws.stream:
             for item in self.history:
                 if item['type'] == 'system_message' and not show_system_msg:
                     continue
                 timestamp = datetime.datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S.%f")
                 timedelta = datetime.datetime.now() - timestamp
-                timer = int(self.settings['timer'])
+                timer = int(self.settings['keys']['timer'])
                 if timer > 0:
                     if timedelta > datetime.timedelta(seconds=timer):
                         continue
-                self.ws.send(json.dumps(item))
+
+                message = prepare_message(item, self.settings['name'])
+                self.ws.send(json.dumps(message))
 
 
 class WebChatSocketServer(WebSocket):
@@ -141,7 +155,7 @@ class WebChatPlugin(WebSocketPlugin):
             self.history.pop(0)
 
     def get_settings(self):
-        return self.style_settings['keys']
+        return self.style_settings
 
     def get_history(self):
         return self.history
@@ -353,7 +367,7 @@ class webchat(MessagingModule):
                  'settings_location': os.path.join(style_path, 'settings.json'),
                  'settings_gui_location': os.path.join(style_path, 'settings_gui.json'),
                  'keys': OrderedDict([
-                     ('show_system_msg', False)
+                     ('show_system_msg', False),
                  ])
              }})
 
@@ -381,7 +395,7 @@ class webchat(MessagingModule):
             self.s_thread.start()
 
             for thread in range(THREADS+5):
-                self.message_threads.append(MessagingThread(self._conf_params['style_settings']['keys']))
+                self.message_threads.append(MessagingThread(self._conf_params['style_settings']))
                 self.message_threads[thread].start()
         else:
             log.error("Port is already used, please change webchat port")

@@ -106,8 +106,6 @@ class levels(MessagingModule):
         self.load_levels()
 
     def load_levels(self):
-        level_code = random_string(5)
-
         if self.levels:
             self.levels = []
 
@@ -130,7 +128,6 @@ class levels(MessagingModule):
                 else:
                     level_exp = self.exp_for_level * level_count
                 level_data.attrib['exp'] = level_exp
-                level_data.attrib['url'] = '{0}?{1}'.format(level_data.attrib['url'], level_code)
                 self.levels.append(level_data.attrib)
 
     def apply_settings(self, **kwargs):
@@ -180,7 +177,7 @@ class levels(MessagingModule):
                 queue, category='module'
             )
         cursor.close()
-        return self.levels[max_level]
+        return self.levels[max_level].copy()
 
     def process_message(self, message, queue, **kwargs):
         if message:
@@ -190,9 +187,9 @@ class levels(MessagingModule):
                 if 'user' in message and message['user'] in self.special_levels:
                     level_info = self.special_levels[message['user']]
                     if 's_levels' in message:
-                        message['s_levels'].append(level_info)
+                        message['s_levels'].append(level_info.copy())
                     else:
-                        message['s_levels'] = [level_info]
+                        message['s_levels'] = [level_info.copy()]
 
                 message['levels'] = self.set_level(message['user'], queue)
             return message
