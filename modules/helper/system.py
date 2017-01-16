@@ -6,7 +6,6 @@ import re
 import os
 import string
 import sys
-
 import requests
 import semantic_version
 
@@ -159,7 +158,7 @@ def remove_message_by_id(ids, text=None):
     return command
 
 
-def get_update(SEM_VERSION):
+def get_update(sem_version):
     github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"
     try:
         update_json = requests.get(github_url, timeout=1)
@@ -168,7 +167,7 @@ def get_update(SEM_VERSION):
             update_url = None
             update_list = update_json.json()
             for update_item in update_list:
-                if semantic_version.Version.coerce(update_item['tag_name'].lstrip('v')) > SEM_VERSION:
+                if semantic_version.Version.coerce(update_item['tag_name'].lstrip('v')) > sem_version:
                     update = True
                     update_url = update_item['html_url']
             return update, update_url
