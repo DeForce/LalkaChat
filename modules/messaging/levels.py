@@ -106,6 +106,8 @@ class levels(MessagingModule):
         self.load_levels()
 
     def load_levels(self):
+        level_code = random_string(5)
+
         if self.levels:
             self.levels = []
 
@@ -128,7 +130,7 @@ class levels(MessagingModule):
                 else:
                     level_exp = self.exp_for_level * level_count
                 level_data.attrib['exp'] = level_exp
-                level_data.attrib['url'] = '{0}?{1}'.format(level_data.attrib['url'], random_string(5))
+                level_data.attrib['url'] = '{0}?{1}'.format(level_data.attrib['url'], level_code)
                 self.levels.append(level_data.attrib)
 
     def apply_settings(self, **kwargs):
