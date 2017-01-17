@@ -266,7 +266,7 @@ class SettingsWindow(wx.Frame):
 
     def on_spinctrl(self, event):
         spin_ctrl = event.EventObject
-        self.on_change(IDS[event.GetId()], str(spin_ctrl.GetValue()), item_type='spinctrl')
+        self.on_change(IDS[event.GetId()], spin_ctrl.GetValue(), item_type='spinctrl')
         event.Skip()
 
     def on_sliderctrl(self, event):

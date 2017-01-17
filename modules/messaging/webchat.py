@@ -7,7 +7,10 @@ import socket
 import cherrypy
 import logging
 import datetime
-import copy
+
+from scss import Compiler
+from scss.namespace import Namespace
+from scss.types import Value, Boolean, String, Number
 from collections import OrderedDict
 from jinja2 import Template
 from cherrypy.lib.static import serve_file
@@ -26,6 +29,12 @@ HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 log = logging.getLogger('webchat')
+scss_map = {
+    basestring: String,
+    bool: Boolean,
+    int: Number,
+    float: Number
+}
 
 
 def prepare_message(msg, theme_name):
@@ -240,6 +249,21 @@ class CssRoot(object):
         with open(os.path.join(self.settings['location'], 'css', 'style.css'), 'r') as css:
             css_content = css.read()
             return Template(css_content).render(**self.settings['keys'])
+
+    @cherrypy.expose
+    def style_scss(self):
+        css_namespace = Namespace()
+        for key, value in self.settings['keys'].items():
+            for baseclass, scss_class in scss_map.items():
+                if isinstance(value, baseclass):
+                    css_namespace.set_variable('${}'.format(key), scss_class(value))
+                    break
+
+        cherrypy.response.headers['Content-Type'] = 'text/css'
+        with open(os.path.join(self.settings['location'], 'css', 'style.scss'), 'r') as css:
+            css_content = css.read()
+            compiler = Compiler(namespace=css_namespace)
+            return compiler.compile_string(css_content)
 
 
 class HttpRoot(object):
