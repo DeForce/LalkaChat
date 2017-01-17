@@ -262,7 +262,7 @@ class CssRoot(object):
         cherrypy.response.headers['Content-Type'] = 'text/css'
         with open(os.path.join(self.settings['location'], 'css', 'style.scss'), 'r') as css:
             css_content = css.read()
-            compiler = Compiler(namespace=css_namespace)
+            compiler = Compiler(namespace=css_namespace, output_style='compressed')
             return compiler.compile_string(css_content)
 
 

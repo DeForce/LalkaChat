@@ -12,7 +12,7 @@ body {
 }
 
 .message {
-    background-color: rgba( 35, 35, 37, $message-opacity / 100.00 }});
+    background-color: rgba(35, 35, 37, ($message-opacity / 100));
     word-wrap: break-word;
     text-shadow: 0 1px 1px black;
     font-family: 'Consolas', serif;
@@ -23,11 +23,11 @@ body {
 
 .message > div {
     display: inline;
-    font-size: $font-size pt;
+    font-size: #{$font-size}pt;
 }
 
 .message.sub-message {
-    background-color: rgba( 255, 0, 128, 0.62 )
+    background-color: rgba(255, 0, 128, 0.62)
 }
 
 .message-remove,
@@ -50,15 +50,15 @@ body {
     border-width: 2px;
     border-style: solid;
     /*margin: -3px;*/
-    width: $badge-size px;
-    height: $badge-size px;
+    width: #{$badge-size}px;
+    height: #{$badge-size}px;
     /*padding: 2px;*/
     border-radius: 5px;
 }
 
 .smile {
     margin-top: -4px;
-    height: $smile_size px;
+    height: #{$smile-size}px;
     width: auto;
     top: 2px;
 }
@@ -100,6 +100,7 @@ body {
 .show-del-enter-active, .show-del-leave-active {
   transition: opacity .5s
 }
+
 .show-del-enter, .show-del-leave-active {
   opacity: 0
 }
