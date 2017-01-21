@@ -3,11 +3,11 @@
 /logs
 levels.db*
 /build
-/dist
 /libs
 /conf
 *.spec
 *.log
 govno_rutony.py
-/node_modules/
 /http
+**/dist
+**/node_modules
