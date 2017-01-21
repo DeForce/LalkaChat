@@ -7,7 +7,7 @@ import socket
 import cherrypy
 import logging
 import datetime
-
+import copy
 from scss import Compiler
 from scss.namespace import Namespace
 from scss.types import Value, Boolean, String, Number
@@ -29,7 +29,7 @@ HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 log = logging.getLogger('webchat')
-scss_map = {
+SCSS_MAP = {
     basestring: String,
     bool: Boolean,
     int: Number,
@@ -241,26 +241,37 @@ class RestRoot(object):
 
 class CssRoot(object):
     def __init__(self, settings):
+        self.css_map = {
+            'css': self.style_css,
+            'scss': self.style_scss
+        }
         self.settings = settings
 
     @cherrypy.expose
-    def style_css(self):
+    def default(self, *args):
         cherrypy.response.headers['Content-Type'] = 'text/css'
-        with open(os.path.join(self.settings['location'], 'css', 'style.css'), 'r') as css:
-            css_content = css.read()
-            return Template(css_content).render(**self.settings['keys'])
+        path = ['css']
+        path.extend(args)
+        file_type = args[-1].split('.')[-1]
+        if file_type in self.css_map:
+            return self.css_map[file_type](*path)
+        return
 
-    @cherrypy.expose
-    def style_scss(self):
+    def style_css(self, *path):
+        cherrypy.response.headers['Content-Type'] = 'text/css'
+        with open(os.path.join(self.settings['location'], *path), 'r') as css:
+            return css.read()
+
+    def style_scss(self, *path):
         css_namespace = Namespace()
         for key, value in self.settings['keys'].items():
-            for baseclass, scss_class in scss_map.items():
+            for baseclass, scss_class in SCSS_MAP.items():
                 if isinstance(value, baseclass):
                     css_namespace.set_variable('${}'.format(key), scss_class(value))
                     break
 
         cherrypy.response.headers['Content-Type'] = 'text/css'
-        with open(os.path.join(self.settings['location'], 'css', 'style.scss'), 'r') as css:
+        with open(os.path.join(self.settings['location'], *path), 'r') as css:
             css_content = css.read()
             compiler = Compiler(namespace=css_namespace, output_style='compressed')
             return compiler.compile_string(css_content)
