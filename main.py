@@ -202,7 +202,7 @@ def init():
 if __name__ == '__main__':
     root_logger = logging.getLogger()
     # Logging level
-    root_logger.setLevel(level=logging.INFO)
+    root_logger.setLevel(level=logging.DEBUG)
     file_handler = logging.FileHandler(LOG_FILE)
     file_handler.setFormatter(LOG_FORMAT)
     root_logger.addHandler(file_handler)
