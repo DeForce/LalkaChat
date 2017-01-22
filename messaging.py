@@ -69,7 +69,7 @@ class Message(threading.Thread):
         modules = {}
         # Loading modules from cfg.
         if len(conf_dict['messaging']) > 0:
-            for module, item in conf_dict['messaging'].iteritems():
+            for module in conf_dict['messaging']:
                 log.info("Loading %s" % module)
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the

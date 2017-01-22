@@ -17,8 +17,8 @@ class mentions(MessagingModule):
         conf_file = os.path.join(conf_folder, "mentions.cfg")
         conf_dict = OrderedDict()
         conf_dict['gui_information'] = {'category': 'messaging'}
-        conf_dict['mentions'] = {}
-        conf_dict['address'] = {}
+        conf_dict['mentions'] = []
+        conf_dict['address'] = []
 
         conf_gui = {
             'mentions': {
@@ -42,12 +42,12 @@ class mentions(MessagingModule):
             if message['type'] in IGNORED_TYPES:
                 return message
 
-            for mention, value in self._conf_params['config']['mentions'].iteritems():
+            for (mention, value) in self._conf_params['config']['mentions']:
                 if re.search(mention, message['text'].lower()):
                     message['mention'] = True
                     break
 
-            for address, value in self._conf_params['config']['address'].iteritems():
+            for (address, value) in self._conf_params['config']['address']:
                 if re.match(address, message['text'].lower()):
                     message['pm'] = True
                     break

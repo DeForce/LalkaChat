@@ -147,7 +147,7 @@ def init():
     )
     loaded_modules['chat'] = chat_module.conf_params()
 
-    for module, settings in chat_conf_dict['chats'].iteritems():
+    for module in chat_conf_dict['chats']:
         log.info("Loading chat module: {0}".format(module))
         module_location = os.path.join(chat_location, module + ".py")
         if os.path.isfile(module_location):

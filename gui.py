@@ -301,24 +301,20 @@ class SettingsWindow(wx.Frame):
                     button.Disable()
         split_keys = key.split(MODULE_KEY)
         config = self.main_class.loaded_modules[split_keys[0]]['config']
+        change_item = split_keys[1]
         if section:
             if isinstance(value, list):
-                if set(config[split_keys[1]].keys()) != set(value):
+                if set(config[change_item]) != set(value):
                     apply_changes()
                 else:
                     clear_changes()
             else:
-                if config[split_keys[1]].decode('utf-8') != return_type(value).decode('utf-8'):
+                if config[change_item].decode('utf-8') != return_type(value).decode('utf-8'):
                     apply_changes()
                 else:
                     clear_changes()
         elif item_type == 'gridbox':
-            main_tuple = []
-            for item, i_value in self.main_class.loaded_modules[split_keys[0]]['config'][split_keys[1]].iteritems():
-                if i_value:
-                    main_tuple.append((item.decode('utf-8'), i_value.decode('utf-8')))
-                else:
-                    main_tuple.append((item.decode('utf-8'),))
+            main_tuple = config[change_item]
 
             if compare_2d_lists(value, main_tuple):
                 clear_changes()
@@ -326,12 +322,12 @@ class SettingsWindow(wx.Frame):
                 apply_changes()
         else:
             if isinstance(value, bool):
-                if config[split_keys[1]][split_keys[2]] != value:
+                if config[change_item][split_keys[2]] != value:
                     apply_changes()
                 else:
                     clear_changes()
             else:
-                if config[split_keys[1]][split_keys[2]] != return_type(value):
+                if config[change_item][split_keys[2]] != return_type(value):
                     apply_changes()
                 else:
                     clear_changes()
@@ -373,6 +369,61 @@ class SettingsWindow(wx.Frame):
         check_ctrl = event.EventObject
         self.on_change(IDS[event.GetId()], check_ctrl.IsChecked(), item_type='checkbox')
         event.Skip()
+
+    def on_list_operation(self, key, action):
+        list_box = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
+        if action == 'list_add':
+            list_input_value = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_input']))).GetValue()
+
+            list_box.AppendRows(1)
+            row_count = list_box.GetNumberRows() - 1
+            list_box.SetCellValue(row_count, 0, list_input_value.strip().lower())
+
+            list_input2_id = get_id_from_name(MODULE_KEY.join([key, 'list_input2']))
+            if list_input2_id:
+                list_input2_value = wx.FindWindowById(list_input2_id).GetValue()
+                list_box.SetCellValue(row_count, 1, list_input2_value.strip())
+
+        elif action == 'list_remove':
+            top = list_box.GetSelectionBlockTopLeft()
+            bot = list_box.GetSelectionBlockBottomRight()
+            if top and bot:
+                top = top[0][0]
+                bot = bot[0][0] + 1
+                del_rows = range(top, bot) if top < bot else range(bot, top)
+            else:
+                del_rows = [self.selected_cell[0]]
+
+            if list_box.GetNumberRows():
+                ids_deleted = 0
+                for select in del_rows:
+                    list_box.DeleteRows(select - ids_deleted)
+                    ids_deleted += 1
+        rows = list_box.GetNumberRows()
+        cols = list_box.GetNumberCols()
+        if cols > 1:
+            list_box_item = [[list_box.GetCellValue(row, col).strip()
+                              for col in range(cols)]
+                             for row in range(rows)]
+            grid_elements = {}
+            for (item, value) in list_box_item:
+                grid_elements[item] = value
+
+        else:
+            grid_elements = list(set([list_box.GetCellValue(row, 0) for row in range(rows)]))
+
+        max_rows = 7
+        if rows == max_rows:
+            self.list_map[key] = list_box.GetBestSize()
+        if rows <= max_rows:
+            list_box.SetMinSize((-1, -1))
+            self.content_page.GetSizer().Layout()
+        else:
+            scroll_size = wx.SystemSettings_GetMetric(wx.SYS_VSCROLL_X)
+            max_size = self.list_map[key]
+            list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
+            list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
+        self.on_change(key, grid_elements, item_type='gridbox')
 
     def create_layout(self):
         self.main_grid = wx.BoxSizer(wx.HORIZONTAL)
@@ -576,7 +627,7 @@ class SettingsWindow(wx.Frame):
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
         item_name = MODULE_KEY.join(key)
         item_box = wx.TextCtrl(panel, id=id_renew(item_name, update=True),
-                               value=str(value).decode('utf-8'))
+                               value=unicode(value))
         item_box.Bind(wx.EVT_TEXT, bind)
         item_text = wx.StaticText(panel, label=translate_key(item_name))
         item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
@@ -636,13 +687,15 @@ class SettingsWindow(wx.Frame):
         list_box.DisableDragRowSize()
         list_box.Bind(wx.grid.EVT_GRID_SELECT_CELL, bind['select'])
 
-        for index, (item, value) in enumerate(value.items()):
-            list_box.AppendRows(1)
-            if is_dual:
-                list_box.SetCellValue(index, 0, item.decode('utf-8'))
-                list_box.SetCellValue(index, 1, value.decode('utf-8'))
-            else:
-                list_box.SetCellValue(index, 0, item.decode('utf-8'))
+        if is_dual:
+            for index, (item, item_value) in enumerate(value.items()):
+                list_box.AppendRows(1)
+                list_box.SetCellValue(index, 0, item)
+                list_box.SetCellValue(index, 1, item_value)
+        else:
+            for index, item in enumerate(value):
+                list_box.AppendRows(1)
+                list_box.SetCellValue(index, 0, item)
 
         list_box.SetColLabelSize(1)
         list_box.SetRowLabelSize(1)
@@ -692,11 +745,6 @@ class SettingsWindow(wx.Frame):
                         if item_in_list not in list_items:
                             list_items.append(item_in_list)
                             translated_items.append(translate_key(item_in_list))
-        elif gui['check_type'] == 'sections':
-            parser = ConfigParser(allow_no_value=True)
-            parser.read(gui.get('check', ''))
-            for item in parser.sections():
-                list_items.append(translate_key(item))
 
         item_key = MODULE_KEY.join(key + ['list_box'])
         label_text = translate_key(item_key)
@@ -719,8 +767,9 @@ class SettingsWindow(wx.Frame):
             else:
                 item_list_box.SetSelection(list_items.index(item))
         else:
-            check_items = [list_items.index(item) for item, value in section_for.items()]
+            check_items = [list_items.index(item) for item in section_for]
             item_list_box.SetChecked(check_items)
+
         if description:
             adv_sizer = wx.BoxSizer(wx.HORIZONTAL)
             adv_sizer.Add(item_list_box, 0, wx.EXPAND)
@@ -777,7 +826,7 @@ class SettingsWindow(wx.Frame):
         keys = IDS[button_id].split(MODULE_KEY)
         last_key = keys[-1]
         if last_key in ['list_add', 'list_remove']:
-            self.list_operation(MODULE_KEY.join(keys[:-1]), action=last_key)
+            self.on_list_operation(MODULE_KEY.join(keys[:-1]), action=last_key)
         elif last_key in ['ok_button', 'apply_button']:
             if self.save_settings():
                 log.debug('Got non-dynamic changes')
@@ -829,20 +878,8 @@ class SettingsWindow(wx.Frame):
                             non_dynamic_check = True
                             break
                 change_type = change['type']
-                if change_type in ['gridbox']:
-                    module_config[section] = OrderedDict()
-                    for change_tuple in change['value']:
-                        if len(change_tuple) > 1:
-                            change_item, change_value = change_tuple
-                        else:
-                            change_item, change_value = (change_tuple[0], None)
-                        module_config[section][change_item] = change_value
-                elif change_type in ['listbox']:
+                if change_type in ['listbox', 'gridbox', 'listbox_check']:
                     module_config[section] = change['value']
-                elif change_type in ['listbox_check']:
-                    module_config[section] = {}
-                    for value in change['value']:
-                        module_config[section][value] = None
                 else:
                     value = change['value']
                     if item == MODULE_KEY.join(['main', 'gui', 'show_hidden']):
@@ -856,53 +893,6 @@ class SettingsWindow(wx.Frame):
         self.selected_cell = (event.GetRow(), event.GetCol())
         event.Skip()
 
-    def list_operation(self, key, action):
-        list_box = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
-        if action == 'list_add':
-            list_input_value = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_input']))).GetValue()
-
-            list_box.AppendRows(1)
-            row_count = list_box.GetNumberRows() - 1
-            list_box.SetCellValue(row_count, 0, list_input_value.strip().lower())
-
-            list_input2_id = get_id_from_name(MODULE_KEY.join([key, 'list_input2']))
-            if list_input2_id:
-                list_input2_value = wx.FindWindowById(list_input2_id).GetValue()
-                list_box.SetCellValue(row_count, 1, list_input2_value.strip())
-
-        elif action == 'list_remove':
-            top = list_box.GetSelectionBlockTopLeft()
-            bot = list_box.GetSelectionBlockBottomRight()
-            if top and bot:
-                top = top[0][0]
-                bot = bot[0][0] + 1
-                del_rows = range(top, bot) if top < bot else range(bot, top)
-            else:
-                del_rows = [self.selected_cell[0]]
-
-            if list_box.GetNumberRows():
-                ids_deleted = 0
-                for select in del_rows:
-                    list_box.DeleteRows(select - ids_deleted)
-                    ids_deleted += 1
-        rows = list_box.GetNumberRows()
-        cols = list_box.GetNumberCols()
-        grid_elements = [tuple([list_box.GetCellValue(row, col).encode('utf-8').strip()
-                                for col in range(cols)])
-                         for row in range(rows)]
-
-        max_rows = 7
-        if rows == max_rows:
-            self.list_map[key] = list_box.GetBestSize()
-        if rows <= max_rows:
-            list_box.SetMinSize((-1, -1))
-            self.content_page.GetSizer().Layout()
-        else:
-            scroll_size = wx.SystemSettings_GetMetric(wx.SYS_VSCROLL_X)
-            max_size = self.list_map[key]
-            list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
-            list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
-        self.on_change(key, grid_elements, item_type='gridbox')
 
 
 class StatusFrame(wx.Panel):
@@ -1038,16 +1028,16 @@ class ChatGui(wx.Frame):
 
     def on_close(self, event):
         log.info("Exiting...")
-        for module, module_dict in self.loaded_modules.iteritems():
-            module_dict['class'].apply_settings(system_exit=True)
 
         # Saving last window size
-        parser = self.loaded_modules['main']['parser']  # type: ConfigParser
+        config = self.loaded_modules['main']['config']['gui_information']
+
         size = self.Size
-        parser.set('gui_information', 'width', size[0])
-        parser.set('gui_information', 'height', size[1])
-        with open(self.loaded_modules['main']['file'], 'w') as p_file:
-            parser.write(p_file)
+        config['width'] = size[0]
+        config['height'] = size[1]
+
+        for module, module_dict in self.loaded_modules.iteritems():
+            module_dict['class'].apply_settings(system_exit=True)
 
         self.Destroy()
 
