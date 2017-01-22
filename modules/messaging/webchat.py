@@ -12,7 +12,6 @@ from scss import Compiler
 from scss.namespace import Namespace
 from scss.types import Value, Boolean, String, Number
 from collections import OrderedDict
-from jinja2 import Template
 from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket

@@ -48,7 +48,23 @@ class levels(MessagingModule):
                     'config': {
                         'experience': {
                             'view': 'dropdown',
-                            'choices': ['static', 'geometrical', 'random']}}}
+                            'choices': ['static', 'geometrical', 'random']},
+                        'exp_for_level': {
+                            'view': 'spin',
+                            'min': 0,
+                            'max': 100000
+                        },
+                        'exp_for_message': {
+                            'view': 'spin',
+                            'min': 0,
+                            'max': 100000
+                        },
+                        'decrease_window': {
+                            'view': 'spin',
+                            'min': 0,
+                            'max': 100000
+                        }
+                    }}
         config = load_from_config_file(conf_file, conf_dict)
 
         self._conf_params.update(

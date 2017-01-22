@@ -1,10 +1,14 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 from parser import save_settings
+BASE_DICT = {
+    'custom_renderer': False
+}
 
 
 class BaseModule:
     def __init__(self, *args, **kwargs):
-        self._conf_params = kwargs.get('conf_params', {})
+        self._conf_params = BASE_DICT.copy()
+        self._conf_params.update(kwargs.get('conf_params', {}))
         self._loaded_modules = None
         self._rest_api = {}
         self._module_name = self.__class__.__name__
@@ -30,6 +34,9 @@ class BaseModule:
 
     def rest_api(self):
         return self._rest_api
+
+    def render(self, *args, **kwargs):
+        pass
 
 
 class MessagingModule(BaseModule):

@@ -46,9 +46,7 @@ body {
 .level,
 .s-level {
     background-color: rgba(47, 47, 47, 1);
-    border-color: rgba(47, 47, 47, 1);
-    border-width: 2px;
-    border-style: solid;
+    border: 2px solid rgba(47, 47, 47, 1);
     /*margin: -3px;*/
     width: #{$badge-size}px;
     height: #{$badge-size}px;
@@ -98,7 +96,7 @@ body {
 }
 
 .show-del-enter-active, .show-del-leave-active {
-  transition: opacity .5s
+  transition: opacity .2s
 }
 
 .show-del-enter, .show-del-leave-active {
