@@ -68,9 +68,8 @@ class c2b(MessagingModule):
                 return message
 
             for item, replace in self._conf_params['config']['config'].iteritems():
-                item = item.decode('utf-8')
                 if item in message['text']:
-                    replace_word = random.choice(replace.split('/')).decode('utf-8')
+                    replace_word = random.choice(replace.split('/'))
                     if message['source'] == 'tw':
                         message['emotes'] = twitch_replace_indexes(item, message['text'],
                                                                    len(item), len(replace_word),
