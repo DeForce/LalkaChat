@@ -1,13 +1,11 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import threading
 from collections import OrderedDict
-
+import threading
 import os
 import logging
 import webbrowser
 import wx
 import wx.grid
-from ConfigParser import ConfigParser
 from cefpython3.wx import chromectrl
 from modules.helper.system import MODULE_KEY, translate_key, PYTHON_FOLDER
 from modules.helper.parser import return_type
@@ -94,6 +92,66 @@ class CategoryKeyError(Exception):
 
 class ModuleKeyError(Exception):
     pass
+
+
+class CustomColourPickerCtrl(object):
+    def __init__(self):
+        self.panel = None
+        self.button = None
+        self.text = None
+        self.event = None
+        self.key = None
+
+    def create(self, panel, value="#FFFFFF", label="Select Colour", orientation=wx.HORIZONTAL, event=None, key=None,
+               *args, **kwargs):
+        item_sizer = wx.BoxSizer(orientation)
+
+        self.event = event
+        self.key = key
+        label_panel = wx.Panel(panel, style=wx.BORDER_SIMPLE)
+        label_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        label_sizer2 = wx.BoxSizer(wx.VERTICAL)
+        label_text = wx.StaticText(label_panel, label=unicode(value), style=wx.ALIGN_CENTER)
+        self.text = label_text
+        label_sizer.Add(label_text, 1, wx.ALIGN_CENTER)
+        label_sizer2.Add(label_sizer, 1, wx.ALIGN_CENTER)
+        label_panel.SetSizer(label_sizer2)
+        label_panel.SetBackgroundColour(value)
+        self.panel = label_panel
+
+        button = wx.Button(panel, label=translate_key(MODULE_KEY.join(key + ['button'])))
+        button.Bind(wx.EVT_BUTTON, self.on_button_press)
+        border_size = wx.SystemSettings_GetMetric(wx.SYS_BORDER_Y)
+        button_size = button.GetSize()
+        if button_size[0] > 150:
+            button_size[0] = 150
+        button_size[1] -= border_size*2
+        self.button = button
+
+        label_panel.SetMinSize(button_size)
+        label_panel.SetSize(button_size)
+
+        item_sizer.Add(label_panel, 0, wx.ALIGN_CENTER)
+        item_sizer.AddSpacer(2)
+        item_sizer.Add(button, 0, wx.EXPAND)
+        return item_sizer
+
+    def on_button_press(self, event):
+        dialog = wx.ColourDialog(self.panel)
+        if dialog.ShowModal() == wx.ID_OK:
+            colour = dialog.GetColourData()
+            hex_colour = colour.Colour.GetAsString(flags=wx.C2S_HTML_SYNTAX)
+            self.panel.SetBackgroundColour(colour.Colour)
+            self.panel.Refresh()
+            self.text.SetLabel(hex_colour)
+            self.panel.Layout()
+            col = colour.Colour
+            if (col.red * 0.299 + col.green * 0.587 + col.blue * 0.114) > 186:
+                self.text.SetForegroundColour('black')
+            else:
+                self.text.SetForegroundColour('white')
+
+            self.event({'colour': colour.Colour, 'hex': hex_colour, 'key': self.key})
 
 
 class KeyListBox(wx.ListBox):
@@ -235,6 +293,10 @@ class SettingsWindow(wx.Frame):
             'slider': {
                 'function': self.create_slider,
                 'bind': self.on_sliderctrl
+            },
+            'colour_picker': {
+                'function': self.create_colour_picker,
+                'bind': self.on_color_picker
             }
         }
         self.list_map = {}
@@ -424,6 +486,9 @@ class SettingsWindow(wx.Frame):
             list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
             list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
         self.on_change(key, grid_elements, item_type='gridbox')
+
+    def on_color_picker(self, event):
+        self.on_change(MODULE_KEY.join(event['key']), event['hex'])
 
     def create_layout(self):
         self.main_grid = wx.BoxSizer(wx.HORIZONTAL)
@@ -638,8 +703,9 @@ class SettingsWindow(wx.Frame):
     def create_spin(panel, item, value, key, bind, gui):
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
         item_name = MODULE_KEY.join(key)
+        style = wx.ALIGN_LEFT
         item_box = wx.SpinCtrl(panel, id=id_renew(item_name, update=True), min=gui['min'], max=gui['max'],
-                               initial=int(value), size=(-1, -1))
+                               initial=int(value), style=style)
         item_text = wx.StaticText(panel, label=translate_key(item_name))
         item_box.Bind(wx.EVT_SPINCTRL, bind)
         item_box.Bind(wx.EVT_TEXT, bind)
@@ -715,6 +781,19 @@ class SettingsWindow(wx.Frame):
 
         border_sizer.Add(item_sizer, 0, wx.EXPAND | wx.ALL, 5)
         return border_sizer
+
+    @staticmethod
+    def create_colour_picker(panel, item, value, key, bind, gui):
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        item_name = MODULE_KEY.join(key)
+        colour_picker = CustomColourPickerCtrl()
+        item_box = colour_picker.create(panel, value=value, event=bind, key=key)
+
+        item_text = wx.StaticText(panel, label=translate_key(item_name))
+        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
+        item_sizer.Add(item_box, 1, wx.EXPAND)
+        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
     @staticmethod
     def create_choose(panel, item, item_list, key, bind, gui):
