@@ -60,14 +60,14 @@ const DOMPurify = require('dompurify');
                 }
             },
             sanitize: function (message) {
-                var html = this.replaceDefaultEmotions(message.text, message.emotes);
-                var clean = Sanitizer.sanitize(html);
+                var sanitized = Sanitizer.sanitize(message.text, { ALLOWED_TAGS: [] });
+                var clean = this.replaceEmotions(sanitized, message.emotes);
 
                 if (!clean) this.remove(message);
 
                 return clean;
             },
-            replaceDefaultEmotions: function (message, emotes) {
+            replaceEmotions: function (message, emotes) {
                 if (!emotes || emotes.length <= 0) {
                     return message;
                 }
