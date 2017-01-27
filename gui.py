@@ -842,7 +842,8 @@ class SettingsWindow(wx.Frame):
         if is_single:
             item, value = section_for.items()[0]
             if item not in item_list_box.GetItems():
-                item_list_box.SetSelection(0)
+                if item_list_box.GetItems():
+                    item_list_box.SetSelection(0)
             else:
                 item_list_box.SetSelection(list_items.index(item))
         else:
