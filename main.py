@@ -12,7 +12,7 @@ import semantic_version
 from collections import OrderedDict
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
-    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update
+    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException
 from modules.helper.module import BaseModule
 
 VERSION = '0.3.5'
@@ -169,8 +169,13 @@ def init():
     # Actually loading modules
     for f_module, f_config in loaded_modules.iteritems():
         if 'class' in f_config:
-            f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules,
-                                          queue=queue)
+            try:
+                f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules,
+                                              queue=queue)
+            except ModuleLoadException:
+                msg.modules.remove(loaded_modules[f_module]['class'])
+                loaded_modules.pop(f_module)
+
     try:
         load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
     except:

@@ -285,7 +285,10 @@ class HttpRoot(object):
         cherrypy.response.headers["Expires"] = -1
         cherrypy.response.headers["Pragma"] = "no-cache"
         cherrypy.response.headers["Cache-Control"] = "private, max-age=0, no-cache, no-store, must-revalidate"
-        return serve_file(os.path.join(self.settings['location'], 'index.html'), 'text/html')
+        if os.path.exists(self.settings['location']):
+            return serve_file(os.path.join(self.settings['location'], 'index.html'), 'text/html')
+        else:
+            return "Style not found"
 
     @cherrypy.expose
     def ws(self):
@@ -369,7 +372,7 @@ class webchat(MessagingModule):
         conf_dict['server'] = OrderedDict()
         conf_dict['server']['host'] = '127.0.0.1'
         conf_dict['server']['port'] = '8080'
-        conf_dict['style'] = 'czt'
+        conf_dict['style'] = DEFAULT_STYLE
         conf_dict['style_settings'] = OrderedDict()
 
         conf_gui = {
@@ -385,6 +388,9 @@ class webchat(MessagingModule):
         parser = load_from_config_file(conf_file, conf_dict)
 
         style_path = self.get_style_path(conf_dict['style'])
+        style_name = style_path.split(os.sep)[-1] if style_path else None
+        settings_location = os.path.join(style_path, 'settings.json') if style_path else None
+        settings_gui = os.path.join(style_path, 'settings_gui.json') if style_path else None
 
         self._conf_params.update(
             {'folder': conf_folder, 'file': conf_file,
@@ -396,10 +402,10 @@ class webchat(MessagingModule):
              'host': conf_dict['server']['host'],
              'port': conf_dict['server']['port'],
              'style_settings': {
-                 'name': conf_dict['style'],
+                 'name': style_name,
                  'location': style_path,
-                 'settings_location': os.path.join(style_path, 'settings.json'),
-                 'settings_gui_location': os.path.join(style_path, 'settings_gui.json'),
+                 'settings_location': settings_location,
+                 'settings_gui_location': settings_gui,
                  'keys': OrderedDict([
                      ('show_system_msg', False),
                  ])
@@ -438,10 +444,14 @@ class webchat(MessagingModule):
     def get_style_path(style):
         path = os.path.abspath(os.path.join(HTTP_FOLDER, style))
         if os.path.exists(path):
-            style_location = path
+            return path
+        elif os.path.exists(os.path.join(HTTP_FOLDER, DEFAULT_STYLE)):
+            return os.path.join(HTTP_FOLDER, DEFAULT_STYLE)
         else:
-            style_location = os.path.join(HTTP_FOLDER, DEFAULT_STYLE)
-        return style_location
+            dirs = os.listdir(HTTP_FOLDER)
+            if dirs:
+                return os.path.join(HTTP_FOLDER, dirs[0])
+        return None
 
     def reload_chat(self):
         self.queue.put({'type': 'command', 'command': 'reload'})
@@ -486,7 +496,7 @@ class webchat(MessagingModule):
 
     def load_style_settings(self):
         file_path = self._conf_params['style_settings']['settings_location']
-        if os.path.exists(file_path):
+        if file_path and os.path.exists(file_path):
             with open(file_path, 'r') as style_file:
                 self._conf_params['style_settings']['keys'].update(json.loads(style_file.read(),
                                                                               object_pairs_hook=OrderedDict))
@@ -495,7 +505,7 @@ class webchat(MessagingModule):
         self._conf_params['config']['style_settings'].update(self._conf_params['style_settings']['keys'])
 
         gui_file_path = self._conf_params['style_settings']['settings_gui_location']
-        if os.path.exists(gui_file_path):
+        if gui_file_path and os.path.exists(gui_file_path):
             with open(gui_file_path, 'r') as gui_file:
                 self._conf_params['gui']['style_settings'].update(json.loads(gui_file.read()))
 

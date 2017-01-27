@@ -97,7 +97,7 @@ class Message(threading.Thread):
                         modules[int(priority)] = [class_module]
 
                     modules_list[module] = params
-                except ModuleLoadException as exc:
+                except ModuleLoadException:
                     log.error("Unable to load module {0}".format(module))
         sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
         for sorted_priority, sorted_list in sorted_module:
