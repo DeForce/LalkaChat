@@ -102,7 +102,7 @@ class CustomColourPickerCtrl(object):
         self.event = None
         self.key = None
 
-    def create(self, panel, value="#FFFFFF", label="Select Colour", orientation=wx.HORIZONTAL, event=None, key=None,
+    def create(self, panel, value="#FFFFFF", orientation=wx.HORIZONTAL, event=None, key=None,
                *args, **kwargs):
         item_sizer = wx.BoxSizer(orientation)
 
@@ -300,6 +300,7 @@ class SettingsWindow(wx.Frame):
             }
         }
         self.list_map = {}
+        self.redraw_map = {}
 
         # Setting up the window
         self.SetBackgroundColour('cream')
@@ -347,21 +348,39 @@ class SettingsWindow(wx.Frame):
         self.on_change(IDS[event.GetId()], items_values, item_type='listbox_check', section=True)
 
     def on_change(self, key, value, item_type=None, section=False):
+        def enable_button():
+            for button in self.buttons[MODULE_KEY.join(['settings', 'apply_button'])]:
+                button.Enable()
+
+        def disable_button():
+            for button in self.buttons[MODULE_KEY.join(['settings', 'apply_button'])]:
+                button.Disable()
+
         def compare_2d_lists(list1, list2):
             return not set(map(tuple, list1)) ^ set(map(tuple, list2))
 
         def apply_changes():
             self.changes[key] = {'value': value, 'type': item_type}
-            for button in self.buttons[MODULE_KEY.join(['settings', 'apply_button'])]:
-                button.Enable()
+            enable_button()
 
-        def clear_changes():
+        def clear_changes(remote_change=None):
             if key in self.changes:
                 self.changes.pop(key)
+            if remote_change:
+                for change in self.changes.keys():
+                    if remote_change in change:
+                        self.changes.pop(change)
             if not self.changes:
-                for button in self.buttons[MODULE_KEY.join(['settings', 'apply_button'])]:
-                    button.Disable()
+                disable_button()
+
         split_keys = key.split(MODULE_KEY)
+        if split_keys[0] in self.redraw_map:
+            if split_keys[1] in self.redraw_map[split_keys[0]]['redraw_trigger']:
+                self.redraw_item(self.redraw_map[split_keys[0]], value)
+                redraw_key = MODULE_KEY.join(self.redraw_map[split_keys[0]]['key'])
+                clear_changes(redraw_key)
+                enable_button()
+
         config = self.main_class.loaded_modules[split_keys[0]]['config']
         change_item = split_keys[1]
         if section:
@@ -590,6 +609,20 @@ class SettingsWindow(wx.Frame):
         page_sc_window = wx.ScrolledWindow(panel, id=id_renew(gui), style=wx.VSCROLL)
         page_sc_window.SetScrollbars(5, 5, 10, 10)
         sizer = wx.BoxSizer(wx.VERTICAL)
+        joined_keys = MODULE_KEY.join(key)
+        if 'redraw' in gui:
+            for redraw_target, redraw_settings in gui['redraw'].items():
+                self.redraw_map[joined_keys] = {
+                    'key': None,
+                    'item': None,
+                    'redraw_type': None,
+                    'redraw_trigger': redraw_settings['redraw_trigger'],
+                    'redraw_target': redraw_target,
+                    'get_config': redraw_settings['get_config'],
+                    'get_gui': redraw_settings['get_gui'],
+                    'sizer_parent': sizer,
+                    'panel_parent': page_sc_window
+                }
         for section_key, section_items in config.items():
             if section_key in SKIP_TAGS:
                 continue
@@ -597,9 +630,20 @@ class SettingsWindow(wx.Frame):
             view = gui.get(section_key, {}).get('view', type(section_items))
             if view in self.function_map.keys():
                 data = self.function_map[view]
+                gui_settings = gui.get(section_key, {}).copy()
+                item_keys = key + [section_key]
                 sizer_item = data['function'](
                     page_sc_window, section_key, section_items, bind=data['bind'],
-                    gui=gui.get(section_key, {}), key=key + [section_key])
+                    gui=gui_settings, key=item_keys)
+                if joined_keys in self.redraw_map.keys():
+                    if section_key == self.redraw_map[joined_keys]['redraw_target']:
+                        self.redraw_map[joined_keys].update({
+                            'bind_item': data,
+                            'item': sizer_item,
+                            'redraw_type': view,
+                            'key': item_keys,
+                        })
+
                 sizer.Add(sizer_item, 0, wx.EXPAND)
 
         page_sc_window.SetSizer(sizer)
@@ -900,6 +944,47 @@ class SettingsWindow(wx.Frame):
         item_sizer.Add(item_box, 1, wx.EXPAND)
         return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
+    def redraw_item(self, redraw_keys, redraw_value):
+        sizer = redraw_keys['item']
+        sizer_parent = redraw_keys['sizer_parent']
+        config = redraw_keys['get_config'](redraw_value)
+        config_gui = redraw_keys['get_gui'](redraw_value)
+        panel = redraw_keys['panel_parent']
+        function = redraw_keys['bind_item']['function']
+        bind = redraw_keys['bind_item']['bind']
+        key = redraw_keys['key']
+        static_box = None
+
+        if isinstance(sizer, wx.StaticBoxSizer):
+            static_box = sizer.GetStaticBox()
+
+        item_index = 0
+        self.detach_all_children(sizer)
+        for index, item_sizer in enumerate(sizer_parent.GetChildren()):
+            if item_sizer.GetSizer() == sizer:
+                item_index = index
+                sizer_parent.Detach(index)
+        if static_box:
+            static_box.Destroy()
+        sizer.Destroy()
+        new_sizer = function(panel, redraw_keys['redraw_target'], config, bind, config_gui, key)
+        sizer_parent.Insert(item_index, new_sizer, 0, wx.EXPAND)
+
+        self.redraw_map[key[0]]['item'] = new_sizer
+
+        self.main_grid.Layout()
+
+    def detach_all_children(self, sizer):
+        if not sizer:
+            return
+        for index, child in reversed(list(enumerate(sizer.GetChildren()))):
+            child_item = child.GetSizer()
+            if not child_item:
+                continue
+            elif child_item.GetChildren():
+                self.detach_all_children(child_item)
+            sizer.Remove(index)
+
     def button_clicked(self, event):
         log.debug("[Settings] Button clicked: {0}".format(IDS[event.GetId()]))
         button_id = event.GetId()
@@ -972,7 +1057,6 @@ class SettingsWindow(wx.Frame):
     def select_cell(self, event):
         self.selected_cell = (event.GetRow(), event.GetCol())
         event.Skip()
-
 
 
 class StatusFrame(wx.Panel):
