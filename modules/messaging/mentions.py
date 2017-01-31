@@ -42,12 +42,12 @@ class mentions(MessagingModule):
             if message['type'] in IGNORED_TYPES:
                 return message
 
-            for (mention, value) in self._conf_params['config']['mentions']:
+            for mention in self._conf_params['config']['mentions']:
                 if re.search(mention, message['text'].lower()):
                     message['mention'] = True
                     break
 
-            for (address, value) in self._conf_params['config']['address']:
+            for address in self._conf_params['config']['address']:
                 if re.match(address, message['text'].lower()):
                     message['pm'] = True
                     break

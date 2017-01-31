@@ -63,7 +63,7 @@ class MessagingThread(threading.Thread):
             elif message['type'] == 'command':
                 cherrypy.engine.publish('process-command', message['command'], message)
 
-            if message['type'] == 'system_message' and not self.settings['keys']['show_system_msg']:
+            if message['type'] == 'system_message' and not self.settings['keys'].get('show_system_msg', True):
                 continue
 
             send_message = prepare_message(message, self.settings['name'])
@@ -84,14 +84,14 @@ class FireFirstMessages(threading.Thread):
         self.settings = settings
 
     def run(self):
-        show_system_msg = cherrypy.engine.publish('get-settings')[0]['keys']['show_system_msg']
+        show_system_msg = cherrypy.engine.publish('get-settings')[0]['keys'].get('show_system_msg', True)
         if self.ws.stream:
             for item in self.history:
                 if item['type'] == 'system_message' and not show_system_msg:
                     continue
                 timestamp = datetime.datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S.%f")
                 timedelta = datetime.datetime.now() - timestamp
-                timer = int(self.settings['keys']['timer'])
+                timer = int(self.settings['keys'].get('timer', 0))
                 if timer > 0:
                     if timedelta > datetime.timedelta(seconds=timer):
                         continue
@@ -374,23 +374,30 @@ class webchat(MessagingModule):
         conf_dict['server']['port'] = '8080'
         conf_dict['style'] = DEFAULT_STYLE
         conf_dict['style_settings'] = OrderedDict()
+        conf_dict['style_settings']['show_system_msg'] = True
 
         conf_gui = {
             'style': {
                 'check': 'http',
                 'check_type': 'dir',
-                'view': 'choose_single'},
+                'view': 'choose_single'
+            },
             'style_settings': {},
             'non_dynamic': ['server.*'],
-            'ignored_sections': ['style_settings']
+            'ignored_sections': ['style_settings'],
+            'redraw': {
+                'style_settings': {
+                    'redraw_trigger': ['style'],
+                    'get_config': self.load_style_settings,
+                    'get_gui': self.get_style_gui_from_file
+                },
+            }
         }
 
         parser = load_from_config_file(conf_file, conf_dict)
 
         style_path = self.get_style_path(conf_dict['style'])
         style_name = style_path.split(os.sep)[-1] if style_path else None
-        settings_location = os.path.join(style_path, 'settings.json') if style_path else None
-        settings_gui = os.path.join(style_path, 'settings_gui.json') if style_path else None
 
         self._conf_params.update(
             {'folder': conf_folder, 'file': conf_file,
@@ -404,14 +411,10 @@ class webchat(MessagingModule):
              'style_settings': {
                  'name': style_name,
                  'location': style_path,
-                 'settings_location': settings_location,
-                 'settings_gui_location': settings_gui,
-                 'keys': OrderedDict([
-                     ('show_system_msg', False),
-                 ])
+                 'keys': None
              }})
 
-        self.load_style_settings()
+        self.load_style_settings(style_name)
 
         self.s_thread = None
         self.queue = None
@@ -461,7 +464,7 @@ class webchat(MessagingModule):
         if 'system_exit' in kwargs:
             return
 
-        self.update_style_settings()
+        self.update_style_settings(self._conf_params['config']['style'])
         self.reload_chat()
 
         if self._conf_params['config']['style'] != self._conf_params['style_settings']['name']:
@@ -494,23 +497,31 @@ class webchat(MessagingModule):
     def rest_get(self, *args):
         return json.dumps(self._conf_params['style_settings']['keys'])
 
-    def load_style_settings(self):
-        file_path = self._conf_params['style_settings']['settings_location']
+    def get_style_from_file(self, style_name):
+        file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
         if file_path and os.path.exists(file_path):
             with open(file_path, 'r') as style_file:
-                self._conf_params['style_settings']['keys'].update(json.loads(style_file.read(),
-                                                                              object_pairs_hook=OrderedDict))
+                return json.load(style_file, object_pairs_hook=OrderedDict)
+        return {}
 
-        self._conf_params['style_settings']['keys'].update(self._conf_params['config']['style_settings'])
-        self._conf_params['config']['style_settings'].update(self._conf_params['style_settings']['keys'])
-
-        gui_file_path = self._conf_params['style_settings']['settings_gui_location']
-        if gui_file_path and os.path.exists(gui_file_path):
-            with open(gui_file_path, 'r') as gui_file:
-                self._conf_params['gui']['style_settings'].update(json.loads(gui_file.read()))
-
-    def update_style_settings(self):
-        self._conf_params['style_settings']['keys'].update(self._conf_params['config']['style_settings'])
-        file_path = self._conf_params['style_settings']['settings_location']
+    def write_style_to_file(self, style_name):
+        file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
         with open(file_path, 'w') as style_file:
-            style_file.write(json.dumps(self._conf_params['style_settings']['keys'], indent=2))
+            json.dump(self._conf_params['style_settings']['keys'], style_file, indent=2)
+
+    def get_style_gui_from_file(self, style_name):
+        file_path = os.path.join(self.get_style_path(style_name), 'settings_gui.json')
+        if file_path and os.path.exists(file_path):
+            with open(file_path, 'r') as gui_file:
+                return json.load(gui_file)
+        return {}
+
+    def load_style_settings(self, style_name):
+        self._conf_params['config']['style_settings'] = self.get_style_from_file(style_name)
+        self._conf_params['style_settings']['keys'] = self._conf_params['config']['style_settings']
+        self._conf_params['gui']['style_settings'] = self.get_style_gui_from_file(style_name)
+        return self._conf_params['config']['style_settings']
+
+    def update_style_settings(self, style_name):
+        self._conf_params['style_settings']['keys'] = self._conf_params['config']['style_settings']
+        self.write_style_to_file(style_name)
