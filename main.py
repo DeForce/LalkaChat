@@ -5,7 +5,6 @@ import os
 import imp
 import Queue
 import messaging
-import gui
 import logging
 import logging.config
 import semantic_version
@@ -182,6 +181,7 @@ def init():
         log.exception("Failed loading translations")
 
     if gui_settings['gui']:
+        import gui
         log.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,
                                main_config=loaded_modules['main'],
