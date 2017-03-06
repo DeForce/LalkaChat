@@ -6,7 +6,7 @@ const NoErrorsPlugin = require('webpack/lib/NoErrorsPlugin');
 const DefinePlugin = require('webpack/lib/DefinePlugin');
 
 const production = {
-    devtool: null,
+    devtool: false,
 
     output: {
         filename: './js/[name].min.js'
