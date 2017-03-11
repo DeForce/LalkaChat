@@ -1,0 +1,20 @@
+language: generic
+
+services:
+  - docker
+
+env:
+  - TEST_SUITE="pylint"
+  - TEST_SUITE="eslint"
+  - TEST_SUITE="scsslint"
+
+matrix:
+  fast_finish: false
+  allow_failures:
+    env:
+      - TEST_SUITE="pylint"
+      - TEST_SUITE="eslint"
+      - TEST_SUITE="scsslint"
+
+script:
+  - ./travis.sh
