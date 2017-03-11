@@ -40,7 +40,7 @@ node('docker-host') {
         }
     }
     stage('Cleanup') {
-        sh 'docker rmi -f $(docker images | grep \'^<none>\' | awk \'{print \$3}\')'
+        sh 'docker rmi -f $(docker images | grep \'^<none>\' | awk \'{print \$3}\') || true'
         deleteDir()
     }
 }
