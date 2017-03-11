@@ -76,7 +76,7 @@ def load_translations_keys(translation_folder, language):
         for f_file in files_list:
             with open(os.path.join(language_folder, f_file)) as r_file:
                 for line in r_file.readlines():
-                    log.debug(line)
+                    log.debug(line.strip())
                     if line.strip():
                         key, value = map(str.strip, line.strip().split(SPLIT_TRANSLATION))
                         if key not in TRANSLATIONS:

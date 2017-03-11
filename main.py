@@ -61,6 +61,7 @@ def init():
     main_config_dict['gui_information']['width'] = '450'
     main_config_dict['gui_information']['height'] = '500'
     main_config_dict['gui'] = OrderedDict()
+    main_config_dict['gui']['cli'] = False
     main_config_dict['gui']['show_hidden'] = False
     main_config_dict['gui']['gui'] = True
     main_config_dict['gui']['on_top'] = True
@@ -174,13 +175,13 @@ def init():
             except ModuleLoadException:
                 msg.modules.remove(loaded_modules[f_module]['class'])
                 loaded_modules.pop(f_module)
-
-    try:
-        load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
-    except:
-        log.exception("Failed loading translations")
+    log.info('LalkaChat loaded successfully')
 
     if gui_settings['gui']:
+        try:
+            load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
+        except:
+            log.exception("Failed loading translations")
         import gui
         log.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,
@@ -189,20 +190,29 @@ def init():
                                queue=queue)
         loaded_modules['gui'] = window.conf_params()
         window.start()
-    try:
-        while True:
-            console = raw_input("> ")
-            log.info(console)
-            if console == "exit":
-                log.info("Exiting now!")
-                close()
-            else:
-                log.info("Incorrect Command")
-    except (KeyboardInterrupt, SystemExit):
-        log.info("Exiting now!")
-        close()
-    except Exception as exc:
-        log.info(exc)
+    if main_config_dict['gui']['cli']:
+        try:
+            while True:
+                console = raw_input("> ")
+                log.info(console)
+                if console == "exit":
+                    log.info("Exiting now!")
+                    close()
+                else:
+                    log.info("Incorrect Command")
+        except (KeyboardInterrupt, SystemExit):
+            log.info("Exiting now")
+            close()
+        except Exception as exc:
+            log.info(exc)
+    else:
+        try:
+            while True:
+                pass
+        except (KeyboardInterrupt, SystemExit):
+            log.info("Exiting now")
+            close()
+
 
 if __name__ == '__main__':
     root_logger = logging.getLogger()
