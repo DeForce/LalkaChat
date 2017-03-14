@@ -146,7 +146,7 @@ class WebChatPlugin(WebSocketPlugin):
         self.bus.unsubscribe('del-client', self.del_client)
         self.bus.unsubscribe('add-history', self.add_history)
         self.bus.unsubscribe('get-history', self.get_history)
-        self.bus.ubsubscribe('process-command', self.process_command)
+        self.bus.unsubscribe('process-command', self.process_command)
 
     def add_client(self, addr, websocket):
         self.clients.append({'ip': addr[0], 'port': addr[1], 'websocket': websocket})

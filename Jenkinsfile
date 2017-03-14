@@ -4,44 +4,68 @@ node('docker-host') {
     stage('Checkout') {
         checkout scm
     }
-
-    def containersToBuild = []
-    stage('Prepare Docker containers') {
-        sh 'python src/scripts/docker_build.py'
-        def ContainerFile = readFile('docker/build_order.json')
-        def ContainerMap = mapToList(new JsonSlurperClassic().parseText(ContainerFile))
-        for (architecture in ContainerMap) {
-            def archName = architecture.getKey()
-            def archData = architecture.getValue()
-            echo "Running builds for ${archName}"
-            stage(archName) {
-                for (image in archData) {
-                    echo "Building ${image} from ${archName}"
-                    def buildName = "deforce/lc-${archName}-${image}"
-                    buildDockerImage(archName, image, buildName)
-                    if (image.equals('testing')) {
-                        containersToBuild.add(buildName)
+    try {
+        def containersToBuild = []
+        stage('Prepare Docker containers') {
+            sh 'python src/scripts/docker_build.py'
+            def ContainerFile = readFile('docker/build_order.json')
+            def ContainerMap = mapToList(new JsonSlurperClassic().parseText(ContainerFile))
+            for (architecture in ContainerMap) {
+                def archName = architecture.getKey()
+                def archData = architecture.getValue()
+                echo "Running builds for ${archName}"
+                stage(archName) {
+                    for (image in archData) {
+                        echo "Building ${image} from ${archName}"
+                        def buildName = "deforce/lc-${archName}-${image}"
+                        buildDockerImage(archName, image, buildName)
+                        if (image.equals('testing')) {
+                            containersToBuild.add(buildName)
+                        }
                     }
                 }
             }
         }
-    }
-
-    stage('Build') {
-        for (container in containersToBuild) {
+        stage('Build') {
+            def container = containersToBuild[0]
             stage(container) {
                 echo "Running Build for ${container}"
-                docker.image(container).inside {
+                def docker_image = docker.image(container)
+                docker_image.inside {
                     stage('Themes') {
                         buildThemes()
                     }
+                    stage('Configuration') {
+                        sh '/bin/sh src/jenkins/prep_config.sh'
+                    }
+                }
+            }
+        }
+        stage('Testing') {
+            for (container in containersToBuild) {
+                stage(container) {
+                    echo "Running Build for ${container}"
+                    def docker_image = docker.image(container)
+                    docker_image.inside {
+                        stage('Run Chat') {
+                            sh '/bin/sh src/jenkins/run_chat.sh'
+                            try {
+                                sh 'ps aux | grep -v grep | grep main.py'
+                            }
+                            finally {
+                                sh 'cat chat.log'
+                            }
+                        }
+                    }
                 }
             }
         }
     }
-    stage('Cleanup') {
-        sh 'docker rmi -f $(docker images | grep \'^<none>\' | awk \'{print \$3}\') || true'
-        deleteDir()
+    finally {
+        stage('Cleanup') {
+            sh 'docker rmi -f $(docker images | grep \'^<none>\' | awk \'{print \$3}\') || true'
+            // deleteDir()
+        }
     }
 }
 
