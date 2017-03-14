@@ -1,4 +1,4 @@
-# LalkaChat [![Build Status](https://travis-ci.org/DeForce/LalkaChat.svg?branch=develop)](https://travis-ci.org/DeForce/LalkaChat)
+# LalkaChat [![Build Status](http://jenkins.czt.lv/job/LalkaChat/job/develop/badge/icon)](http://jenkins.czt.lv/job/LalkaChat/job/develop/)
 
   LalkaChat is a program for displaying multiple chats from services is one place.  
   It's cross-platform and highly configurable. You can set the style of the chat, so it can look differently and you can tweak a lot of the settings.  
