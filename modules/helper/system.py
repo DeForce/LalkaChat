@@ -70,6 +70,10 @@ class ModuleLoadException(Exception):
         return repr(self.message)
 
 
+class RestApiException(Exception):
+    pass
+
+
 def load_translations_keys(translation_folder, language):
     def load_language(language_folder):
         files_list = [f_item for f_item in os.listdir(language_folder) if f_item.endswith(TRANSLATION_FILETYPE)]

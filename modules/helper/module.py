@@ -1,5 +1,6 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 from parser import save_settings
+from system import RestApiException
 BASE_DICT = {
     'custom_renderer': False
 }
@@ -37,6 +38,15 @@ class BaseModule:
 
     def render(self, *args, **kwargs):
         pass
+
+    def rest_add(self, method, path, function_to_call):
+        if method not in self._rest_api:
+            self._rest_api[method] = {}
+
+        if path in self._rest_api[method]:
+            raise RestApiException('Path already taken')
+
+        self._rest_api[method][path] = function_to_call
 
 
 class MessagingModule(BaseModule):

@@ -1,8 +1,10 @@
+import groovy.json.JsonBuilder
 import groovy.json.JsonSlurperClassic
 
 node('docker-host') {
     stage('Checkout') {
         checkout scm
+        sh 'mkdir -p results'
     }
     try {
         def containersToBuild = []
@@ -47,14 +49,36 @@ node('docker-host') {
                     echo "Running Build for ${container}"
                     def docker_image = docker.image(container)
                     docker_image.inside {
-                        stage('Run Chat') {
-                            sh '/bin/sh src/jenkins/run_chat.sh'
-                            try {
+                        try {
+                            stage('Run Chat') {
+                                sh '/bin/sh src/jenkins/run_chat.sh'
                                 sh 'ps aux | grep -v grep | grep main.py'
                             }
-                            finally {
-                                sh 'cat chat.log'
+                            stage('Run Tests') {
+                                sh 'python src/jenkins/get_chat_tests.py'
+                                def ChatJson = readFile('chat_tests.json')
+                                def ChatTestsList = new JsonSlurperClassic().parseText(ChatJson)
+                                def ChatTestResults = [:]
+                                for (def ChatTest : ChatTestsList) {
+                                    echo "Running ${ChatTest} test"
+                                    def result = false
+                                    try {
+                                        if(ChatTest.endsWith('.py')) {
+                                            sh "python ${ChatTest}"
+                                        }
+                                        else {
+                                            sh "sh ${ChatTest}"
+                                        }
+                                        result = true
+                                    } finally {
+                                        ChatTestResults[ChatTest] = result
+                                    }
+                                }
+                                writeFile(file: 'results/chat_test.txt', text: new JsonBuilder(ChatTestResults).toPrettyString())
                             }
+                        } finally {
+                            sh 'cat chat.log'
+                            archive 'results/**'
                         }
                     }
                 }
@@ -71,7 +95,7 @@ node('docker-host') {
 
 def buildThemes() {
     // Creates themes.json
-    sh 'python src/scripts/get_themes.py'
+    sh 'python src/jenkins/get_themes.py'
     def ThemesJson = readFile('themes.json')
     def ThemesList = new JsonSlurperClassic().parseText(ThemesJson)
     echo "${ThemesList}"

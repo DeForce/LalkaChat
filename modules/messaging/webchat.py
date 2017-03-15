@@ -225,17 +225,26 @@ class RestRoot(object):
 
     @cherrypy.expose
     def default(self, *args):
-        if len(args) > 0:
+        # Default error state
+        message = 'Incorrect api call'
+        error_code = 400
+
+        if len(args) > 1:
             module_name = args[0]
-            query = args[1:]
+            rest_path = args[1]
+            query = args[2:] if len(args) > 2 else None
             if module_name in self._rest_modules:
                 method = cherrypy.request.method
                 api = self._rest_modules[module_name]
                 if method in api:
-                    return api[method](query)
+                    if rest_path in api[method]:
+                        return api[method][rest_path](query)
+                error_code = 404
+                message = 'Method not found'
+        cherrypy.response.status = error_code
         return json.dumps({'error': 'Bad Request',
-                           'status': 400,
-                           'message': 'Unable to find module'})
+                           'status': error_code,
+                           'message': message})
 
 
 class CssRoot(object):
@@ -327,12 +336,8 @@ class SocketThread(threading.Thread):
                      'tools.caching.on': True,
                      'tools.expires.on': True,
                      'tools.expires.secs': 1}}
-        self.css_config = {
-            '/': {}
-        }
-        self.rest_config = {
-            '/': {}
-        }
+        self.css_config = {'/': {}}
+        self.rest_config = {'/': {}}
 
     def run(self):
         cherrypy.log.access_file = ''
@@ -421,7 +426,8 @@ class webchat(MessagingModule):
         self.message_threads = []
 
         # Rest Api Settings
-        self._rest_api['GET'] = self.rest_get
+        self.rest_add('GET', 'style', self.rest_get_style_settings)
+        self.rest_add('GET', 'history', self.rest_get_history)
 
     def load_module(self, *args, **kwargs):
         MessagingModule.load_module(self, *args, **kwargs)
@@ -494,8 +500,12 @@ class webchat(MessagingModule):
             s_queue.put(message)
             return message
 
-    def rest_get(self, *args):
+    def rest_get_style_settings(self, *args):
         return json.dumps(self._conf_params['style_settings']['keys'])
+
+    @staticmethod
+    def rest_get_history(*args, **kwargs):
+        return json.dumps(cherrypy.engine.publish('get-history')[0])
 
     def get_style_from_file(self, style_name):
         file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
