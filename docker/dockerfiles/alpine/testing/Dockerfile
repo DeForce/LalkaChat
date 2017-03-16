@@ -2,4 +2,4 @@ FROM deforce/lc-alpine-build-deps
 
 MAINTAINER CzT/DeForce <vlad@czt.lv>
 
-COPY . /usr/local/lalkachat
+RUN apk --update add curl bash
