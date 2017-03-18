@@ -6,6 +6,7 @@ node('docker-host') {
         checkout scm
         sh 'mkdir -p results'
     }
+    def stable = true
     try {
         def containersToBuild = []
         stage('Prepare Docker containers') {
@@ -55,26 +56,16 @@ node('docker-host') {
                                 sh 'ps aux | grep -v grep | grep main.py'
                             }
                             stage('Run Tests') {
-                                sh 'python src/jenkins/get_chat_tests.py'
-                                def ChatJson = readFile('chat_tests.json')
-                                def ChatTestsList = new JsonSlurperClassic().parseText(ChatJson)
-                                def ChatTestResults = [:]
-                                for (def ChatTest : ChatTestsList) {
-                                    echo "Running ${ChatTest} test"
-                                    def result = false
-                                    try {
-                                        if(ChatTest.endsWith('.py')) {
-                                            sh "python ${ChatTest}"
-                                        }
-                                        else {
-                                            sh "sh ${ChatTest}"
-                                        }
-                                        result = true
-                                    } finally {
-                                        ChatTestResults[ChatTest] = result
-                                    }
+                                stage('Chat Tests') {
+                                    runTests('src/jenkins/chat_tests', 'chat')
                                 }
-                                writeFile(file: 'results/chat_test.txt', text: new JsonBuilder(ChatTestResults).toPrettyString())
+                            }
+                            stage('Lint Tests') {
+                                try {
+                                    runTests('src/jenkins/lint_tests', 'lint')
+                                } catch(exc) {
+                                    stable = false
+                                }
                             }
                         } finally {
                             sh 'cat chat.log'
@@ -87,6 +78,9 @@ node('docker-host') {
     }
     finally {
         stage('Cleanup') {
+            if(!stable) {
+                currentBuild.result = 'UNSTABLE'
+            }
             sh 'docker rmi -f $(docker images | grep \'^<none>\' | awk \'{print \$3}\') || true'
             // deleteDir()
         }
@@ -103,6 +97,30 @@ def buildThemes() {
         sh "/bin/sh src/jenkins/test_theme.sh ${Theme}"
         sh "/bin/sh src/jenkins/build_theme.sh ${Theme}"
     }
+}
+
+def runTests(folder, name) {
+    sh "python src/jenkins/get_folder_tests.py ${folder} ${name}"
+    def TestJson = readFile("${name}_tests.json")
+    def TestsList = new JsonSlurperClassic().parseText(TestJson)
+    def TestResults = [:]
+    for (def Test : TestsList) {
+        echo "Running ${Test} test"
+        def result = false
+        try {
+            def Test_Name = Test.split('/').last().split("\\.").first()
+            if(Test.endsWith('.py')) {
+                sh "python ${Test} > results/${name}_${Test_Name}_results.txt"
+            } else {
+                sh "/bin/bash ${Test} > results/${name}_${Test_Name}_results.txt"
+            }
+            result = true
+        }
+        finally {
+            TestResults[Test] = result
+        }
+    }
+    writeFile(file: "results/${name}_test.txt", text: new JsonBuilder(TestResults).toPrettyString())
 }
 
 def buildDockerImage(archName, image, buildName) {

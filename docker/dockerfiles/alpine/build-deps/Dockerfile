@@ -2,7 +2,11 @@ FROM deforce/lc-alpine-wxpython
 
 MAINTAINER CzT/DeForce <vlad@czt.lv>
 
-COPY requires_linux.txt /root/
+# Misc Packages
+RUN apk --update add build-base bzip2 git libstdc++ openssl-dev tar wget wxgtk-dev xz
 
-RUN apk --update add build-base bzip2 git libstdc++ openssl-dev py2-pip python2-dev tar wget wxgtk-dev xz nodejs-npm
+# Deps for chat
+RUN apk --update add py2-pip python2-dev
+COPY requires_linux.txt /root/
 RUN pip install -r /root/requires_linux.txt
+
