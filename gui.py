@@ -720,6 +720,12 @@ class SettingsWindow(wx.Frame):
         if max_text_size:
             for ctrl in text_ctrls:
                 ctrl.SetMinSize((max_text_size + 50, ctrl.GetSize()[1]))
+
+        item_count = instatic_sizer.GetItemCount()
+        if not item_count:
+            static_sizer.Destroy()
+            return wx.BoxSizer(wx.VERTICAL)
+
         static_sizer.Add(instatic_sizer, 0, wx.EXPAND | wx.ALL, 5)
         return static_sizer
 
