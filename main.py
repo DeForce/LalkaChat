@@ -62,6 +62,7 @@ def init():
     main_config_dict['gui_information']['height'] = '500'
     main_config_dict['system'] = OrderedDict()
     main_config_dict['system']['log_level'] = 'INFO'
+    main_config_dict['system']['testing_mode'] = False
     main_config_dict['gui'] = OrderedDict()
     main_config_dict['gui']['cli'] = False
     main_config_dict['gui']['show_hidden'] = False
