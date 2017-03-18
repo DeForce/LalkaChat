@@ -119,6 +119,11 @@ def init():
     log.info("Loading Messaging Handler")
     log.info("Loading Queue for message handling")
 
+    try:
+        load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
+    except:
+        log.exception("Failed loading translations")
+
     # Creating queues for messaging transfer between chat threads
     queue = Queue.Queue()
     # Loading module for message processing...
@@ -168,7 +173,8 @@ def init():
             chat_init = getattr(tmp, module)
             class_module = chat_init(queue, PYTHON_FOLDER,
                                      conf_folder=CONF_FOLDER,
-                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(module)))
+                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(module)),
+                                     testing=main_config_dict['system']['testing_mode'])
             loaded_modules[module] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")
@@ -179,16 +185,13 @@ def init():
             try:
                 f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules,
                                               queue=queue)
+                log.debug('loaded module {}'.format(f_module))
             except ModuleLoadException:
                 msg.modules.remove(loaded_modules[f_module]['class'])
                 loaded_modules.pop(f_module)
     log.info('LalkaChat loaded successfully')
 
     if gui_settings['gui']:
-        try:
-            load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
-        except:
-            log.exception("Failed loading translations")
         import gui
         log.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,

@@ -224,10 +224,16 @@ class RestRoot(object):
                     self._rest_modules[name] = api
 
     @cherrypy.expose
-    def default(self, *args):
+    def default(self, *args, **kwargs):
         # Default error state
         message = 'Incorrect api call'
         error_code = 400
+        data = None
+
+        body = cherrypy.request.body
+        if cherrypy.request.method in cherrypy.request.methods_with_bodies:
+            data = json.load(body)
+            kwargs.update(data)
 
         if len(args) > 1:
             module_name = args[0]
@@ -238,7 +244,7 @@ class RestRoot(object):
                 api = self._rest_modules[module_name]
                 if method in api:
                     if rest_path in api[method]:
-                        return api[method][rest_path](query)
+                        return api[method][rest_path](query, **kwargs)
                 error_code = 404
                 message = 'Method not found'
         cherrypy.response.status = error_code

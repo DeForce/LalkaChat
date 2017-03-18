@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import json
+import random
+import string
 import threading
 import os
 import requests
@@ -197,8 +199,8 @@ class GGChat(WebSocketClient):
         self.chat_module = kwargs.get('chat_module')
         self.crit_error = False
 
-        message_handler = GoodgameMessageHandler(self, gg_queue=self.gg_queue, **kwargs)
-        message_handler.start()
+        self.message_handler = GoodgameMessageHandler(self, gg_queue=self.gg_queue, **kwargs)
+        self.message_handler.start()
 
     def opened(self):
         success_msg = "Connection Successful"
@@ -246,6 +248,7 @@ class GGThread(threading.Thread):
         self.nick = nick
         self.ch_id = None
         self.kwargs = kwargs
+        self.ws = None
 
     def load_config(self):
         try:
@@ -293,15 +296,54 @@ class GGThread(threading.Thread):
             log.info("Connecting, try {0}".format(try_count))
             if self.load_config():
                 # Connecting to goodgame websocket
-                ws = GGChat(self.address, protocols=['websocket'], queue=self.queue, ch_id=self.ch_id, nick=self.nick,
-                            heartbeat_freq=30, main_thread=self, **self.kwargs)
+                self.ws = GGChat(self.address, protocols=['websocket'], queue=self.queue,
+                                 ch_id=self.ch_id, nick=self.nick,
+                                 heartbeat_freq=30, main_thread=self, **self.kwargs)
                 try:
-                    ws.connect()
-                    ws.run_forever()
+                    self.ws.connect()
+                    self.ws.run_forever()
                     log.debug("Connection closed")
                     break
                 except Exception as exc:
                     log.exception(exc)
+
+
+def gg_message(nickname, text):
+    return {
+        'type': u'message',
+        'data': {
+            u'color': u'streamer',
+            u'hideIcon': 0,
+            u'mobile': 0,
+            u'text': u'{}'.format(text),
+            u'user_name': u'{}'.format(nickname),
+            u'icon': u'none',
+            u'message_id': ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+        }
+    }
+
+
+class TestGG(threading.Thread):
+    def __init__(self, main_class):
+        super(TestGG, self).__init__()
+        self.main_class = main_class  # type: goodgame
+        self.main_class.rest_add('POST', 'push_message', self.send_message)
+        self.gg_handler = None
+
+    def run(self):
+        while True:
+            try:
+                if self.main_class.gg.ws:
+                    self.gg_handler = self.main_class.gg.ws.message_handler
+                    break
+            except:
+                continue
+
+    def send_message(self, *args, **kwargs):
+        nickname = kwargs.get('nickname', 'super_tester')
+        text = kwargs.get('text', 'Kappa 123')
+
+        self.gg_handler.process_message(gg_message(nickname, text))
 
 
 class goodgame(ChatModule):
@@ -326,6 +368,10 @@ class goodgame(ChatModule):
         self.channel_name = CONF_DICT['config']['channel_name']
         self.gg = None
 
+        self.testing = kwargs.get('testing')
+        if self.testing:
+            self.testing = TestGG(self)
+
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
         if 'webchat' in self._loaded_modules:
@@ -336,6 +382,8 @@ class goodgame(ChatModule):
                       settings=self._conf_params['settings'], chat_module=self)
         self.gg = gg
         gg.start()
+        if self.testing:
+            self.testing.start()
 
     def get_remove_text(self):
         if self._loaded_modules['webchat']['style_settings']['keys'].get('remove_message'):

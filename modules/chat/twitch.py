@@ -316,6 +316,8 @@ class twThread(threading.Thread):
         self.bttv_smiles = bttv_smiles
         self.kwargs = kwargs
         self.chat_module = kwargs.get('chat_module')
+        self.irc = None
+
         if bttv_smiles:
             self.kwargs['bttv_smiles_dict'] = {}
 
@@ -339,9 +341,9 @@ class twThread(threading.Thread):
             log.info("Connecting, try {0}".format(try_count))
             try:
                 if self.load_config():
-                    irc = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
-                    irc.connect(self.host, self.port, self.nickname)
-                    irc.start()
+                    self.irc = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
+                    self.irc.connect(self.host, self.port, self.nickname)
+                    self.irc.start()
                     log.info("Connection closed")
                     break
             except TwitchUserError:
@@ -414,6 +416,44 @@ class twThread(threading.Thread):
         return True
 
 
+class TwitchMessage(object):
+    def __init__(self, source, text, emotes=False):
+        self.type = 'pubmsg'
+        self.source = '{0}!{0}@{0}.tmi.twitch.tv'.format(source)
+        self.arguments = [text]
+        self.tags = [
+            {'key': u'badges', 'value': u'broadcaster/1'},
+            {'key': u'color', 'value': u'#FFFFFF'},
+            {'key': u'display-name', 'value': u'{}'.format(source)}
+        ]
+        if emotes:
+            self.tags.append({'key': u'emotes', 'value': u'25:0-4'})
+
+
+class TestTwitch(threading.Thread):
+    def __init__(self, main_class):
+        super(TestTwitch, self).__init__()
+        self.main_class = main_class  # type: twitch
+        self.main_class.rest_add('POST', 'push_message', self.send_message)
+        self.tw_queue = None
+
+    def run(self):
+        while True:
+            try:
+                if self.main_class.tw.irc.twitch_queue:
+                    self.tw_queue = self.main_class.tw.irc.twitch_queue
+                    break
+            except:
+                continue
+
+    def send_message(self, *args, **kwargs):
+        emotes = kwargs.get('emotes', False)
+        nickname = kwargs.get('nickname', 'super_tester')
+        text = kwargs.get('text', 'Kappa 123')
+
+        self.tw_queue.put(TwitchMessage(nickname, text, emotes))
+
+
 class twitch(ChatModule):
     def __init__(self, queue, python_folder, **kwargs):
         ChatModule.__init__(self)
@@ -437,15 +477,22 @@ class twitch(ChatModule):
         self.port = int(CONF_DICT['config']['port'])
         self.channel = CONF_DICT['config']['channel']
         self.bttv = CONF_DICT['config']['bttv']
+        self.tw = None
+
+        self.testing = kwargs.get('testing')
+        if self.testing:
+            self.testing = TestTwitch(self)
 
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
         if 'webchat' in self._loaded_modules:
             self._loaded_modules['webchat']['class'].add_depend('twitch')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        tw = twThread(self.queue, self.host, self.port, self.channel, self.bttv,
-                      settings=self._conf_params['settings'], chat_module=self)
-        tw.start()
+        self.tw = twThread(self.queue, self.host, self.port, self.channel, self.bttv,
+                           settings=self._conf_params['settings'], chat_module=self)
+        self.tw.start()
+        if self.testing:
+            self.testing.start()
 
     def get_viewers(self):
         streams_url = 'https://api.twitch.tv/kraken/streams/{0}'.format(self.channel)

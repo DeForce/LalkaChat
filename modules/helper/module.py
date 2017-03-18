@@ -40,6 +40,14 @@ class BaseModule:
         pass
 
     def rest_add(self, method, path, function_to_call):
+        """
+        Rest add function will take method, path, function and
+          register with that to restApi handler
+        :param method: HTTP Method to trigger function
+        :param path: HTTP Path (/rest/%module_name%/$path)
+        :param function_to_call: what function rest api will trigger when it
+          receives path with correct method
+        """
         if method not in self._rest_api:
             self._rest_api[method] = {}
 

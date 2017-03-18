@@ -1,5 +1,7 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import json
+import random
+import string
 import threading
 import time
 import re
@@ -290,6 +292,46 @@ class FsThread(threading.Thread):
                 break
 
 
+class Sc2tvMessage(object):
+    def __init__(self, nickname, text):
+        message = [
+            u'/chat/message',
+            {
+                u'from': {
+                    u'color': 0,
+                    u'name': u'{}'.format(nickname)},
+                u'text': u'{}'.format(text),
+                u'to': None,
+                u'store': {u'bonuses': [], u'icon': 0, u'subscriptions': []},
+                u'id': ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+            }
+        ]
+        self.data = '42{}'.format(json.dumps(message))
+
+
+class TestSc2tv(threading.Thread):
+    def __init__(self, main_class):
+        super(TestSc2tv, self).__init__()
+        self.main_class = main_class  # type: sc2tv
+        self.main_class.rest_add('POST', 'push_message', self.send_message)
+        self.fs_thread = None
+
+    def run(self):
+        while True:
+            try:
+                if self.main_class.fs_thread.ws:
+                    self.fs_thread = self.main_class.fs_thread.ws
+                    break
+            except:
+                continue
+
+    def send_message(self, *args, **kwargs):
+        nickname = kwargs.get('nickname', 'super_tester')
+        text = kwargs.get('text', 'Kappa 123')
+
+        self.fs_thread.received_message(Sc2tvMessage(nickname, text))
+
+
 class sc2tv(ChatModule):
     def __init__(self, queue, python_folder, **kwargs):
         ChatModule.__init__(self)
@@ -311,12 +353,17 @@ class sc2tv(ChatModule):
         self.channel_name = CONF_DICT['config']['channel_name']
         self.fs_thread = None
 
+        self.testing = kwargs.get('testing')
+        if self.testing:
+            self.testing = TestSc2tv(self)
+
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
         # Creating new thread with queue in place for messaging transfers
-        fs = FsThread(self.queue, self.socket, self.channel_name, chat_module=self)
-        self.fs_thread = fs
-        fs.start()
+        self.fs_thread = FsThread(self.queue, self.socket, self.channel_name, chat_module=self)
+        self.fs_thread.start()
+        if self.testing:
+            self.testing.start()
 
     def get_viewers(self, ws):
         user_data = {'name': ws.channel_name}
@@ -334,6 +381,7 @@ class sc2tv(ChatModule):
             status_request = requests.post('http://funstream.tv/api/stream', timeout=5, data=status_data)
             if status_request.status_code == 200:
                 if status_request.json()['online']:
+                    self.set_online()
                     ws.fs_send(request)
                 else:
                     self.set_viewers('N/A')
