@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ElementTree
 from collections import OrderedDict
 import datetime
 
-from modules.helper.parser import load_from_config_file
+from modules.helper.parser import load_from_config_file, save_settings
 from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES, random_string
 from modules.helper.module import MessagingModule
 
@@ -146,6 +146,7 @@ class levels(MessagingModule):
                 self.levels.append(level_data.attrib)
 
     def apply_settings(self, **kwargs):
+        save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections', ()))
         if 'webchat' in kwargs.get('from_depend', []):
             self.load_levels()
 

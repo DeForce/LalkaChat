@@ -466,7 +466,7 @@ class webchat(MessagingModule):
         self.queue.put({'type': 'command', 'command': 'reload'})
 
     def apply_settings(self, **kwargs):
-        save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections'))
+        save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections', ()))
         if 'system_exit' in kwargs:
             return
 
