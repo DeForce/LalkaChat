@@ -60,6 +60,8 @@ def init():
     main_config_dict['gui_information']['category'] = 'main'
     main_config_dict['gui_information']['width'] = '450'
     main_config_dict['gui_information']['height'] = '500'
+    main_config_dict['system'] = OrderedDict()
+    main_config_dict['system']['log_level'] = 'INFO'
     main_config_dict['gui'] = OrderedDict()
     main_config_dict['gui']['cli'] = False
     main_config_dict['gui']['show_hidden'] = False
@@ -76,9 +78,13 @@ def init():
             'check_type': 'dir',
             'check': 'translations'
         },
-        'non_dynamic': ['language.list_box', 'gui.*']
+        'system': {
+            'hidden': ['log_level']
+        },
+        'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
     }
     config = load_from_config_file(MAIN_CONF_FILE, main_config_dict)
+    root_logger.setLevel(level=logging.getLevelName(main_config_dict['system'].get('log_level', 'INFO')))
     # Adding config for main module
     main_class = BaseModule(
         conf_params={
@@ -217,7 +223,6 @@ def init():
 if __name__ == '__main__':
     root_logger = logging.getLogger()
     # Logging level
-    root_logger.setLevel(level=logging.DEBUG)
     file_handler = logging.FileHandler(LOG_FILE)
     file_handler.setFormatter(LOG_FORMAT)
     root_logger.addHandler(file_handler)
