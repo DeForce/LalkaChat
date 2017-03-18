@@ -71,17 +71,20 @@ class ChatModule(BaseModule):
     def set_viewers(self, viewers):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
-            if gui_class.gui.status_frame:
-                gui_class.gui.status_frame.set_viewers(self._module_name, viewers)
+            if gui_class.gui:
+                if gui_class.gui.status_frame:
+                    gui_class.gui.status_frame.set_viewers(self._module_name, viewers)
 
     def set_online(self):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
-            if gui_class.gui.status_frame:
-                gui_class.gui.status_frame.set_online(self._module_name)
+            if gui_class.gui:
+                if gui_class.gui.status_frame:
+                    gui_class.gui.status_frame.set_online(self._module_name)
 
     def set_offline(self):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
-            if gui_class.gui.status_frame:
-                gui_class.gui.status_frame.set_offline(self._module_name)
+            if gui_class.gui:
+                if gui_class.gui.status_frame:
+                    gui_class.gui.status_frame.set_offline(self._module_name)
