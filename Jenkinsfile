@@ -5,6 +5,7 @@ node('docker-host') {
     stage('Checkout') {
         checkout scm
         sh 'mkdir -p results'
+        sh 'rsync -avz src/jenkins/root/ ./'
     }
     def stable = true
     try {
@@ -57,12 +58,12 @@ node('docker-host') {
                             }
                             stage('Run Tests') {
                                 stage('Chat Tests') {
-                                    runTests('src/jenkins/chat_tests', 'chat')
+                                    runTests('src/jenkins/chat_tests', 'chat', false)
                                 }
                             }
                             stage('Lint Tests') {
                                 try {
-                                    runTests('src/jenkins/lint_tests', 'lint')
+                                    runTests('src/jenkins/lint_tests', 'lint', true)
                                 } catch(exc) {
                                     stable = false
                                 }
@@ -99,7 +100,7 @@ def buildThemes() {
     }
 }
 
-def runTests(folder, name) {
+def runTests(folder, name, skip) {
     sh "python src/jenkins/get_folder_tests.py ${folder} ${name}"
     def TestJson = readFile("${name}_tests.json")
     def TestsList = new JsonSlurperClassic().parseText(TestJson)
@@ -110,11 +111,15 @@ def runTests(folder, name) {
         try {
             def Test_Name = Test.split('/').last().split("\\.").first()
             if(Test.endsWith('.py')) {
-                sh "python ${Test} > results/${name}_${Test_Name}_results.txt"
+                sh "set -o pipefail && python ${Test} 2>&1 | tee results/${name}_${Test_Name}_results.txt"
             } else {
-                sh "/bin/bash ${Test} > results/${name}_${Test_Name}_results.txt"
+                sh "set -o pipefail && /bin/bash ${Test} 2>&1 | tee results/${name}_${Test_Name}_results.txt"
             }
             result = true
+        } catch(exc) {
+            if(!skip) {
+                error('Test didn\'t pass')
+            }
         }
         finally {
             TestResults[Test] = result
