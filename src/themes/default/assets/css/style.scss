@@ -95,10 +95,6 @@ body {
     background-color: #009CDC;
 }
 
-.show-del-enter-active, .show-del-leave-active {
-  transition: opacity .2s
-}
-
 .show-del-enter, .show-del-leave-active {
   opacity: 0
 }
