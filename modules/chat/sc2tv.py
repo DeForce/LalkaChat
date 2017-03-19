@@ -21,6 +21,8 @@ SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
 FILE_ICON = os.path.join('img', 'fs.png')
 SYSTEM_USER = 'Peka2.tv'
+SMILE_REGEXP = r':(\w+|\d+):'
+SMILE_FORMAT = ':{}:'
 
 PING_DELAY = 10
 
@@ -52,7 +54,6 @@ class FsChat(WebSocketClient):
         self.channel_id = self.fs_get_id()
 
         self.smiles = kwargs.get('smiles')
-        self.smile_regex = ':(\w+|\d+):'
 
         self.iter = 0
         self.duplicates = []
@@ -206,11 +207,13 @@ class FsChat(WebSocketClient):
             else:
                 comp['to'] = None
 
-            smiles_array = re.findall(self.smile_regex, comp['text'])
+            smiles_array = re.findall(SMILE_REGEXP, comp['text'])
             for smile in smiles_array:
                 for smile_find in self.smiles:
-                    if smile_find['code'] == smile:
+                    if smile_find['code'] == smile.lower():
                         if self.allow_smile(smile_find, message['store']['subscriptions']):
+                            comp['text'] = comp['text'].replace(SMILE_FORMAT.format(smile),
+                                                                EMOTE_FORMAT.format(smile))
                             comp['emotes'].append({'emote_id': smile, 'emote_url': smile_find['url']})
 
             self.duplicates.append(message['id'])
@@ -227,12 +230,7 @@ class FsChat(WebSocketClient):
         self.chat_module.set_viewers(message['result']['amount'])
 
     def _send_message(self, comp):
-        self._post_process_emotes(comp)
         self.queue.put(comp)
-
-    @staticmethod
-    def _post_process_emotes(comp):
-        comp['text'] = re.sub(':(\w+|\d+):', EMOTE_FORMAT.format('\\1'), comp['text'])
 
 
 class FsPingThread(threading.Thread):
