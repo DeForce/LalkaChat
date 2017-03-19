@@ -322,6 +322,7 @@ class TestSc2tv(threading.Thread):
                     break
             except:
                 continue
+        log.info("sc2tv Testing mode online")
 
     def send_message(self, *args, **kwargs):
         nickname = kwargs.get('nickname', 'super_tester')
