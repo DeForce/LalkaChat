@@ -23,5 +23,8 @@
     "view": "spin",
     "min": 8,
     "max": 128
+  },
+  "background_colour": {
+    "view": "colour_picker"
   }
 }
