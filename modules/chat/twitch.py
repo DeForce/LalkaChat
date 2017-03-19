@@ -445,6 +445,7 @@ class TestTwitch(threading.Thread):
                     break
             except:
                 continue
+        log.info("twitch Testing mode online")
 
     def send_message(self, *args, **kwargs):
         emotes = kwargs.get('emotes', False)

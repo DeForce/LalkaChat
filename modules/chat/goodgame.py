@@ -335,6 +335,7 @@ class TestGG(threading.Thread):
                     break
             except:
                 continue
+        log.info("GG Testing mode online")
 
     def send_message(self, *args, **kwargs):
         nickname = kwargs.get('nickname', 'super_tester')
