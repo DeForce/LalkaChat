@@ -96,3 +96,12 @@ class ChatModule(BaseModule):
             if gui_class.gui:
                 if gui_class.gui.status_frame:
                     gui_class.gui.status_frame.set_offline(self._module_name)
+
+    def get_remove_text(self):
+        remove_dict = {}
+        st_settings = self._loaded_modules['webchat']['style_settings']
+        if st_settings['gui']['keys'].get('remove_message'):
+            remove_dict['gui'] = st_settings['gui']['keys'].get('remove_text')
+        if st_settings['chat']['keys'].get('remove_message'):
+            remove_dict['chat'] = st_settings['chat']['keys'].get('remove_text')
+        return remove_dict

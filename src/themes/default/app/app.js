@@ -7,7 +7,7 @@ const DOMPurify = require('dompurify');
     new Vue({
         el: '#chat-container',
         data: function () {
-            var wsUrl = 'ws://' + window.location.host + '/ws';
+            var wsUrl = 'ws://' + window.location.host + window.location.pathname + '/ws';
             var messages = [];
             var socket = new WebSocket(wsUrl);
 
@@ -28,7 +28,12 @@ const DOMPurify = require('dompurify');
             self.socket.onopen = this.onopen;
             self.socket.onclose = this.onclose;
 
-            self.get(window.location.href + 'rest/webchat', function (err, response) {
+            var style_get = 'chat';
+            if(window.location.pathname.toString().indexOf('gui') !== -1) {
+                style_get = 'gui'
+            }
+
+            self.get('http://' + window.location.host + '/rest/webchat/style/' + style_get, function (err, response) {
                 if (!err) {
                     self.messagesInterval = response.timer * 1000 || -1;
                 }
