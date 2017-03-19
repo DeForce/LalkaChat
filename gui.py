@@ -379,15 +379,18 @@ class SettingsWindow(wx.Frame):
                 disable_button()
 
         split_keys = key.split(MODULE_KEY)
-        if split_keys[0] in self.redraw_map:
-            if split_keys[1] in self.redraw_map[split_keys[0]]['redraw_trigger']:
-                self.redraw_item(self.redraw_map[split_keys[0]], value)
-                redraw_key = MODULE_KEY.join(self.redraw_map[split_keys[0]]['key'])
-                clear_changes(redraw_key)
-                enable_button()
+        module_name = split_keys[0]
+        config_section_name = split_keys[1]
+        if module_name in self.redraw_map:
+            for section, section_config in self.redraw_map[module_name].items():
+                if config_section_name in section_config['redraw_trigger']:
+                    redraw_key = MODULE_KEY.join(section_config['key'])
+                    self.redraw_item(section_config, value)
+                    clear_changes(redraw_key)
+                    enable_button()
 
-        config = self.main_class.loaded_modules[split_keys[0]]['config']
-        change_item = split_keys[1]
+        config = self.main_class.loaded_modules[module_name]['config']
+        change_item = config_section_name
         if section:
             if isinstance(value, list):
                 if set(config[change_item]) != set(value):
@@ -395,7 +398,7 @@ class SettingsWindow(wx.Frame):
                 else:
                     clear_changes()
             else:
-                if config[change_item].decode('utf-8') != return_type(value).decode('utf-8'):
+                if config[change_item] != return_type(value):
                     apply_changes()
                 else:
                     clear_changes()
@@ -616,7 +619,9 @@ class SettingsWindow(wx.Frame):
         joined_keys = MODULE_KEY.join(key)
         if 'redraw' in gui:
             for redraw_target, redraw_settings in gui['redraw'].items():
-                self.redraw_map[joined_keys] = {
+                if joined_keys not in self.redraw_map:
+                    self.redraw_map[joined_keys] = {}
+                self.redraw_map[joined_keys][redraw_target] = {
                     'key': None,
                     'item': None,
                     'redraw_type': None,
@@ -625,7 +630,8 @@ class SettingsWindow(wx.Frame):
                     'get_config': redraw_settings['get_config'],
                     'get_gui': redraw_settings['get_gui'],
                     'sizer_parent': sizer,
-                    'panel_parent': page_sc_window
+                    'panel_parent': page_sc_window,
+                    'all_settings': redraw_settings
                 }
         for section_key, section_items in config.items():
             if section_key in SKIP_TAGS:
@@ -640,8 +646,8 @@ class SettingsWindow(wx.Frame):
                     page_sc_window, section_key, section_items, bind=data['bind'],
                     gui=gui_settings, key=item_keys)
                 if joined_keys in self.redraw_map.keys():
-                    if section_key == self.redraw_map[joined_keys]['redraw_target']:
-                        self.redraw_map[joined_keys].update({
+                    if section_key in self.redraw_map[joined_keys]:
+                        self.redraw_map[joined_keys][section_key].update({
                             'bind_item': data,
                             'item': sizer_item,
                             'redraw_type': view,
@@ -957,7 +963,7 @@ class SettingsWindow(wx.Frame):
     def redraw_item(self, redraw_keys, redraw_value):
         sizer = redraw_keys['item']
         sizer_parent = redraw_keys['sizer_parent']
-        config = redraw_keys['get_config'](redraw_value)
+        config = redraw_keys['get_config'](redraw_value, keys=redraw_keys)
         config_gui = redraw_keys['get_gui'](redraw_value)
         panel = redraw_keys['panel_parent']
         function = redraw_keys['bind_item']['function']
@@ -980,7 +986,7 @@ class SettingsWindow(wx.Frame):
         new_sizer = function(panel, redraw_keys['redraw_target'], config, bind, config_gui, key)
         sizer_parent.Insert(item_index, new_sizer, 0, wx.EXPAND)
 
-        self.redraw_map[key[0]]['item'] = new_sizer
+        self.redraw_map[key[0]][key[1]]['item'] = new_sizer
 
         self.main_grid.Layout()
 
@@ -1282,6 +1288,7 @@ class GuiThread(threading.Thread, BaseModule):
         if HAS_CHROME:
             browser.Initialize()
         url = ':'.join([self.url, str(self.port)])
+        url += '/gui'
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
         self.gui = ChatGui(None, "LalkaChat", url, **self.kwargs)  # A Frame is a top-level window.
         app.MainLoop()

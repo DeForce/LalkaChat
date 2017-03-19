@@ -383,11 +383,6 @@ class goodgame(ChatModule):
         if self.testing:
             self.testing.start()
 
-    def get_remove_text(self):
-        if self._loaded_modules['webchat']['style_settings']['keys'].get('remove_message'):
-            return self._loaded_modules['webchat']['style_settings']['keys'].get('remove_text')
-        return None
-
     def get_viewers(self):
         streams_url = 'http://api2.goodgame.ru/streams/{0}'.format(self.gg.ch_id)
         try:

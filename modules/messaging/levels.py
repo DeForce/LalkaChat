@@ -107,7 +107,7 @@ class levels(MessagingModule):
         self.threshold_users = {}
 
         # Load levels
-        webchat_location = self._loaded_modules['webchat']['style_settings']['location']
+        webchat_location = self._loaded_modules['webchat']['style_settings']['gui']['location']
         if webchat_location and os.path.exists(webchat_location):
             self.level_file = os.path.join(webchat_location, 'levels.xml')
         else:
@@ -129,7 +129,7 @@ class levels(MessagingModule):
 
         self.level_file = os.path.abspath(
             os.path.join(
-                self._loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
+                self._loaded_modules['webchat']['style_settings']['gui']['location'], 'levels.xml'
             )
         )
         tree = ElementTree.parse(self.level_file)

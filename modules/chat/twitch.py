@@ -509,11 +509,6 @@ class twitch(ChatModule):
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
-    def get_remove_text(self):
-        if self._loaded_modules['webchat']['style_settings']['keys'].get('remove_message'):
-            return self._loaded_modules['webchat']['style_settings']['keys'].get('remove_text')
-        return None
-
     def apply_settings(self, **kwargs):
         ChatModule.apply_settings(self, **kwargs)
         if 'webchat' in kwargs.get('from_depend', []):
