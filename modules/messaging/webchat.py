@@ -11,7 +11,7 @@ import datetime
 import copy
 from scss import Compiler
 from scss.namespace import Namespace
-from scss.types import Value, Boolean, String, Number
+from scss.types import Color, Boolean, String, Number
 from collections import OrderedDict
 from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
@@ -30,12 +30,6 @@ s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 log = logging.getLogger('webchat')
 REMOVED_TRIGGER = '%%REMOVED%%'
-SCSS_MAP = {
-    basestring: String,
-    bool: Boolean,
-    int: Number,
-    float: Number
-}
 
 WS_THREADS = THREADS + 3
 
@@ -270,7 +264,6 @@ class RestRoot(object):
         # Default error state
         message = 'Incorrect api call'
         error_code = 400
-        data = None
 
         body = cherrypy.request.body
         if cherrypy.request.method in cherrypy.request.methods_with_bodies:
@@ -321,10 +314,18 @@ class CssRoot(object):
     def style_scss(self, *path):
         css_namespace = Namespace()
         for key, value in self.settings['keys'].items():
-            for baseclass, scss_class in SCSS_MAP.items():
-                if isinstance(value, baseclass):
-                    css_namespace.set_variable('${}'.format(key), scss_class(value))
-                    break
+            if isinstance(value, basestring):
+                if value.startswith('#'):
+                    css_value = Color.from_hex(value)
+                else:
+                    css_value = String(value)
+            elif isinstance(value, bool):
+                css_value = Boolean(value)
+            elif isinstance(value, int) or isinstance(value, float):
+                css_value = Number(value)
+            else:
+                raise ValueError("Unable to find comparable values")
+            css_namespace.set_variable('${}'.format(key), css_value)
 
         cherrypy.response.headers['Content-Type'] = 'text/css'
         with open(os.path.join(self.settings['location'], *path), 'r') as css:
@@ -333,13 +334,14 @@ class CssRoot(object):
             # Something wrong with PyScss,
             #  Syntax error: Found u'100%' but expected one of ADD.
             # Doesn't happen on next attempt, so we are doing bad thing
-            while True:
+            attempts = 0
+            while attempts < 10:
                 try:
+                    attempts += 1
                     ret_string = compiler.compile_string(css_content)
-                    break
-                except:
-                    pass
-            return ret_string
+                    return ret_string
+                except Exception as exc:
+                    log.debug(exc)
 
 
 class HttpRoot(object):
@@ -572,7 +574,6 @@ class webchat(MessagingModule):
 
         chat_style = self._conf_params['config']['style']
         gui_style = self._conf_params['config']['style_gui']
-        config = self._conf_params['config']
         style_config = self._conf_params['style_settings']
 
         self.update_style_settings(chat_style, gui_style)

@@ -6,5 +6,6 @@
   "message_opacity": 67,
   "font_size": 15,
   "smile_size": 20,
-  "badge_size": 16
+  "badge_size": 16,
+  "background_colour": "#FFFFFF"
 }
