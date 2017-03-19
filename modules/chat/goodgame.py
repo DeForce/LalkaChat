@@ -30,6 +30,8 @@ CONF_DICT['config'] = OrderedDict()
 CONF_DICT['config']['show_pm'] = True
 CONF_DICT['config']['channel_name'] = 'CHANGE_ME'
 CONF_DICT['config']['socket'] = 'ws://chat.goodgame.ru:8081/chat/websocket'
+SMILE_REGEXP = r':(\w+|\d+):'
+SMILE_FORMAT = ':{}:'
 
 CONF_GUI = {
     'config': {
@@ -50,7 +52,6 @@ class GoodgameMessageHandler(threading.Thread):
 
         self.nick = kwargs.get('nick')
         self.smiles = kwargs.get('smiles')
-        self.smile_regex = ':(\w+|\d+):'
         self.chat_module = kwargs.get('chat_module')
         self.kwargs = kwargs
 
@@ -138,17 +139,13 @@ class GoodgameMessageHandler(threading.Thread):
             log.exception(exc)
 
     def _send_message(self, comp):
-        self._post_process_emotes(comp)
         self.message_queue.put(comp)
 
-    @staticmethod
-    def _post_process_emotes(comp):
-        comp['text'] = re.sub(':(\w+|\d+):', EMOTE_FORMAT.format('\\1'), comp['text'])
-
     def _process_smiles(self, comp, msg):
-        smiles_array = re.findall(self.smile_regex, comp['text'])
+        smiles_array = re.findall(SMILE_REGEXP, comp['text'])
         for smile in smiles_array:
             if smile in self.smiles:
+                comp['text'] = comp['text'].replace(SMILE_FORMAT.format(smile), EMOTE_FORMAT.format(smile))
                 smile_info = self.smiles.get(smile)
                 allow = False
                 gif = False
