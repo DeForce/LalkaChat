@@ -146,7 +146,6 @@ class GoodgameMessageHandler(threading.Thread):
         smiles_array = re.findall(SMILE_REGEXP, comp['text'])
         for smile in smiles_array:
             if smile in self.smiles:
-                comp['text'] = comp['text'].replace(SMILE_FORMAT.format(smile), EMOTE_FORMAT.format(smile))
                 smile_info = self.smiles.get(smile)
                 allow = False
                 gif = False
@@ -172,6 +171,7 @@ class GoodgameMessageHandler(threading.Thread):
                             gif = True
 
                 if allow:
+                    comp['text'] = comp['text'].replace(SMILE_FORMAT.format(smile), EMOTE_FORMAT.format(smile))
                     if smile not in comp['emotes']:
                         if gif and smile_info['urls']['gif']:
                             comp['emotes'][smile] = {'emote_url': smile_info['urls']['gif']}
