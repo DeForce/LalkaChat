@@ -475,7 +475,7 @@ class webchat(MessagingModule):
             },
             'style_settings': {},
             'non_dynamic': ['server.*'],
-            'ignored_sections': ['style_settings'],
+            'ignored_sections': ['style_settings', 'style_gui_settings'],
             'redraw': {
                 'style_settings': {
                     'redraw_trigger': ['style'],

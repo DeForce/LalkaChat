@@ -68,5 +68,5 @@ def save_settings(conf_dict, ignored_sections=()):
         return
     output = convert_to_yaml(conf_dict.get('config'), ignored_sections)
     with open(conf_dict.get('file'), 'w+') as conf_file:
-        dump_text = yaml.safe_dump(output, default_flow_style=False)
+        dump_text = yaml.safe_dump(output, default_flow_style=False, allow_unicode=True)
         conf_file.write(dump_text)
