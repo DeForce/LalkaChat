@@ -76,26 +76,26 @@ class ChatModule(BaseModule):
     def __init__(self, *args, **kwargs):
         BaseModule.__init__(self, *args, **kwargs)
 
-    def set_viewers(self, viewers):
+    def set_viewers(self, channel, viewers):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
             if gui_class.gui:
                 if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_viewers(self._module_name, viewers)
+                    gui_class.gui.status_frame.set_viewers(self._module_name, channel, viewers)
 
-    def set_online(self):
+    def set_online(self, channel):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
             if gui_class.gui:
                 if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_online(self._module_name)
+                    gui_class.gui.status_frame.set_online(self._module_name, channel)
 
-    def set_offline(self):
+    def set_offline(self, channel):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
             if gui_class.gui:
                 if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_offline(self._module_name)
+                    gui_class.gui.status_frame.set_offline(self._module_name, channel)
 
     def get_remove_text(self):
         remove_dict = {}
