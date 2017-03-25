@@ -7,8 +7,8 @@ import random
 import requests
 import logging.config
 import Queue
-from collections import OrderedDict
 import time
+from collections import OrderedDict
 from modules.helper.parser import load_from_config_file
 from modules.helper.module import ChatModule
 from modules.helper.system import system_message, translate_key, remove_message_by_user, EMOTE_FORMAT, NA_MESSAGE
@@ -352,6 +352,7 @@ class twThread(threading.Thread):
                 break
             except Exception as exc:
                 log.exception(exc)
+            time.sleep(5)
 
     def load_config(self):
         try:
