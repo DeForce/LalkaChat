@@ -18,15 +18,16 @@ logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('twitch')
 headers = {'Client-ID': '5jwove9dketiiz2kozapz8rhjdsxqxc'}
-emote_bits_theme = 'dark'
-emote_bits_type = 'static'
-emote_bits_url = 'static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
-emote_smile_url = 'http://static-cdn.jtvnw.net/emoticons/v1/{id}/1.0'
+BITS_THEME = 'dark'
+BITS_TYPE = 'animated'
+BITS_URL = 'http://static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
+EMOTE_SMILE_URL = 'http://static-cdn.jtvnw.net/emoticons/v1/{id}/1.0'
 NOT_FOUND = 'none'
 SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 FILE_ICON = os.path.join('img', 'tw.png')
 SYSTEM_USER = 'Twitch.TV'
+BITS_REGEXP = r'(^|\s)(\w+){}(\s|$)'
 
 PING_DELAY = 10
 
@@ -124,7 +125,7 @@ class TwitchMessageHandler(threading.Thread):
             emote_id, emote_pos_diap = emote.split(':')
             message['emotes'].append({'emote_id': emote_id,
                                       'positions': emote_pos_diap.split(','),
-                                      'emote_url': emote_smile_url.format(id=emote_id)})
+                                      'emote_url': EMOTE_SMILE_URL.format(id=emote_id)})
 
     def _handle_bttv_smiles(self, message):
         for word in message['text'].split():
@@ -178,6 +179,8 @@ class TwitchMessageHandler(threading.Thread):
                 self._handle_badges(message, tag_value)
             elif tag_key == 'emotes' and tag_value:
                 self._handle_emotes(message, tag_value)
+            elif tag_key == 'bits' and tag_value:
+                self._handle_bits(message, tag_value)
 
         self._handle_bttv_smiles(message)
         self._handle_pm(message)
@@ -187,6 +190,32 @@ class TwitchMessageHandler(threading.Thread):
 
         self._send_message(message)
 
+    def _handle_bits(self, message, amount):
+        regexp = re.search(BITS_REGEXP.format(amount), message['text'])
+        emote = regexp.group(2)
+        emote_smile = '{}{}'.format(emote, amount)
+
+        if amount >= 10000:
+            color = 'red'
+        elif amount >= 5000:
+            color = 'blue'
+        elif amount >= 1000:
+            color = 'green'
+        elif amount >= 100:
+            color = 'purple'
+        else:
+            color = 'gray'
+
+        message['bits'] = {
+            'bits': emote_smile,
+            'amount': amount,
+            'theme': BITS_THEME,
+            'type': BITS_TYPE,
+            'color': color,
+            'size': 4
+        }
+        message['text'] = message['text'].replace(emote_smile, EMOTE_FORMAT.format(emote_smile))
+
     @staticmethod
     def _handle_sub_message(message):
         message['sub_message'] = True
@@ -195,7 +224,23 @@ class TwitchMessageHandler(threading.Thread):
         self._post_process_emotes(message)
         self._post_process_bttv_emotes(message)
         self._post_process_multiple_channels(message)
+        self._post_process_bits(message)
         self.message_queue.put(message)
+
+    @staticmethod
+    def _post_process_bits(message):
+        if 'bits' not in message:
+            return
+        bits = message['bits']
+        message['emotes'].append({
+            'emote_id': bits['bits'],
+            'emote_url': BITS_URL.format(
+                theme=bits['theme'],
+                type=bits['type'],
+                color=bits['color'],
+                size=bits['size']
+            )
+        })
 
     @staticmethod
     def _post_process_emotes(message):
@@ -476,7 +521,8 @@ class TwitchMessage(object):
         self.tags = [
             {'key': u'badges', 'value': u'broadcaster/1'},
             {'key': u'color', 'value': u'#FFFFFF'},
-            {'key': u'display-name', 'value': u'{}'.format(source)}
+            {'key': u'display-name', 'value': u'{}'.format(source)},
+            {'key': u'bits', 'value': u'20'}
         ]
         if emotes:
             self.tags.append({'key': u'emotes', 'value': u'25:0-4'})
