@@ -10,6 +10,7 @@ import requests
 import Queue
 import re
 import logging
+import time
 from collections import OrderedDict
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import system_message, translate_key, remove_message_by_id, EMOTE_FORMAT, NA_MESSAGE
@@ -303,6 +304,7 @@ class GGThread(threading.Thread):
                     break
                 except Exception as exc:
                     log.exception(exc)
+            time.sleep(5)
 
 
 def gg_message(nickname, text):

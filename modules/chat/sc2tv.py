@@ -288,6 +288,7 @@ class FsThread(threading.Thread):
                 self.ws.connect()
                 self.ws.run_forever()
                 break
+            time.sleep(5)
 
 
 class Sc2tvMessage(object):
