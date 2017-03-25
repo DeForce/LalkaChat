@@ -43,7 +43,7 @@ CONF_GUI = {
             'addable': 'true'
         }
     },
-    'non_dynamic': ['config.*'],
+    'non_dynamic': ['config.socket'],
     'icon': FILE_ICON}
 
 
@@ -220,7 +220,8 @@ class GGChat(WebSocketClient):
                                          self.chat_module.get_viewers(self.main_thread.nick))
         except Exception as exc:
             log.exception(exc)
-        self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])), category='connection')
+        self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])).format(self.main_thread.nick),
+                            category='connection')
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
@@ -228,12 +229,25 @@ class GGChat(WebSocketClient):
         log.info("Sent join message")
 
     def closed(self, code, reason=None):
+        """
+        Codes used by LC
+        4000 - Normal disconnect by LC
+        4001 - Invalid Channel ID
+
+        :param code: 
+        :param reason: 
+        """
         log.info("Connection Closed Down")
         self.chat_module.set_offline(self.main_thread.nick)
-        if 'INV_CH_ID' in reason:
+        if code in [4000, 4001]:
             self.crit_error = True
+            self.system_message(translate_key(
+                MODULE_KEY.join(['goodgame', 'connection_closed'])).format(self.main_thread.nick),
+                                category='connection')
         else:
-            self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_died'])), category='connection')
+            self.system_message(translate_key(
+                MODULE_KEY.join(['goodgame', 'connection_died'])).format(self.main_thread.nick),
+                                category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
@@ -242,7 +256,7 @@ class GGChat(WebSocketClient):
         self.gg_queue.put(json.loads(str(mes)))
 
     def system_message(self, msg, category='system'):
-        system_message(msg, self.queue, SOURCE,
+        system_message(msg, self.queue, source=SOURCE,
                        icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
 
 
@@ -317,6 +331,9 @@ class GGThread(threading.Thread):
                 except Exception as exc:
                     log.exception(exc)
             time.sleep(5)
+
+    def stop(self):
+        self.ws.close(4000)
 
 
 def gg_message(nickname, text):
@@ -396,10 +413,7 @@ class goodgame(ChatModule):
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
         # Creating new thread with queue in place for messaging transfers
         for channel in self.channels_list:
-            gg = GGThread(self.queue, self.host, channel,
-                          settings=self._conf_params['settings'], chat_module=self)
-            self.gg[channel] = gg
-            gg.start()
+            self._set_chat_online(channel)
         if self.testing:
             self.testing.start()
 
@@ -419,7 +433,23 @@ class goodgame(ChatModule):
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
+    def _set_chat_offline(self, chat):
+        ChatModule.set_chat_offline(self, chat)
+        try:
+            self.gg[chat].stop()
+        except Exception as exc:
+            log.debug(exc)
+        del self.gg[chat]
+
+    def _set_chat_online(self, chat):
+        ChatModule.set_chat_online(self, chat)
+        gg = GGThread(self.queue, self.host, chat,
+                      settings=self._conf_params['settings'], chat_module=self)
+        self.gg[chat] = gg
+        gg.start()
+
     def apply_settings(self, **kwargs):
         ChatModule.apply_settings(self, **kwargs)
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
+        self._check_chats(self.gg.keys())

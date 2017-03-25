@@ -1172,58 +1172,57 @@ class StatusFrame(wx.Panel):
         self.SetBackgroundColour('cream')
 
         self.chats = {}
-        self._create_items()
+        self.border_sizer = self._create_sizer()
+
+        for chat_name, chat_settings in self.chat_modules.items():
+            if chat_name == 'chat':
+                continue
+            if chat_settings['class'].get_queue('status_frame'):
+                for item in chat_settings['class'].get_queue('status_frame'):
+                    if item['action'] == 'add':
+                        self.set_chat_online(chat_name, item['channel'])
+
+                for item in chat_settings['class'].get_queue('status_frame'):
+                    if item['action'] == 'set_online':
+                        self.set_online(chat_name, item['channel'])
 
         self.Fit()
         self.Layout()
         self.Show(True)
 
-    def _create_items(self):
+    def _create_sizer(self):
         border_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        border_sizer.AddSpacer(5)
+        border_sizer.AddSpacer(2)
         item_sizer = wx.FlexGridSizer(0, 0, 10, 10)
-        for chat_name, settings in self.chat_modules.iteritems():
-            if chat_name not in ['chat']:
-                channels = settings['config']['config']['channels_list']
-                self.chats[chat_name] = {}
-                multiple = True
-                if len(channels) == 1:
-                    multiple = False
-                for channel in channels:
-                    self.chats[chat_name][channel.lower()] = {}
-                    item_sizer.Add(self._create_item(chat_name, channel, settings, multiple), 0, wx.EXPAND)
-
         border_sizer.Add(item_sizer, 0, wx.EXPAND)
-        border_sizer.AddSpacer(5)
+        border_sizer.AddSpacer(2)
         self.SetSizer(border_sizer)
+        return item_sizer
 
-    def _create_item(self, module_name, channel, settings, multiple):
+    def _create_item(self, channel, icon, multiple):
         item_sizer = wx.BoxSizer(wx.VERTICAL)
         module_sizer = wx.FlexGridSizer(0, 0, 5, 3)
 
-        chat_icon = wx.Image(settings['gui'].get('icon'), wx.BITMAP_TYPE_ANY)
-        chat_icon = chat_icon.Scale(16, 16)
         bitmap = wx.StaticBitmap(self, wx.ID_ANY,
-                                 wx.BitmapFromImage(chat_icon),
+                                 wx.Bitmap(icon),
                                  size=wx.Size(16, 16))
-        label = wx.StaticText(self, id=wx.ID_ANY, label='N/A')
-
         module_sizer.Add(bitmap, 0, wx.EXPAND)
-        if multiple:
-            channel_name = wx.StaticText(self, id=wx.ID_ANY, label='{}: '.format(channel))
-            module_sizer.Add(channel_name, 0, wx.EXPAND)
-            self.chats[module_name][channel.lower()]['name'] = channel_name
+
+        label = wx.StaticText(self, id=wx.ID_ANY, label='N/A')
         module_sizer.Add(label, 1, wx.EXPAND)
+
+        channel = '{}: '.format(channel) if multiple else ''
+
+        channel_name = wx.StaticText(self, id=wx.ID_ANY, label=channel)
+        module_sizer.Add(channel_name, 0, wx.EXPAND)
+
         module_sizer.AddSpacer(2)
 
-        item_sizer.Add(module_sizer)
+        item_sizer.Add(module_sizer, 0, wx.EXPAND)
 
         status_sizer = wx.BoxSizer(wx.HORIZONTAL)
         status_item = wx.Panel(self, size=wx.Size(-1, 5))
         status_item.SetBackgroundColour('gray')
-
-        self.chats[module_name][channel.lower()]['label'] = label
-        self.chats[module_name][channel.lower()]['status'] = status_item
 
         status_sizer.Add(status_item, 1, wx.EXPAND)
 
@@ -1231,14 +1230,46 @@ class StatusFrame(wx.Panel):
         item_sizer.Add(status_sizer, 1, wx.EXPAND)
         item_sizer.AddSpacer(2)
 
-        return item_sizer
+        self.border_sizer.Add(item_sizer, 0, wx.EXPAND)
+        return {'item': item_sizer, 'label': label,
+                'status': status_item, 'name': channel_name}
 
     def set_online(self, module_name, channel):
-        self.chats[module_name][channel.lower()]['status'].SetBackgroundColour(wx.Colour(0, 128, 0))
+        if module_name in self.chats:
+            if channel.lower() in self.chats[module_name]:
+                self.chats[module_name][channel.lower()]['status'].SetBackgroundColour(wx.Colour(0, 128, 0))
+        self.Layout()
+        self.Refresh()
+
+    def set_chat_online(self, module_name, channel):
+        if module_name not in self.chats:
+            self.chats[module_name] = {}
+        if channel.lower() not in self.chats[module_name]:
+            config = self.chat_modules.get(module_name)['class'].conf_params()
+            icon = config['gui']['icon']
+            multiple = config['config']['config']['show_channel_names']
+            self.chats[module_name][channel.lower()] = self._create_item(channel, icon, multiple)
+        self.Layout()
+        self.Refresh()
+
+    def set_chat_offline(self, module_name, channel):
+        channel = channel.lower()
+        if module_name not in self.chats:
+            return
+        if channel not in self.chats[module_name]:
+            return
+
+        chat = self.chats[module_name][channel]
+        self.border_sizer.Detach(chat['item'])
+        chat['item'].Clear(True)
+        del self.chats[module_name][channel]
+        self.Layout()
         self.Refresh()
 
     def set_offline(self, module_name, channel):
-        self.chats[module_name][channel.lower()]['status'].SetBackgroundColour('red')
+        if module_name in self.chats:
+            if channel in self.chats[module_name]:
+                self.chats[module_name][channel.lower()]['status'].SetBackgroundColour('red')
         self.Refresh()
 
     def set_viewers(self, module_name, channel, viewers):
@@ -1248,7 +1279,9 @@ class StatusFrame(wx.Panel):
             viewers = str(viewers)
         if len(viewers) >= 5:
             viewers = '{0}k'.format(viewers[:-3])
-        self.chats[module_name][channel.lower()]['label'].SetLabel(str(viewers))
+        if module_name in self.chats:
+            if channel.lower() in self.chats[module_name]:
+                self.chats[module_name][channel.lower()]['label'].SetLabel(str(viewers))
         self.Layout()
 
 

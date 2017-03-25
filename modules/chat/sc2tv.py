@@ -42,7 +42,7 @@ CONF_GUI = {
             'addable': 'true'
         },
     },
-    'non_dynamic': ['config.*'],
+    'non_dynamic': ['config.socket'],
     'icon': FILE_ICON}
 
 
@@ -72,12 +72,25 @@ class FsChat(WebSocketClient):
         self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_success'])), category='connection')
 
     def closed(self, code, reason=None):
+        """
+        Codes used by LC
+        4000 - Normal disconnect by LC
+        4001 - Invalid Channel ID
+
+        :param code: 
+        :param reason: 
+        """
         self.chat_module.set_offline(self.channel_name)
-        if reason == 'INV_CH_ID':
+        if code in [4000, 4001]:
             self.crit_error = True
+            self.fs_system_message(translate_key(
+                MODULE_KEY.join(['sc2tv', 'connection_closed'])).format(self.channel_name),
+                                category='connection')
         else:
             log.info("Websocket Connection Closed Down")
-            self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])), category='connection')
+            self.fs_system_message(
+                translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])).format(self.channel_name),
+                category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
@@ -302,6 +315,10 @@ class FsThread(threading.Thread):
                 break
             time.sleep(5)
 
+    def stop(self):
+        self.ws.send("11")
+        self.ws.close(4000, reason="CLOSE_OK")
+
 
 class Sc2tvMessage(object):
     def __init__(self, nickname, text):
@@ -378,8 +395,7 @@ class sc2tv(ChatModule):
         ChatModule.load_module(self, *args, **kwargs)
         # Creating new thread with queue in place for messaging transfers
         for channel in self.channels_list:
-            self.fs_thread[channel] = FsThread(self.queue, self.socket, channel, chat_module=self)
-            self.fs_thread[channel].start()
+            self._set_chat_online(channel)
         if self.testing:
             self.testing.start()
 
@@ -406,3 +422,20 @@ class sc2tv(ChatModule):
 
         except requests.ConnectionError:
             log.error("Unable to get smiles")
+
+    def _set_chat_offline(self, chat):
+        ChatModule.set_chat_offline(self, chat)
+        try:
+            self.fs_thread[chat].stop()
+        except Exception as exc:
+            log.debug(exc)
+        del self.fs_thread[chat]
+
+    def _set_chat_online(self, chat):
+        ChatModule.set_chat_online(self, chat)
+        self.fs_thread[chat] = FsThread(self.queue, self.socket, chat, chat_module=self)
+        self.fs_thread[chat].start()
+
+    def apply_settings(self, **kwargs):
+        ChatModule.apply_settings(self, **kwargs)
+        self._check_chats(self.fs_thread.keys())

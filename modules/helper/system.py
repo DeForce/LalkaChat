@@ -53,7 +53,8 @@ LANGUAGE_DICT = {
 }
 
 
-def system_message(message, queue, source=SOURCE, icon=SOURCE_ICON, from_user=SOURCE_USER, category='system'):
+def system_message(message, queue, source=SOURCE,
+                   icon=SOURCE_ICON, from_user=SOURCE_USER, category='system'):
     queue.put({'source': source,
                'source_icon': icon,
                'user': from_user,

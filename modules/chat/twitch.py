@@ -47,12 +47,16 @@ CONF_GUI = {
             'addable': 'true'
         }
     },
-    'non_dynamic': ['config.*'],
+    'non_dynamic': ['config.host', 'config.port', 'config.bttv'],
     'icon': FILE_ICON}
 
 
 class TwitchUserError(Exception):
     """Exception for twitch user error"""
+
+
+class TwitchNormalDisconnect(Exception):
+    """Normal Disconnect exception"""
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -240,6 +244,8 @@ class TwitchPingHandler(threading.Thread):
             time.sleep(PING_DELAY)
 
 
+
+
 class IRC(irc.client.SimpleIRCClient):
     def __init__(self, queue, channel, **kwargs):
         irc.client.SimpleIRCClient.__init__(self)
@@ -263,14 +269,23 @@ class IRC(irc.client.SimpleIRCClient):
                        source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
 
     def on_disconnect(self, connection, event):
-        log.info("Connection lost")
-        log.debug("connection: {}".format(connection))
-        log.debug("event: {}".format(event))
-        self.chat_module.set_offline(self.nick)
-        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'connection_died'])), category='connection')
-        timer = threading.Timer(5.0, self.reconnect,
-                                args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
-        timer.start()
+        if 'CLOSE_OK' in event.arguments:
+            log.info("Connection closed")
+            self.system_message(
+                translate_key(MODULE_KEY.join(['twitch', 'connection_closed'])).format(self.nick),
+                category='connection')
+            raise TwitchNormalDisconnect()
+        else:
+            log.info("Connection lost")
+            log.debug("connection: {}".format(connection))
+            log.debug("event: {}".format(event))
+            self.chat_module.set_offline(self.nick)
+            self.system_message(
+                translate_key(MODULE_KEY.join(['twitch', 'connection_died'])).format(self.nick),
+                category='connection')
+            timer = threading.Timer(5.0, self.reconnect,
+                                    args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
+            timer.start()
 
     def reconnect(self, host, port, nickname):
         try_count = 0
@@ -375,7 +390,11 @@ class TWThread(threading.Thread):
                     break
             except TwitchUserError:
                 log.critical("Unable to find twitch user, please fix")
-                self.chat_module.set_offline(self.channel[1:])
+                self.chat_module.set_offline(self.nickname)
+                break
+            except TwitchNormalDisconnect:
+                log.info("Twitch closing")
+                self.chat_module.set_offline(self.nickname)
                 break
             except Exception as exc:
                 log.exception(exc)
@@ -444,6 +463,9 @@ class TWThread(threading.Thread):
                         "Args: {1}".format(exc.message, exc.args))
 
         return True
+
+    def stop(self):
+        self.irc.tw_connection.disconnect("CLOSE_OK")
 
 
 class TwitchMessage(object):
@@ -525,9 +547,7 @@ class twitch(ChatModule):
             self._loaded_modules['webchat']['class'].add_depend('twitch')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
         for channel in self.channels_list:
-            self.tw_dict[channel] = TWThread(self.queue, self.host, self.port, channel, self.bttv,
-                                             settings=self._conf_params['settings'], chat_module=self)
-            self.tw_dict[channel].start()
+            self._set_chat_online(channel)
         if self.testing:
             self.testing.start()
 
@@ -546,7 +566,22 @@ class twitch(ChatModule):
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
+    def _set_chat_offline(self, chat):
+        ChatModule.set_chat_offline(self, chat)
+        try:
+            self.tw_dict[chat].stop()
+        except Exception as exc:
+            log.debug(exc)
+        del self.tw_dict[chat]
+
+    def _set_chat_online(self, chat):
+        ChatModule.set_chat_online(self, chat)
+        self.tw_dict[chat] = TWThread(self.queue, self.host, self.port, chat, self.bttv,
+                                      settings=self._conf_params['settings'], chat_module=self)
+        self.tw_dict[chat].start()
+
     def apply_settings(self, **kwargs):
         ChatModule.apply_settings(self, **kwargs)
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
+        self._check_chats(self.tw_dict.keys())
