@@ -1,6 +1,6 @@
 requests
-cherrypy==8.1.0
-ws4py
+cherrypy
+ws4py>=0.4.0
 irc
 semantic_version
 jinja2
