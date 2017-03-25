@@ -303,7 +303,15 @@ class SettingsWindow(wx.Frame):
             'colour_picker': {
                 'function': self.create_colour_picker,
                 'bind': self.on_color_picker
-            }
+            },
+            'list': {
+                'function': self.create_list,
+                'bind': {
+                    'add': self.button_clicked,
+                    'remove': self.button_clicked,
+                    'select': self.select_cell
+                }
+            },
         }
         self.list_map = {}
         self.redraw_map = {}
@@ -464,16 +472,21 @@ class SettingsWindow(wx.Frame):
     def on_list_operation(self, key, action):
         list_box = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
         if action == 'list_add':
-            list_input_value = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_input']))).GetValue()
+            list_input_value = wx.FindWindowById(
+                get_id_from_name(MODULE_KEY.join([key, 'list_input']))).GetValue().strip()
 
-            list_box.AppendRows(1)
-            row_count = list_box.GetNumberRows() - 1
-            list_box.SetCellValue(row_count, 0, list_input_value.strip().lower())
+            row_count = list_box.GetNumberRows()
+            row_values = [list_box.GetCellValue(f_row, 0).lower() for f_row in range(0, row_count)]
+            if list_input_value.lower() not in row_values:
+                list_box.AppendRows(1)
+                list_box.SetCellValue(row_count, 0, list_input_value)
 
             list_input2_id = get_id_from_name(MODULE_KEY.join([key, 'list_input2']))
             if list_input2_id:
-                list_input2_value = wx.FindWindowById(list_input2_id).GetValue()
-                list_box.SetCellValue(row_count, 1, list_input2_value.strip())
+                list_input2_value = wx.FindWindowById(list_input2_id).GetValue().strip()
+                row_values = [list_box.GetCellValue(f_row, 1).lower() for f_row in range(0, row_count)]
+                if list_input2_value.lower() not in row_values:
+                    list_box.SetCellValue(row_count, 1, list_input2_value)
 
         elif action == 'list_remove':
             top = list_box.GetSelectionBlockTopLeft()
@@ -658,8 +671,8 @@ class SettingsWindow(wx.Frame):
                 gui_settings = gui.get(section_key, {}).copy()
                 item_keys = key + [section_key]
                 sizer_item = data['function'](
-                    page_sc_window, section_key, section_items, bind=data['bind'],
-                    gui=gui_settings, key=item_keys)
+                    panel=page_sc_window, item=section_key, value=section_items, bind=data['bind'],
+                    gui=gui_settings, key=item_keys, from_sb=False)
                 if joined_keys in self.redraw_map.keys():
                     if section_key in self.redraw_map[joined_keys]:
                         self.redraw_map[joined_keys][section_key].update({
@@ -678,22 +691,28 @@ class SettingsWindow(wx.Frame):
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         button_sizer.Add(
             self.create_button(
-                panel, None, None, ['settings', 'ok_button'],
-                self.button_clicked, multiple=True)['item'],
+                panel=panel, key=['settings', 'ok_button'],
+                bind=self.button_clicked, multiple=True)['item'],
             0, wx.ALIGN_RIGHT)
         button_sizer.Add(
             self.create_button(
-                panel, None, None, ['settings', 'apply_button'],
-                self.button_clicked, enabled=False, multiple=True)['item'],
+                panel=panel, key=['settings', 'apply_button'],
+                bind=self.button_clicked, enabled=False, multiple=True)['item'],
             0, wx.ALIGN_RIGHT)
         button_sizer.Add(
             self.create_button(
-                panel, None, None, ['settings', 'cancel_button'],
-                self.button_clicked, multiple=True)['item'],
+                panel=panel, key=['settings', 'cancel_button'],
+                bind=self.button_clicked, multiple=True)['item'],
             0, wx.ALIGN_RIGHT)
         sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 4)
 
-    def create_button(self, panel, item, value, key, bind, enabled=True, multiple=False, **kwargs):
+    def create_button(self, **kwargs):
+        panel = kwargs.get('panel')
+        key = kwargs.get('key')
+        bind = kwargs.get('bind')
+        enabled = kwargs.get('enabled', True)
+        multiple = kwargs.get('multiple')
+
         item_sizer = wx.BoxSizer(wx.VERTICAL)
         item_name = MODULE_KEY.join(key)
         button_id = id_renew(item_name, update=True, multiple=multiple)
@@ -710,7 +729,12 @@ class SettingsWindow(wx.Frame):
         item_sizer.Add(c_button)
         return {'item': item_sizer}
 
-    def create_static_box(self, panel, item, value, bind, gui, key):
+    def create_static_box(self, **kwargs):
+        panel = kwargs.get('panel')
+        value = kwargs.get('value')
+        gui = kwargs.get('gui')
+        key = kwargs.get('key')
+
         static_box = wx.StaticBox(panel, label=translate_key(MODULE_KEY.join(key)))
         static_sizer = wx.StaticBoxSizer(static_box, wx.VERTICAL)
         instatic_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -727,11 +751,11 @@ class SettingsWindow(wx.Frame):
                 continue
             view = gui.get(item, {}).get('view', type(value))
             if view in self.value_map.keys():
-                function = self.value_map[view]
-                item_dict = function['function'](static_box, item, value, key=key + [item], bind=function['bind'],
-                                                 gui=gui.get(item, {}))
+                fnction = self.value_map[view]
+                item_dict = fnction['function'](panel=static_box, item=item, value=value, key=key + [item],
+                                                bind=fnction['bind'], gui=gui.get(item, {}), from_sb=True)
                 if 'text_size' in item_dict:
-                    if max_text_size < item_dict['text_size']:
+                    if max_text_size < item_dict.get('text_size'):
                         max_text_size = item_dict['text_size']
 
                     text_ctrls.append(item_dict['text_ctrl'])
@@ -751,7 +775,12 @@ class SettingsWindow(wx.Frame):
         return static_sizer
 
     @staticmethod
-    def create_checkbox(panel, item, value, key, bind, **kwargs):
+    def create_checkbox(**kwargs):
+        panel = kwargs.get('panel')
+        value = kwargs.get('value')
+        key = kwargs.get('key')
+        bind = kwargs.get('bind')
+
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
         style = wx.ALIGN_CENTER_VERTICAL
         item_key = MODULE_KEY.join(key)
@@ -763,7 +792,12 @@ class SettingsWindow(wx.Frame):
         return {'item': item_sizer}
 
     @staticmethod
-    def create_textctrl(panel, item, value, key, bind, **kwargs):
+    def create_textctrl(**kwargs):
+        panel = kwargs.get('panel')
+        value = kwargs.get('value')
+        key = kwargs.get('key')
+        bind = kwargs.get('bind')
+
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
         item_name = MODULE_KEY.join(key)
         item_box = wx.TextCtrl(panel, id=id_renew(item_name, update=True),
@@ -775,7 +809,13 @@ class SettingsWindow(wx.Frame):
         return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
     @staticmethod
-    def create_spin(panel, item, value, key, bind, gui):
+    def create_spin(**kwargs):
+        panel = kwargs.get('panel')
+        value = kwargs.get('value')
+        key = kwargs.get('key')
+        bind = kwargs.get('bind')
+        gui = kwargs.get('gui')
+
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
         item_name = MODULE_KEY.join(key)
         style = wx.ALIGN_LEFT
@@ -789,7 +829,14 @@ class SettingsWindow(wx.Frame):
         return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
     @staticmethod
-    def create_list(panel, item, value, key, bind, gui):
+    def create_list(**kwargs):
+        panel = kwargs.get('panel')
+        value = kwargs.get('value')
+        key = kwargs.get('key')
+        bind = kwargs.get('bind')
+        gui = kwargs.get('gui')
+        from_sb = kwargs.get('from_sb')
+
         view = gui.get('view')
         is_dual = True if 'dual' in view else False
         style = wx.ALIGN_CENTER_VERTICAL
@@ -855,10 +902,18 @@ class SettingsWindow(wx.Frame):
         item_sizer.Add(list_box)
 
         border_sizer.Add(item_sizer, 0, wx.EXPAND | wx.ALL, 5)
-        return border_sizer
+        if from_sb:
+            return {'item': border_sizer}
+        else:
+            return border_sizer
 
     @staticmethod
-    def create_colour_picker(panel, item, value, key, bind, gui):
+    def create_colour_picker(**kwargs):
+        panel = kwargs.get('panel')
+        value = kwargs.get('value')
+        key = kwargs.get('key')
+        bind = kwargs.get('bind')
+
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         item_name = MODULE_KEY.join(key)
@@ -871,7 +926,13 @@ class SettingsWindow(wx.Frame):
         return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
     @staticmethod
-    def create_choose(panel, item, item_list, key, bind, gui):
+    def create_choose(**kwargs):
+        panel = kwargs.get('panel')
+        item_list = kwargs.get('value')
+        key = kwargs.get('key')
+        bind = kwargs.get('bind')
+        gui = kwargs.get('gui')
+
         view = gui.get('view')
         is_single = True if 'single' in view else False
         description = gui.get('description', False)
@@ -945,7 +1006,13 @@ class SettingsWindow(wx.Frame):
         return border_sizer
 
     @staticmethod
-    def create_dropdown(panel, item, value, key, bind, gui):
+    def create_dropdown(**kwargs):
+        panel = kwargs.get('panel')
+        value = kwargs.get('value')
+        key = kwargs.get('key')
+        bind = kwargs.get('bind')
+        gui = kwargs.get('gui')
+
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
         choices = gui.get('choices', [])
         item_name = MODULE_KEY.join(key)
@@ -959,7 +1026,13 @@ class SettingsWindow(wx.Frame):
         return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
     @staticmethod
-    def create_slider(panel, item, value, key, bind, gui):
+    def create_slider(**kwargs):
+        panel = kwargs.get('panel')
+        value = kwargs.get('value')
+        key = kwargs.get('key')
+        bind = kwargs.get('bind')
+        gui = kwargs.get('gui')
+
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
         item_name = MODULE_KEY.join(key)
         style = wx.SL_VALUE_LABEL | wx.SL_AUTOTICKS
@@ -981,7 +1054,7 @@ class SettingsWindow(wx.Frame):
         config = redraw_keys['get_config'](redraw_value, keys=redraw_keys)
         config_gui = redraw_keys['get_gui'](redraw_value)
         panel = redraw_keys['panel_parent']
-        function = redraw_keys['bind_item']['function']
+        fnc = redraw_keys['bind_item']['function']
         bind = redraw_keys['bind_item']['bind']
         key = redraw_keys['key']
         static_box = None
@@ -998,7 +1071,8 @@ class SettingsWindow(wx.Frame):
         if static_box:
             static_box.Destroy()
         sizer.Destroy()
-        new_sizer = function(panel, redraw_keys['redraw_target'], config, bind, config_gui, key)
+        new_sizer = fnc(panel=panel, item=redraw_keys['redraw_target'],
+                        value=config, bind=bind, gui=config_gui, key=key)
         sizer_parent.Insert(item_index, new_sizer, 0, wx.EXPAND)
 
         self.redraw_map[key[0]][key[1]]['item'] = new_sizer
@@ -1041,24 +1115,24 @@ class SettingsWindow(wx.Frame):
 
     def save_settings(self):
         dynamic_check = False
-        for module in self.main_class.loaded_modules.keys():
+        for module_name in self.main_class.loaded_modules.keys():
             change_list = {}
             for item, change in self.changes.iteritems():
-                if module == item.split(MODULE_KEY)[0]:
+                if module_name == item.split(MODULE_KEY)[0]:
                     change_list[item] = change
             for key in change_list.keys():
                 self.changes.pop(key)
 
-            if self.save_module(module, change_list):
+            if self.save_module(module_name, change_list):
                 dynamic_check = True
         for button in self.buttons[MODULE_KEY.join(['settings', 'apply_button'])]:
             button.Disable()
         return dynamic_check
 
-    def save_module(self, module, changed_items):
+    def save_module(self, module_name, changed_items):
         non_dynamic_check = False
         if changed_items:
-            module_settings = self.main_class.loaded_modules.get(module, {})
+            module_settings = self.main_class.loaded_modules.get(module_name, {})
             non_dynamic = module_settings.get('gui', {}).get('non_dynamic', [])
             module_config = module_settings.get('config')
 
@@ -1073,8 +1147,9 @@ class SettingsWindow(wx.Frame):
                         elif MODULE_KEY.join([section, item_name]) in d_item:
                             non_dynamic_check = True
                             break
-                change_type = change['type']
-                if change_type in ['listbox', 'gridbox', 'listbox_check']:
+                if item_split[-1] in ['list_box']:
+                    del item_split[-1]
+                if len(item_split) == 2:
                     module_config[section] = change['value']
                 else:
                     value = change['value']
@@ -1107,18 +1182,24 @@ class StatusFrame(wx.Panel):
         border_sizer = wx.BoxSizer(wx.HORIZONTAL)
         border_sizer.AddSpacer(5)
         item_sizer = wx.FlexGridSizer(0, 0, 10, 10)
-        for module, settings in self.chat_modules.iteritems():
-            if module not in ['chat']:
-                self.chats[module] = {}
-                item_sizer.Add(self._create_item(module, settings), 0, wx.EXPAND)
+        for chat_name, settings in self.chat_modules.iteritems():
+            if chat_name not in ['chat']:
+                channels = settings['config']['config']['channels_list']
+                self.chats[chat_name] = {}
+                multiple = True
+                if len(channels) == 1:
+                    multiple = False
+                for channel in channels:
+                    self.chats[chat_name][channel.lower()] = {}
+                    item_sizer.Add(self._create_item(chat_name, channel, settings, multiple), 0, wx.EXPAND)
 
         border_sizer.Add(item_sizer, 0, wx.EXPAND)
         border_sizer.AddSpacer(5)
         self.SetSizer(border_sizer)
 
-    def _create_item(self, module, settings):
+    def _create_item(self, module_name, channel, settings, multiple):
         item_sizer = wx.BoxSizer(wx.VERTICAL)
-        module_sizer = wx.FlexGridSizer(0, 0, 5, 5)
+        module_sizer = wx.FlexGridSizer(0, 0, 5, 3)
 
         chat_icon = wx.Image(settings['gui'].get('icon'), wx.BITMAP_TYPE_ANY)
         chat_icon = chat_icon.Scale(16, 16)
@@ -1126,8 +1207,12 @@ class StatusFrame(wx.Panel):
                                  wx.BitmapFromImage(chat_icon),
                                  size=wx.Size(16, 16))
         label = wx.StaticText(self, id=wx.ID_ANY, label='N/A')
-        self.chats[module]['label'] = label
+
         module_sizer.Add(bitmap, 0, wx.EXPAND)
+        if multiple:
+            channel_name = wx.StaticText(self, id=wx.ID_ANY, label='{}: '.format(channel))
+            module_sizer.Add(channel_name, 0, wx.EXPAND)
+            self.chats[module_name][channel.lower()]['name'] = channel_name
         module_sizer.Add(label, 1, wx.EXPAND)
         module_sizer.AddSpacer(2)
 
@@ -1136,7 +1221,9 @@ class StatusFrame(wx.Panel):
         status_sizer = wx.BoxSizer(wx.HORIZONTAL)
         status_item = wx.Panel(self, size=wx.Size(-1, 5))
         status_item.SetBackgroundColour('gray')
-        self.chats[module]['status'] = status_item
+
+        self.chats[module_name][channel.lower()]['label'] = label
+        self.chats[module_name][channel.lower()]['status'] = status_item
 
         status_sizer.Add(status_item, 1, wx.EXPAND)
 
@@ -1146,22 +1233,22 @@ class StatusFrame(wx.Panel):
 
         return item_sizer
 
-    def set_online(self, module):
-        self.chats[module]['status'].SetBackgroundColour(wx.Colour(0, 128, 0))
+    def set_online(self, module_name, channel):
+        self.chats[module_name][channel.lower()]['status'].SetBackgroundColour(wx.Colour(0, 128, 0))
         self.Refresh()
 
-    def set_offline(self, module):
-        self.chats[module]['status'].SetBackgroundColour('red')
+    def set_offline(self, module_name, channel):
+        self.chats[module_name][channel.lower()]['status'].SetBackgroundColour('red')
         self.Refresh()
 
-    def set_viewers(self, module, viewers):
+    def set_viewers(self, module_name, channel, viewers):
         if not viewers:
             return
         if isinstance(viewers, int):
             viewers = str(viewers)
         if len(viewers) >= 5:
             viewers = '{0}k'.format(viewers[:-3])
-        self.chats[module]['label'].SetLabel(str(viewers))
+        self.chats[module_name][channel.lower()]['label'].SetLabel(str(viewers))
         self.Layout()
 
 
@@ -1232,6 +1319,7 @@ class ChatGui(wx.Frame):
 
     def on_close(self, event):
         log.info("Exiting...")
+        log.debug(event)
 
         # Saving last window size
         config = self.loaded_modules['main']['config']['gui_information']
@@ -1240,7 +1328,7 @@ class ChatGui(wx.Frame):
         config['width'] = size[0]
         config['height'] = size[1]
 
-        for module, module_dict in self.loaded_modules.iteritems():
+        for module_name, module_dict in self.loaded_modules.iteritems():
             module_dict['class'].apply_settings(system_exit=True)
 
         self.Destroy()
@@ -1279,7 +1367,7 @@ class ChatGui(wx.Frame):
         if list_keys[0] in self.loaded_modules:
             self.loaded_modules[list_keys[0]]['class'].gui_button_press(self, event, list_keys)
         else:
-            for module, settings in self.loaded_modules.items():
+            for module_name, settings in self.loaded_modules.items():
                 if 'class' in settings:
                     settings['class'].gui_button_press(self, event, list_keys)
         event.Skip()
