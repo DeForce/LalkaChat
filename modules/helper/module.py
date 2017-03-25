@@ -1,4 +1,6 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
+import Queue
+
 from parser import save_settings
 from system import RestApiException
 BASE_DICT = {
@@ -13,6 +15,15 @@ class BaseModule:
         self._loaded_modules = None
         self._rest_api = {}
         self._module_name = self.__class__.__name__
+        self._load_queue = {}
+
+    def add_to_queue(self, q_type, data):
+        if q_type not in self._load_queue:
+            self._load_queue[q_type] = []
+        self._load_queue[q_type].append(data)
+
+    def get_queue(self, q_type):
+        return self._load_queue.get(q_type, {})
 
     def conf_params(self):
         params = self._conf_params
@@ -89,6 +100,8 @@ class ChatModule(BaseModule):
             if gui_class.gui:
                 if gui_class.gui.status_frame:
                     gui_class.gui.status_frame.set_online(self._module_name, channel)
+        else:
+            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_online'})
 
     def set_offline(self, channel):
         if 'gui' in self._loaded_modules:
@@ -96,6 +109,51 @@ class ChatModule(BaseModule):
             if gui_class.gui:
                 if gui_class.gui.status_frame:
                     gui_class.gui.status_frame.set_offline(self._module_name, channel)
+        else:
+            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_offline'})
+
+    def set_chat_online(self, channel):
+        if 'gui' in self._loaded_modules:
+            gui_class = self._loaded_modules['gui']['class']
+            if gui_class.gui:
+                if gui_class.gui.status_frame:
+                    gui_class.gui.status_frame.set_chat_online(self._module_name, channel)
+        else:
+            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'add'})
+
+    def set_chat_offline(self, channel):
+        if 'gui' in self._loaded_modules:
+            gui_class = self._loaded_modules['gui']['class']
+            if gui_class.gui:
+                if gui_class.gui.status_frame:
+                    gui_class.gui.status_frame.set_chat_offline(self._module_name, channel)
+        else:
+            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'remove'})
+
+    def _set_chat_offline(self, *args, **kwargs):
+        """
+            Overwite this method
+        :param args: 
+        :param kwargs: 
+        """
+        pass
+
+    def _set_chat_online(self, *args, **kwargs):
+        """
+            Overwite this method
+        :param args: 
+        :param kwargs: 
+        """
+        pass
+
+    def _check_chats(self, online_chats):
+        chats = self._conf_params['config']['config']['channels_list']
+
+        chats_to_set_offline = [chat for chat in online_chats if chat not in chats]
+        [self._set_chat_offline(chat) for chat in chats_to_set_offline]
+
+        chats_to_set_online = [chat for chat in chats if chat not in online_chats]
+        [self._set_chat_online(chat) for chat in chats_to_set_online]
 
     def get_remove_text(self):
         remove_dict = {}

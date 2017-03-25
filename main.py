@@ -201,6 +201,7 @@ def init():
                                queue=queue)
         loaded_modules['gui'] = window.conf_params()
         window.start()
+
     if main_config_dict['gui']['cli']:
         try:
             while True:
