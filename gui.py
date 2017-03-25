@@ -226,6 +226,7 @@ class SettingsWindow(wx.Frame):
 
         self.settings_saved = True
         self.tree_ctrl = None
+        self.tree_ctrl_image_dict = {}
         self.content_page = None
         self.sizer_dict = {}
         self.changes = {}
@@ -306,6 +307,7 @@ class SettingsWindow(wx.Frame):
         }
         self.list_map = {}
         self.redraw_map = {}
+        self.show_icons = self.main_class.main_config['config']['gui']['show_icons']
 
         # Setting up the window
         self.SetBackgroundColour('cream')
@@ -522,22 +524,35 @@ class SettingsWindow(wx.Frame):
         style = wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_TWIST_BUTTONS | wx.TR_NO_LINES
         # style = wx.TR_HAS_BUTTONS | wx.TR_SINGLE | wx.TR_HIDE_ROOT
 
+        image_list = wx.ImageList(16, 16)
+
         tree_ctrl_id = id_renew('settings.tree', update=True)
         tree_ctrl = wx.TreeCtrl(self, id=tree_ctrl_id, style=style)
         root_key = MODULE_KEY.join(['settings', 'tree', 'root'])
         root_node = tree_ctrl.AddRoot(translate_key(root_key))
-        for item, value in self.categories.iteritems():
-            item_key = MODULE_KEY.join(['settings', item])
+        for cat_name, category in self.categories.iteritems():
+            item_key = MODULE_KEY.join(['settings', cat_name])
             item_data = wx.TreeItemData()
             item_data.SetData(item_key)
 
             item_node = tree_ctrl.AppendItem(root_node, translate_key(item_key), data=item_data)
-            for f_item, f_value in value.iteritems():
-                if not f_item == item:
-                    f_item_key = MODULE_KEY.join([item_key, f_item])
+            for module_name, module_settings in category.iteritems():
+                if not module_name == cat_name:
+                    if module_settings.get('gui', {}).get('icon'):
+                        icon = wx.Bitmap(module_settings['gui']['icon'])
+                        self.tree_ctrl_image_dict[module_name] = image_list.GetImageCount()
+                        image_list.Add(icon)
+                    else:
+                        self.tree_ctrl_image_dict[module_name] = -1
+
+                    f_item_key = MODULE_KEY.join([item_key, module_name])
                     f_item_data = wx.TreeItemData()
                     f_item_data.SetData(f_item_key)
-                    tree_ctrl.AppendItem(item_node, translate_key(f_item), data=f_item_data)
+                    tree_ctrl.AppendItem(item_node, translate_key(module_name),
+                                         image=self.tree_ctrl_image_dict[module_name],
+                                         data=f_item_data)
+        if self.show_icons:
+            tree_ctrl.AssignImageList(image_list)
         tree_ctrl.ExpandAll()
 
         self.tree_ctrl = tree_ctrl

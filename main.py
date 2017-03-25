@@ -65,6 +65,7 @@ def init():
     main_config_dict['system']['testing_mode'] = False
     main_config_dict['gui'] = OrderedDict()
     main_config_dict['gui']['cli'] = False
+    main_config_dict['gui']['show_icons'] = False
     main_config_dict['gui']['show_hidden'] = False
     main_config_dict['gui']['gui'] = True
     main_config_dict['gui']['on_top'] = True
