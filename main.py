@@ -81,7 +81,7 @@ def init():
             'check': 'translations'
         },
         'system': {
-            'hidden': ['log_level']
+            'hidden': ['log_level', 'testing_mode']
         },
         'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
     }
