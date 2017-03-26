@@ -108,8 +108,9 @@ node('docker-host') {
             if(!stable) {
                 currentBuild.result = 'UNSTABLE'
             }
+            sh 'rm -rf dist/'
             sh 'docker rmi -f $(docker images | grep \'^<none>\' | awk \'{print \$3}\') || true'
-            // deleteDir()
+            deleteDir()
         }
     }
 }
