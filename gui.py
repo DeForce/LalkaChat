@@ -517,8 +517,6 @@ class SettingsWindow(wx.Frame):
             grid_elements = list(set([list_box.GetCellValue(row, 0) for row in range(rows)]))
 
         max_rows = 7
-        if rows == max_rows:
-            self.list_map[key] = list_box.GetBestSize()
         if rows <= max_rows:
             list_box.SetMinSize((-1, -1))
             self.content_page.GetSizer().Layout()
@@ -527,6 +525,8 @@ class SettingsWindow(wx.Frame):
             max_size = self.list_map[key]
             list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
             list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
+        if rows == max_rows:
+            self.list_map[key] = list_box.GetBestSize()
         self.on_change(key, grid_elements, item_type='gridbox')
 
     def on_color_picker(self, event):
@@ -1271,6 +1271,8 @@ class StatusFrame(wx.Panel):
         self.Refresh()
 
     def refresh_labels(self, module_name):
+        if module_name not in self.chats:
+            return
         show_names = self.chat_modules[module_name]['config']['config']['show_channel_names']
         for name, settings in self.chats[module_name].items():
             channel = '{}: '.format(settings['channel']) if show_names else ''

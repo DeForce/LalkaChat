@@ -92,9 +92,9 @@ node('docker-host') {
                 sh "sh src/jenkins/build_default_themes.sh"
                 sh "cp -r http/ dist/windows/main/http/"
                 sh "chmod a+x -R dist/windows/main/"
-                sh "mv dist/windows/main dist/windows/${ZipName}"
+                sh "mv dist/windows/main dist/windows/LalkaChat"
                 dir('dist/windows/') {
-                    sh "zip -r ${ZipName}.zip ${ZipName}"
+                    sh "zip -r ${ZipName}.zip LalkaChat"
                 }
                 archive "dist/windows/${ZipName}.zip"
                 sh "chmod 664 dist/windows/${ZipName}.zip"
