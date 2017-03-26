@@ -39,6 +39,7 @@ CONF_DICT['config']['bttv'] = True
 CONF_DICT['config']['host'] = 'irc.twitch.tv'
 CONF_DICT['config']['port'] = 6667
 CONF_DICT['config']['show_channel_names'] = True
+CONF_DICT['config']['show_nickname_colors'] = False
 CONF_DICT['config']['channels_list'] = []
 CONF_GUI = {
     'config': {
@@ -181,6 +182,8 @@ class TwitchMessageHandler(threading.Thread):
                 self._handle_emotes(message, tag_value)
             elif tag_key == 'bits' and tag_value:
                 self._handle_bits(message, tag_value)
+            elif tag_key == 'color' and tag_value:
+                self._handle_viewer_color(message, tag_value)
 
         self._handle_bttv_smiles(message)
         self._handle_pm(message)
@@ -190,7 +193,12 @@ class TwitchMessageHandler(threading.Thread):
 
         self._send_message(message)
 
-    def _handle_bits(self, message, amount):
+    def _handle_viewer_color(self, message, value):
+        if self.irc_class.chat_module.conf_params()['config']['config']['show_nickname_colors']:
+            message['nick_color'] = value
+
+    @staticmethod
+    def _handle_bits(message, amount):
         regexp = re.search(BITS_REGEXP.format(amount), message['text'])
         emote = regexp.group(2)
         emote_smile = '{}{}'.format(emote, amount)
@@ -287,8 +295,6 @@ class TwitchPingHandler(threading.Thread):
             except Exception as exc:
                 log.exception(exc)
             time.sleep(PING_DELAY)
-
-
 
 
 class IRC(irc.client.SimpleIRCClient):
