@@ -99,7 +99,7 @@ def load_translations_keys(translation_folder, language):
             log.warning("Unable to load language {0}".format(language_item))
 
 
-def find_key_translation(item):
+def find_key_translation(item, language=ACTIVE_LANGUAGE):
     translation = TRANSLATIONS.get(item)
     if translation is None:
         split_item = [f_item for f_item in item.split(MODULE_KEY) if f_item != '*']
@@ -107,7 +107,10 @@ def find_key_translation(item):
             wildcard_item = MODULE_KEY.join(split_item[1:])
             return find_key_translation('*{0}{1}'.format(MODULE_KEY, wildcard_item))
         else:
-            return item
+            if language == ACTIVE_LANGUAGE:
+                return find_key_translation(item, language=DEFAULT_LANGUAGE)
+            else:
+                return item
     return translation
 
 
