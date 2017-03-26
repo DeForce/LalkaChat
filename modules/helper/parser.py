@@ -21,7 +21,8 @@ def load_from_config_file(conf_file, conf_dict):
         return
     with open(conf_file, 'r') as conf_f:
         loaded_dict = yaml.safe_load(conf_f.read())
-    update(conf_dict, loaded_dict)
+    if loaded_dict:
+        update(conf_dict, loaded_dict)
 
 
 def return_type(item):
@@ -48,16 +49,19 @@ def get_config(conf_file):
     return heal_config
 
 
-def convert_to_yaml(source, ignored_sections):
+def convert_to_yaml(source, ignored_keys):
     output = {}
     if not source:
         return output
 
     for item, value in source.items():
-        if item in ignored_sections:
+        if item in ignored_keys:
             continue
         if isinstance(value, OrderedDict):
-            output[item] = convert_to_yaml(value, ignored_sections)
+            output[item] = convert_to_yaml(
+                value,
+                [key.replace('{}.'.format(item), '') for key in ignored_keys if key.startswith(item)]
+            )
         else:
             output[item] = value
     return output

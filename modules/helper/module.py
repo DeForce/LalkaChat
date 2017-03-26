@@ -42,7 +42,8 @@ class BaseModule:
             system_exit - param provided if system is exiting
         :return:
         """
-        save_settings(self.conf_params())
+        save_settings(self.conf_params(),
+                      ignored_sections=self.conf_params().get('gui', {}).get('ignored_sections', ()))
 
     def rest_api(self):
         return self._rest_api
