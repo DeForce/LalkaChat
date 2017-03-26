@@ -30,7 +30,7 @@ node('docker-host') {
                 }
             }
         }
-        stage('Build') {
+        stage('PreBuild') {
             def container = containersToBuild[0]
             stage(container) {
                 echo "Running Build for ${container}"
@@ -46,6 +46,7 @@ node('docker-host') {
             }
         }
         stage('Testing') {
+            def lintRun = false
             for (container in containersToBuild) {
                 stage(container) {
                     echo "Running Build for ${container}"
@@ -63,7 +64,10 @@ node('docker-host') {
                             }
                             stage('Lint Tests') {
                                 try {
-                                    runTests('src/jenkins/lint_tests', 'lint', true)
+                                    if(!lintRun) {
+                                        runTests('src/jenkins/lint_tests', 'lint', true)
+                                        lintRun = true
+                                    }
                                 } catch(exc) {
                                     stable = false
                                 }
@@ -74,6 +78,28 @@ node('docker-host') {
                         }
                     }
                 }
+            }
+        }
+        stage('Build') {
+            if (env.BRANCH_NAME == 'develop' || env.BRANCH_NAME == 'master') {
+                def ZipName = env.BUILD_TAG.replace('jenkins-', '')
+                echo ZipName
+                def container = 'deforce/ubuntu-builder'
+                sh "cp requires_windows.txt requirements.txt"
+                def binariesLocation = "http://repo.intra.czt.lv/lalkachat/"
+                sh "wget -r --cut-dirs=1 -nH -np --reject index.html ${binariesLocation} "
+                sh "docker run -v \"\$(pwd):/src/\" ${container}"
+                sh "sh src/jenkins/build_default_themes.sh"
+                sh "cp -r http/ dist/windows/main/http/"
+                sh "chmod a+x -R dist/windows/main/"
+                sh "mv dist/windows/main dist/windows/${ZipName}"
+                dir('dist/windows/') {
+                    sh "zip -r ${ZipName}.zip ${ZipName}"
+                }
+                archive "dist/windows/${ZipName}.zip"
+                sh "chmod 664 dist/windows/${ZipName}.zip"
+                def UploadPath = "jenkins@czt.lv:/usr/local/nginx/html/czt.lv/lalkachat/"
+                sh "scp dist/windows/${ZipName}.zip ${UploadPath}"
             }
         }
     }
