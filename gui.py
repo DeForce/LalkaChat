@@ -1208,14 +1208,12 @@ class StatusFrame(wx.Panel):
                                  size=wx.Size(16, 16))
         module_sizer.Add(bitmap, 0, wx.EXPAND)
 
+        channel_name = '{}: '.format(channel) if multiple else ''
+        channel_text = wx.StaticText(self, id=wx.ID_ANY, label=channel_name)
+        module_sizer.Add(channel_text, 0, wx.EXPAND)
+
         label = wx.StaticText(self, id=wx.ID_ANY, label='N/A')
         module_sizer.Add(label, 1, wx.EXPAND)
-
-        channel = '{}: '.format(channel) if multiple else ''
-
-        channel_name = wx.StaticText(self, id=wx.ID_ANY, label=channel)
-        module_sizer.Add(channel_name, 0, wx.EXPAND)
-
         module_sizer.AddSpacer(2)
 
         item_sizer.Add(module_sizer, 0, wx.EXPAND)
@@ -1232,7 +1230,7 @@ class StatusFrame(wx.Panel):
 
         self.border_sizer.Add(item_sizer, 0, wx.EXPAND)
         return {'item': item_sizer, 'label': label,
-                'status': status_item, 'name': channel_name}
+                'status': status_item, 'name': channel_text, 'channel': channel}
 
     def set_online(self, module_name, channel):
         if module_name in self.chats:
@@ -1270,6 +1268,14 @@ class StatusFrame(wx.Panel):
         if module_name in self.chats:
             if channel in self.chats[module_name]:
                 self.chats[module_name][channel.lower()]['status'].SetBackgroundColour('red')
+        self.Refresh()
+
+    def refresh_labels(self, module_name):
+        show_names = self.chat_modules[module_name]['config']['config']['show_channel_names']
+        for name, settings in self.chats[module_name].items():
+            channel = '{}: '.format(settings['channel']) if show_names else ''
+            settings['name'].SetLabel(channel)
+        self.Layout()
         self.Refresh()
 
     def set_viewers(self, module_name, channel, viewers):

@@ -87,6 +87,17 @@ class ChatModule(BaseModule):
     def __init__(self, *args, **kwargs):
         BaseModule.__init__(self, *args, **kwargs)
 
+    def apply_settings(self, **kwargs):
+        BaseModule.apply_settings(self, **kwargs)
+        self.refresh_channel_names()
+
+    def refresh_channel_names(self):
+        if 'gui' in self._loaded_modules:
+            gui_class = self._loaded_modules['gui']['class']
+            if gui_class.gui:
+                if gui_class.gui.status_frame:
+                    gui_class.gui.status_frame.refresh_labels(self._module_name)
+
     def set_viewers(self, channel, viewers):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
