@@ -312,6 +312,10 @@ class SettingsWindow(wx.Frame):
                     'select': self.select_cell
                 }
             },
+            'button': {
+                'function': self.create_button,
+                'bind': self.button_clicked
+            }
         }
         self.list_map = {}
         self.redraw_map = {}
@@ -709,6 +713,7 @@ class SettingsWindow(wx.Frame):
     def create_button(self, **kwargs):
         panel = kwargs.get('panel')
         key = kwargs.get('key')
+        value = kwargs.get('value')
         bind = kwargs.get('bind')
         enabled = kwargs.get('enabled', True)
         multiple = kwargs.get('multiple')
@@ -725,7 +730,11 @@ class SettingsWindow(wx.Frame):
         else:
             self.buttons[item_name] = [c_button]
 
-        c_button.Bind(wx.EVT_BUTTON, bind, id=button_id)
+        if value:
+            c_button.Bind(wx.EVT_BUTTON, value, id=button_id)
+        else:
+            c_button.Bind(wx.EVT_BUTTON, bind, id=button_id)
+
         item_sizer.Add(c_button)
         return {'item': item_sizer}
 
@@ -752,15 +761,19 @@ class SettingsWindow(wx.Frame):
             view = gui.get(item, {}).get('view', type(value))
             if view in self.value_map.keys():
                 fnction = self.value_map[view]
-                item_dict = fnction['function'](panel=static_box, item=item, value=value, key=key + [item],
-                                                bind=fnction['bind'], gui=gui.get(item, {}), from_sb=True)
-                if 'text_size' in item_dict:
-                    if max_text_size < item_dict.get('text_size'):
-                        max_text_size = item_dict['text_size']
+            elif callable(value):
+                fnction = self.value_map['button']
+            else:
+                return
+            item_dict = fnction['function'](panel=static_box, item=item, value=value, key=key + [item],
+                                            bind=fnction['bind'], gui=gui.get(item, {}), from_sb=True)
+            if 'text_size' in item_dict:
+                if max_text_size < item_dict.get('text_size'):
+                    max_text_size = item_dict['text_size']
 
-                    text_ctrls.append(item_dict['text_ctrl'])
-                spacer = True if not spacer else instatic_sizer.AddSpacer(spacer_size)
-                instatic_sizer.Add(item_dict['item'], 0, wx.EXPAND, 5)
+                text_ctrls.append(item_dict['text_ctrl'])
+            spacer = True if not spacer else instatic_sizer.AddSpacer(spacer_size)
+            instatic_sizer.Add(item_dict['item'], 0, wx.EXPAND, 5)
 
         if max_text_size:
             for ctrl in text_ctrls:

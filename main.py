@@ -83,6 +83,7 @@ def init():
         'system': {
             'hidden': ['log_level', 'testing_mode']
         },
+        'ignored_sections': ['gui.reload'],
         'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
     }
     config = load_from_config_file(MAIN_CONF_FILE, main_config_dict)
