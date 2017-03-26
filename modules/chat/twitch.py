@@ -581,7 +581,7 @@ class twitch(ChatModule):
         self.tw_dict[chat].start()
 
     def apply_settings(self, **kwargs):
-        ChatModule.apply_settings(self, **kwargs)
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
         self._check_chats(self.tw_dict.keys())
+        ChatModule.apply_settings(self, **kwargs)
