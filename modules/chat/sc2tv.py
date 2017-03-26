@@ -437,5 +437,5 @@ class sc2tv(ChatModule):
         self.fs_thread[chat].start()
 
     def apply_settings(self, **kwargs):
-        ChatModule.apply_settings(self, **kwargs)
         self._check_chats(self.fs_thread.keys())
+        ChatModule.apply_settings(self, **kwargs)
