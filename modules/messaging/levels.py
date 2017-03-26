@@ -143,6 +143,9 @@ class levels(MessagingModule):
                 else:
                     level_exp = self.exp_for_level * level_count
                 level_data.attrib['exp'] = level_exp
+                if not level_data.attrib['url'].startswith('/'):
+                    level_data.attrib['url'] = '/{}'.format(level_data.attrib['url'])
+
                 self.levels.append(level_data.attrib)
 
     def apply_settings(self, **kwargs):

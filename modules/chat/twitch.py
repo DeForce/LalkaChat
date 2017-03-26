@@ -514,7 +514,7 @@ class TWThread(threading.Thread):
 
 
 class TwitchMessage(object):
-    def __init__(self, source, text, emotes=False):
+    def __init__(self, source, text, emotes=False, bits=False):
         self.type = 'pubmsg'
         self.source = '{0}!{0}@{0}.tmi.twitch.tv'.format(source)
         self.arguments = [text]
@@ -522,10 +522,11 @@ class TwitchMessage(object):
             {'key': u'badges', 'value': u'broadcaster/1'},
             {'key': u'color', 'value': u'#FFFFFF'},
             {'key': u'display-name', 'value': u'{}'.format(source)},
-            {'key': u'bits', 'value': u'20'}
         ]
         if emotes:
             self.tags.append({'key': u'emotes', 'value': u'25:0-4'})
+        if bits:
+            self.tags.append({'key': u'bits', 'value': u'20'})
 
 
 class TestTwitch(threading.Thread):
@@ -548,10 +549,11 @@ class TestTwitch(threading.Thread):
 
     def send_message(self, *args, **kwargs):
         emotes = kwargs.get('emotes', False)
+        bits = kwargs.get('bits', False)
         nickname = kwargs.get('nickname', 'super_tester')
         text = kwargs.get('text', 'Kappa 123')
 
-        self.tw_queue.put(TwitchMessage(nickname, text, emotes))
+        self.tw_queue.put(TwitchMessage(nickname, text, emotes, bits))
 
 
 class twitch(ChatModule):

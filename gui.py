@@ -1332,6 +1332,11 @@ class ChatGui(wx.Frame):
                 }
                 self.browser = browser.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False,
                                                   browserSettings=browser_settings)
+                if self.main_config['config']['system']['testing_mode']:
+                    self.browser2 = browser.ChromeCtrl(self, useTimer=False, url=str(url).replace('/gui', ''),
+                                                       hasNavBar=False, browserSettings=browser_settings)
+                    vbox.Add(self.browser2, 1, wx.EXPAND)
+
             else:
                 self.browser = browser.WebView.New(parent=self, url=url, name='LalkaWebViewGui')
             vbox.Add(self.browser, 1, wx.EXPAND)
