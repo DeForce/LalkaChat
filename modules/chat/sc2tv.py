@@ -1,5 +1,7 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import json
+import random
+import string
 import threading
 import time
 import re
@@ -18,7 +20,9 @@ log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
 FILE_ICON = os.path.join('img', 'fs.png')
-SYSTEM_USER = 'Funstream'
+SYSTEM_USER = 'Peka2.tv'
+SMILE_REGEXP = r':(\w+|\d+):'
+SMILE_FORMAT = ':{}:'
 
 PING_DELAY = 10
 
@@ -26,13 +30,19 @@ CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
 CONF_DICT['config']['show_pm'] = True
-CONF_DICT['config']['channel_name'] = 'CHANGE_ME'
 CONF_DICT['config']['socket'] = 'ws://funstream.tv/socket.io/'
+CONF_DICT['config']['show_channel_names'] = True
+CONF_DICT['config']['channels_list'] = []
 
 CONF_GUI = {
     'config': {
-        'hidden': ['socket']},
-    'non_dynamic': ['config.*'],
+        'hidden': ['socket'],
+        'channels_list': {
+            'view': 'list',
+            'addable': 'true'
+        },
+    },
+    'non_dynamic': ['config.socket'],
     'icon': FILE_ICON}
 
 
@@ -50,7 +60,6 @@ class FsChat(WebSocketClient):
         self.channel_id = self.fs_get_id()
 
         self.smiles = kwargs.get('smiles')
-        self.smile_regex = ':(\w+|\d+):'
 
         self.iter = 0
         self.duplicates = []
@@ -63,12 +72,25 @@ class FsChat(WebSocketClient):
         self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_success'])), category='connection')
 
     def closed(self, code, reason=None):
-        self.chat_module.set_offline()
-        if reason == 'INV_CH_ID':
+        """
+        Codes used by LC
+        4000 - Normal disconnect by LC
+        4001 - Invalid Channel ID
+
+        :param code: 
+        :param reason: 
+        """
+        self.chat_module.set_offline(self.channel_name)
+        if code in [4000, 4001]:
             self.crit_error = True
+            self.fs_system_message(translate_key(
+                MODULE_KEY.join(['sc2tv', 'connection_closed'])).format(self.channel_name),
+                                category='connection')
         else:
             log.info("Websocket Connection Closed Down")
-            self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])), category='connection')
+            self.fs_system_message(
+                translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])).format(self.channel_name),
+                category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
@@ -204,11 +226,13 @@ class FsChat(WebSocketClient):
             else:
                 comp['to'] = None
 
-            smiles_array = re.findall(self.smile_regex, comp['text'])
+            smiles_array = re.findall(SMILE_REGEXP, comp['text'])
             for smile in smiles_array:
                 for smile_find in self.smiles:
-                    if smile_find['code'] == smile:
+                    if smile_find['code'] == smile.lower():
                         if self.allow_smile(smile_find, message['store']['subscriptions']):
+                            comp['text'] = comp['text'].replace(SMILE_FORMAT.format(smile),
+                                                                EMOTE_FORMAT.format(smile))
                             comp['emotes'].append({'emote_id': smile, 'emote_url': smile_find['url']})
 
             self.duplicates.append(message['id'])
@@ -217,20 +241,20 @@ class FsChat(WebSocketClient):
             self._send_message(comp)
 
     def _process_joined(self):
-        self.chat_module.set_online()
+        self.chat_module.set_online(self.channel_name)
         self.fs_system_message(
             translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.channel_name), category='connection')
 
     def _process_channel_list(self, message):
-        self.chat_module.set_viewers(message['result']['amount'])
+        self.chat_module.set_viewers(self.channel_name, message['result']['amount'])
+
+    def _post_process_multiple_channels(self, message):
+        if self.chat_module.conf_params()['config']['config']['show_channel_names']:
+            message['channel_name'] = self.channel_name
 
     def _send_message(self, comp):
-        self._post_process_emotes(comp)
+        self._post_process_multiple_channels(comp)
         self.queue.put(comp)
-
-    @staticmethod
-    def _post_process_emotes(comp):
-        comp['text'] = re.sub(':(\w+|\d+):', EMOTE_FORMAT.format('\\1'), comp['text'])
 
 
 class FsPingThread(threading.Thread):
@@ -257,6 +281,7 @@ class FsThread(threading.Thread):
         self.queue = queue
         self.socket = socket
         self.channel_name = channel_name
+        self.chat_module = kwargs.get('chat_module')
         self.smiles = []
         self.ws = None
         self.kwargs = kwargs
@@ -288,6 +313,53 @@ class FsThread(threading.Thread):
                 self.ws.connect()
                 self.ws.run_forever()
                 break
+            time.sleep(5)
+
+    def stop(self):
+        self.ws.send("11")
+        self.ws.close(4000, reason="CLOSE_OK")
+
+
+class Sc2tvMessage(object):
+    def __init__(self, nickname, text):
+        message = [
+            u'/chat/message',
+            {
+                u'from': {
+                    u'color': 0,
+                    u'name': u'{}'.format(nickname)},
+                u'text': u'{}'.format(text),
+                u'to': None,
+                u'store': {u'bonuses': [], u'icon': 0, u'subscriptions': []},
+                u'id': ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+            }
+        ]
+        self.data = '42{}'.format(json.dumps(message))
+
+
+class TestSc2tv(threading.Thread):
+    def __init__(self, main_class):
+        super(TestSc2tv, self).__init__()
+        self.main_class = main_class  # type: sc2tv
+        self.main_class.rest_add('POST', 'push_message', self.send_message)
+        self.fs_thread = None
+
+    def run(self):
+        while True:
+            try:
+                thread = self.main_class.fs_thread.items()[0][1]
+                if thread.ws:
+                    self.fs_thread = thread.ws
+                    break
+            except:
+                continue
+        log.info("sc2tv Testing mode online")
+
+    def send_message(self, *args, **kwargs):
+        nickname = kwargs.get('nickname', 'super_tester')
+        text = kwargs.get('text', 'Kappa 123')
+
+        self.fs_thread.received_message(Sc2tvMessage(nickname, text))
 
 
 class sc2tv(ChatModule):
@@ -308,15 +380,24 @@ class sc2tv(ChatModule):
 
         self.queue = queue
         self.socket = CONF_DICT['config']['socket']
-        self.channel_name = CONF_DICT['config']['channel_name']
-        self.fs_thread = None
+        self.channels_list = CONF_DICT['config']['channels_list']
+        self.fs_thread = {}
+
+        if len(self.channels_list) == 1:
+            if CONF_DICT['config']['show_channel_names']:
+                CONF_DICT['config']['show_channel_names'] = False
+
+        self.testing = kwargs.get('testing')
+        if self.testing:
+            self.testing = TestSc2tv(self)
 
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
         # Creating new thread with queue in place for messaging transfers
-        fs = FsThread(self.queue, self.socket, self.channel_name, chat_module=self)
-        self.fs_thread = fs
-        fs.start()
+        for channel in self.channels_list:
+            self._set_chat_online(channel)
+        if self.testing:
+            self.testing.start()
 
     def get_viewers(self, ws):
         user_data = {'name': ws.channel_name}
@@ -334,9 +415,27 @@ class sc2tv(ChatModule):
             status_request = requests.post('http://funstream.tv/api/stream', timeout=5, data=status_data)
             if status_request.status_code == 200:
                 if status_request.json()['online']:
+                    self.set_online(ws.channel_name)
                     ws.fs_send(request)
                 else:
-                    self.set_viewers('N/A')
+                    self.set_viewers(ws.channel_name, 'N/A')
 
         except requests.ConnectionError:
             log.error("Unable to get smiles")
+
+    def _set_chat_offline(self, chat):
+        ChatModule.set_chat_offline(self, chat)
+        try:
+            self.fs_thread[chat].stop()
+        except Exception as exc:
+            log.debug(exc)
+        del self.fs_thread[chat]
+
+    def _set_chat_online(self, chat):
+        ChatModule.set_chat_online(self, chat)
+        self.fs_thread[chat] = FsThread(self.queue, self.socket, chat, chat_module=self)
+        self.fs_thread[chat].start()
+
+    def apply_settings(self, **kwargs):
+        self._check_chats(self.fs_thread.keys())
+        ChatModule.apply_settings(self, **kwargs)

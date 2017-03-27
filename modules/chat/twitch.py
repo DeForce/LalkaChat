@@ -7,8 +7,8 @@ import random
 import requests
 import logging.config
 import Queue
-from collections import OrderedDict
 import time
+from collections import OrderedDict
 from modules.helper.parser import load_from_config_file
 from modules.helper.module import ChatModule
 from modules.helper.system import system_message, translate_key, remove_message_by_user, EMOTE_FORMAT, NA_MESSAGE
@@ -18,15 +18,16 @@ logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('twitch')
 headers = {'Client-ID': '5jwove9dketiiz2kozapz8rhjdsxqxc'}
-emote_bits_theme = 'dark'
-emote_bits_type = 'static'
-emote_bits_url = 'static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
-emote_smile_url = 'http://static-cdn.jtvnw.net/emoticons/v1/{id}/1.0'
+BITS_THEME = 'dark'
+BITS_TYPE = 'animated'
+BITS_URL = 'http://static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
+EMOTE_SMILE_URL = 'http://static-cdn.jtvnw.net/emoticons/v1/{id}/1.0'
 NOT_FOUND = 'none'
 SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 FILE_ICON = os.path.join('img', 'tw.png')
 SYSTEM_USER = 'Twitch.TV'
+BITS_REGEXP = r'(^|\s)(\w+){}(\s|$)'
 
 PING_DELAY = 10
 
@@ -34,19 +35,30 @@ CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
 CONF_DICT['config']['show_pm'] = True
-CONF_DICT['config']['channel'] = 'CHANGE_ME'
 CONF_DICT['config']['bttv'] = True
 CONF_DICT['config']['host'] = 'irc.twitch.tv'
 CONF_DICT['config']['port'] = 6667
+CONF_DICT['config']['show_channel_names'] = True
+CONF_DICT['config']['show_nickname_colors'] = False
+CONF_DICT['config']['channels_list'] = []
 CONF_GUI = {
     'config': {
-        'hidden': ['host', 'port']},
-    'non_dynamic': ['config.*'],
+        'hidden': ['host', 'port'],
+        'channels_list': {
+            'view': 'list',
+            'addable': 'true'
+        }
+    },
+    'non_dynamic': ['config.host', 'config.port', 'config.bttv'],
     'icon': FILE_ICON}
 
 
 class TwitchUserError(Exception):
     """Exception for twitch user error"""
+
+
+class TwitchNormalDisconnect(Exception):
+    """Normal Disconnect exception"""
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -114,7 +126,7 @@ class TwitchMessageHandler(threading.Thread):
             emote_id, emote_pos_diap = emote.split(':')
             message['emotes'].append({'emote_id': emote_id,
                                       'positions': emote_pos_diap.split(','),
-                                      'emote_url': emote_smile_url.format(id=emote_id)})
+                                      'emote_url': EMOTE_SMILE_URL.format(id=emote_id)})
 
     def _handle_bttv_smiles(self, message):
         for word in message['text'].split():
@@ -168,6 +180,10 @@ class TwitchMessageHandler(threading.Thread):
                 self._handle_badges(message, tag_value)
             elif tag_key == 'emotes' and tag_value:
                 self._handle_emotes(message, tag_value)
+            elif tag_key == 'bits' and tag_value:
+                self._handle_bits(message, tag_value)
+            elif tag_key == 'color' and tag_value:
+                self._handle_viewer_color(message, tag_value)
 
         self._handle_bttv_smiles(message)
         self._handle_pm(message)
@@ -177,6 +193,37 @@ class TwitchMessageHandler(threading.Thread):
 
         self._send_message(message)
 
+    def _handle_viewer_color(self, message, value):
+        if self.irc_class.chat_module.conf_params()['config']['config']['show_nickname_colors']:
+            message['nick_color'] = value
+
+    @staticmethod
+    def _handle_bits(message, amount):
+        regexp = re.search(BITS_REGEXP.format(amount), message['text'])
+        emote = regexp.group(2)
+        emote_smile = '{}{}'.format(emote, amount)
+
+        if amount >= 10000:
+            color = 'red'
+        elif amount >= 5000:
+            color = 'blue'
+        elif amount >= 1000:
+            color = 'green'
+        elif amount >= 100:
+            color = 'purple'
+        else:
+            color = 'gray'
+
+        message['bits'] = {
+            'bits': emote_smile,
+            'amount': amount,
+            'theme': BITS_THEME,
+            'type': BITS_TYPE,
+            'color': color,
+            'size': 4
+        }
+        message['text'] = message['text'].replace(emote_smile, EMOTE_FORMAT.format(emote_smile))
+
     @staticmethod
     def _handle_sub_message(message):
         message['sub_message'] = True
@@ -184,7 +231,24 @@ class TwitchMessageHandler(threading.Thread):
     def _send_message(self, message):
         self._post_process_emotes(message)
         self._post_process_bttv_emotes(message)
+        self._post_process_multiple_channels(message)
+        self._post_process_bits(message)
         self.message_queue.put(message)
+
+    @staticmethod
+    def _post_process_bits(message):
+        if 'bits' not in message:
+            return
+        bits = message['bits']
+        message['emotes'].append({
+            'emote_id': bits['bits'],
+            'emote_url': BITS_URL.format(
+                theme=bits['theme'],
+                type=bits['type'],
+                color=bits['color'],
+                size=bits['size']
+            )
+        })
 
     @staticmethod
     def _post_process_emotes(message):
@@ -207,21 +271,27 @@ class TwitchMessageHandler(threading.Thread):
         for emote, data in message['bttv_emotes'].iteritems():
             message['text'] = message['text'].replace(emote, EMOTE_FORMAT.format(emote))
             message['emotes'].append(data)
-        pass
+
+    def _post_process_multiple_channels(self, message):
+        channel_class = self.irc_class.main_class
+        if channel_class.chat_module.conf_params()['config']['config']['show_channel_names']:
+            message['channel_name'] = channel_class.display_name
 
 
 class TwitchPingHandler(threading.Thread):
-    def __init__(self, irc_connection, chat_module):
+    def __init__(self, irc_connection, chat_module, irc_class):
         threading.Thread.__init__(self)
         self.irc_connection = irc_connection
         self.chat_module = chat_module
+        self.irc_class = irc_class
 
     def run(self):
         log.info("Ping started")
         while self.irc_connection.connected:
             self.irc_connection.ping("keep-alive")
             try:
-                self.chat_module.set_viewers(self.chat_module.get_viewers())
+                self.chat_module.set_viewers(self.irc_class.nick,
+                                             self.chat_module.get_viewers(self.irc_class.nick))
             except Exception as exc:
                 log.exception(exc)
             time.sleep(PING_DELAY)
@@ -250,12 +320,23 @@ class IRC(irc.client.SimpleIRCClient):
                        source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
 
     def on_disconnect(self, connection, event):
-        log.info("Connection lost")
-        self.chat_module.set_offline()
-        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'connection_died'])), category='connection')
-        timer = threading.Timer(5.0, self.reconnect,
-                                args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
-        timer.start()
+        if 'CLOSE_OK' in event.arguments:
+            log.info("Connection closed")
+            self.system_message(
+                translate_key(MODULE_KEY.join(['twitch', 'connection_closed'])).format(self.nick),
+                category='connection')
+            raise TwitchNormalDisconnect()
+        else:
+            log.info("Connection lost")
+            log.debug("connection: {}".format(connection))
+            log.debug("event: {}".format(event))
+            self.chat_module.set_offline(self.nick)
+            self.system_message(
+                translate_key(MODULE_KEY.join(['twitch', 'connection_died'])).format(self.nick),
+                category='connection')
+            timer = threading.Timer(5.0, self.reconnect,
+                                    args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
+            timer.start()
 
     def reconnect(self, host, port, nickname):
         try_count = 0
@@ -270,38 +351,49 @@ class IRC(irc.client.SimpleIRCClient):
 
     def on_welcome(self, connection, event):
         log.info("Welcome Received, joining {0} channel".format(self.channel))
+        log.debug("event: {}".format(event))
         self.tw_connection = connection
         self.system_message(translate_key(MODULE_KEY.join(['twitch', 'joining'])).format(self.channel),
                             category='connection')
-        self.chat_module.set_online()
+        self.chat_module.set_online(self.nick)
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilities (Twitch color, Display Name,
         #  Subscriber, etc)
         connection.join(self.channel)
         connection.cap('REQ', ':twitch.tv/tags')
         connection.cap('REQ', ':twitch.tv/commands')
-        ping_handler = TwitchPingHandler(connection, self.chat_module)
+        ping_handler = TwitchPingHandler(connection, self.chat_module, self)
         ping_handler.start()
 
     def on_join(self, connection, event):
+        log.debug("connection: {}".format(connection))
+        log.debug("event: {}".format(event))
         msg = translate_key(MODULE_KEY.join(['twitch', 'join_success'])).format(self.channel)
         log.info(msg)
         self.system_message(msg, category='connection')
 
     def on_pubmsg(self, connection, event):
+        log.debug("connection: {}".format(connection))
+        log.debug("event: {}".format(event))
         self.twitch_queue.put(event)
 
     def on_action(self, connection, event):
+        log.debug("connection: {}".format(connection))
+        log.debug("event: {}".format(event))
         self.twitch_queue.put(event)
 
     def on_clearchat(self, connection, event):
+        log.debug("connection: {}".format(connection))
+        log.debug("event: {}".format(event))
         self.twitch_queue.put(event)
 
     def on_usernotice(self, connection, event):
+        log.debug("connection: {}".format(connection))
+        log.debug("event: {}".format(event))
         self.twitch_queue.put(event)
 
 
-class twThread(threading.Thread):
+class TWThread(threading.Thread):
     def __init__(self, queue, host, port, channel, bttv_smiles, anon=True, **kwargs):
         threading.Thread.__init__(self)
         # Basic value setting.
@@ -316,6 +408,9 @@ class twThread(threading.Thread):
         self.bttv_smiles = bttv_smiles
         self.kwargs = kwargs
         self.chat_module = kwargs.get('chat_module')
+        self.display_name = None
+        self.irc = None
+
         if bttv_smiles:
             self.kwargs['bttv_smiles_dict'] = {}
 
@@ -339,23 +434,30 @@ class twThread(threading.Thread):
             log.info("Connecting, try {0}".format(try_count))
             try:
                 if self.load_config():
-                    irc = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
-                    irc.connect(self.host, self.port, self.nickname)
-                    irc.start()
+                    self.irc = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
+                    self.irc.connect(self.host, self.port, self.nickname)
+                    self.irc.start()
                     log.info("Connection closed")
                     break
             except TwitchUserError:
                 log.critical("Unable to find twitch user, please fix")
-                self.chat_module.set_offline()
+                self.chat_module.set_offline(self.nickname)
+                break
+            except TwitchNormalDisconnect:
+                log.info("Twitch closing")
+                self.chat_module.set_offline(self.nickname)
                 break
             except Exception as exc:
                 log.exception(exc)
+            time.sleep(5)
 
     def load_config(self):
         try:
             request = requests.get("https://api.twitch.tv/kraken/channels/{0}".format(self.channel), headers=headers)
             if request.status_code == 200:
                 log.info("Channel found, continuing")
+                data = request.json()
+                self.display_name = data['display_name']
             elif request.status_code == 404:
                 raise TwitchUserError
             else:
@@ -413,6 +515,52 @@ class twThread(threading.Thread):
 
         return True
 
+    def stop(self):
+        self.irc.tw_connection.disconnect("CLOSE_OK")
+
+
+class TwitchMessage(object):
+    def __init__(self, source, text, emotes=False, bits=False):
+        self.type = 'pubmsg'
+        self.source = '{0}!{0}@{0}.tmi.twitch.tv'.format(source)
+        self.arguments = [text]
+        self.tags = [
+            {'key': u'badges', 'value': u'broadcaster/1'},
+            {'key': u'color', 'value': u'#FFFFFF'},
+            {'key': u'display-name', 'value': u'{}'.format(source)},
+        ]
+        if emotes:
+            self.tags.append({'key': u'emotes', 'value': u'25:0-4'})
+        if bits:
+            self.tags.append({'key': u'bits', 'value': u'20'})
+
+
+class TestTwitch(threading.Thread):
+    def __init__(self, main_class):
+        super(TestTwitch, self).__init__()
+        self.main_class = main_class  # type: twitch
+        self.main_class.rest_add('POST', 'push_message', self.send_message)
+        self.tw_queue = None
+
+    def run(self):
+        while True:
+            try:
+                thread = self.main_class.tw_dict.items()[0][1]
+                if thread.irc.twitch_queue:
+                    self.tw_queue = thread.irc.twitch_queue
+                    break
+            except:
+                continue
+        log.info("twitch Testing mode online")
+
+    def send_message(self, *args, **kwargs):
+        emotes = kwargs.get('emotes', False)
+        bits = kwargs.get('bits', False)
+        nickname = kwargs.get('nickname', 'super_tester')
+        text = kwargs.get('text', 'Kappa 123')
+
+        self.tw_queue.put(TwitchMessage(nickname, text, emotes, bits))
+
 
 class twitch(ChatModule):
     def __init__(self, queue, python_folder, **kwargs):
@@ -435,20 +583,31 @@ class twitch(ChatModule):
         self.queue = queue
         self.host = CONF_DICT['config']['host']
         self.port = int(CONF_DICT['config']['port'])
-        self.channel = CONF_DICT['config']['channel']
+        self.channels_list = CONF_DICT['config']['channels_list']
         self.bttv = CONF_DICT['config']['bttv']
+        self.tw_dict = {}
+
+        if len(self.channels_list) == 1:
+            if CONF_DICT['config']['show_channel_names']:
+                CONF_DICT['config']['show_channel_names'] = False
+
+        self.testing = kwargs.get('testing')
+        if self.testing:
+            self.testing = TestTwitch(self)
 
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
         if 'webchat' in self._loaded_modules:
             self._loaded_modules['webchat']['class'].add_depend('twitch')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        tw = twThread(self.queue, self.host, self.port, self.channel, self.bttv,
-                      settings=self._conf_params['settings'], chat_module=self)
-        tw.start()
+        for channel in self.channels_list:
+            self._set_chat_online(channel)
+        if self.testing:
+            self.testing.start()
 
-    def get_viewers(self):
-        streams_url = 'https://api.twitch.tv/kraken/streams/{0}'.format(self.channel)
+    @staticmethod
+    def get_viewers(channel):
+        streams_url = 'https://api.twitch.tv/kraken/streams/{0}'.format(channel)
         try:
             request = requests.get(streams_url, headers=headers)
             if request.status_code == 200:
@@ -461,12 +620,22 @@ class twitch(ChatModule):
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
-    def get_remove_text(self):
-        if self._loaded_modules['webchat']['style_settings']['keys'].get('remove_message'):
-            return self._loaded_modules['webchat']['style_settings']['keys'].get('remove_text')
-        return None
+    def _set_chat_offline(self, chat):
+        ChatModule.set_chat_offline(self, chat)
+        try:
+            self.tw_dict[chat].stop()
+        except Exception as exc:
+            log.debug(exc)
+        del self.tw_dict[chat]
+
+    def _set_chat_online(self, chat):
+        ChatModule.set_chat_online(self, chat)
+        self.tw_dict[chat] = TWThread(self.queue, self.host, self.port, chat, self.bttv,
+                                      settings=self._conf_params['settings'], chat_module=self)
+        self.tw_dict[chat].start()
 
     def apply_settings(self, **kwargs):
-        ChatModule.apply_settings(self, **kwargs)
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
+        self._check_chats(self.tw_dict.keys())
+        ChatModule.apply_settings(self, **kwargs)

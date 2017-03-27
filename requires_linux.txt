@@ -1,0 +1,8 @@
+requests
+cherrypy
+ws4py>=0.4.0
+irc
+semantic_version
+jinja2
+pyScss
+pyyaml

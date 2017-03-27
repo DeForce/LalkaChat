@@ -1,25 +1,28 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
+import collections
+import yaml
+from collections import OrderedDict
 from ConfigParser import RawConfigParser
 
 
-def load_from_config_file(conf_file, conf_dict):
-    config_parser = get_config(conf_file)
-
-    for section in config_parser.sections():
-        if section not in conf_dict.keys():
-            continue
-
-        if isinstance(conf_dict[section], dict):
-            tmp_dict = {}
-            for item, value in config_parser.items(section):
-                tmp_dict[item] = return_type(value)
-            conf_dict[section].update(tmp_dict)
-        elif isinstance(conf_dict[section], list):
-            pass
+def update(d, u):
+    for k, v in u.iteritems():
+        if isinstance(v, collections.Mapping):
+            r = update(d.get(k, {}), v)
+            d[k] = r
         else:
-            conf_dict[section] = return_type(config_parser.items(section)[0][0])
-    return config_parser
+            d[k] = u[k]
+    return d
+
+
+def load_from_config_file(conf_file, conf_dict):
+    if not os.path.exists(conf_file):
+        return
+    with open(conf_file, 'r') as conf_f:
+        loaded_dict = yaml.safe_load(conf_f.read())
+    if loaded_dict:
+        update(conf_dict, loaded_dict)
 
 
 def return_type(item):
@@ -27,7 +30,7 @@ def return_type(item):
         if isinstance(item, bool):
             return item
         elif isinstance(item, int):
-            return str(item)
+            return item
         elif item.lower() == 'true':
             return True
         elif item.lower() == 'false':
@@ -46,28 +49,28 @@ def get_config(conf_file):
     return heal_config
 
 
-def save_settings(conf_dict, ignored_sections=()):
-    if 'parser' not in conf_dict:
-        return
-    if 'config' not in conf_dict:
-        return
+def convert_to_yaml(source, ignored_keys):
+    output = {}
+    if not source:
+        return output
 
-    parser = conf_dict.get('parser')  # type: RawConfigParser
-    config = conf_dict.get('config')
-
-    for section, section_object in config.iteritems():
-        if section in ignored_sections:
+    for item, value in source.items():
+        if item in ignored_keys:
             continue
-
-        if parser.has_section(section):
-            parser.remove_section(section)
-        parser.add_section(section)
-
-        if isinstance(section_object, dict):
-            for item, value in section_object.iteritems():
-                parser.set(section, item, value)
+        if isinstance(value, OrderedDict):
+            output[item] = convert_to_yaml(
+                value,
+                [key.replace('{}.'.format(item), '') for key in ignored_keys if key.startswith(item)]
+            )
         else:
-            parser.set(section, section_object)
+            output[item] = value
+    return output
 
+
+def save_settings(conf_dict, ignored_sections=()):
+    if 'file' not in conf_dict:
+        return
+    output = convert_to_yaml(conf_dict.get('config'), ignored_sections)
     with open(conf_dict.get('file'), 'w+') as conf_file:
-        parser.write(conf_file)
+        dump_text = yaml.safe_dump(output, default_flow_style=False, allow_unicode=True)
+        conf_file.write(dump_text)

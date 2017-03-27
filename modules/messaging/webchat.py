@@ -1,5 +1,6 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
+import re
 import threading
 import json
 import Queue
@@ -7,16 +8,18 @@ import socket
 import cherrypy
 import logging
 import datetime
+import copy
+from scss import Compiler
+from scss.namespace import Namespace
+from scss.types import Color, Boolean, String, Number
 from collections import OrderedDict
-from jinja2 import Template
 from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from modules.helper.parser import load_from_config_file, save_settings
-from modules.helper.system import THREADS
+from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER, remove_message_by_id
 from modules.helper.module import MessagingModule
 from gui import MODULE_KEY
-from main import PYTHON_FOLDER, CONF_FOLDER
 
 DEFAULT_STYLE = 'default'
 DEFAULT_PRIORITY = 9001
@@ -26,6 +29,26 @@ HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 log = logging.getLogger('webchat')
+REMOVED_TRIGGER = '%%REMOVED%%'
+
+WS_THREADS = THREADS + 3
+
+
+def prepare_message(msg, style_settings):
+    message = copy.deepcopy(msg)
+
+    if 'levels' in message:
+        message['levels']['url'] = '{}?{}'.format(message['levels']['url'], style_settings['style_name'])
+
+    if 'text' in message and message['text'] == REMOVED_TRIGGER:
+        message['text'] = style_settings.get('remove_text')
+
+    if 'command' in message:
+        if message['command'].startswith('replace'):
+            message['text'] = style_settings['keys']['remove_text']
+
+    message['id'] = str(message['id'])
+    return message
 
 
 class MessagingThread(threading.Thread):
@@ -38,6 +61,7 @@ class MessagingThread(threading.Thread):
     def run(self):
         while self.running:
             message = s_queue.get()
+
             if 'timestamp' not in message:
                 message['timestamp'] = datetime.datetime.now().isoformat()
 
@@ -46,14 +70,25 @@ class MessagingThread(threading.Thread):
             elif message['type'] == 'command':
                 cherrypy.engine.publish('process-command', message['command'], message)
 
-            if message['type'] == 'system_message' and not self.settings['show_system_msg']:
+            if message['type'] == 'system_message' and not self.settings['chat']['keys'].get('show_system_msg', True):
                 continue
 
-            cherrypy.engine.publish('websocket-broadcast', json.dumps(message))
+            log.debug("%s", message)
+            self.send_message(message, 'chat')
+            self.send_message(message, 'gui')
         log.info("Messaging thread stopping")
 
     def stop(self):
         self.running = False
+
+    def send_message(self, message, chat_type):
+        send_message = prepare_message(message, self.settings[chat_type])
+        ws_list = cherrypy.engine.publish('get-clients', chat_type)[0]
+        for ws in ws_list:
+            try:
+                ws.send(json.dumps(send_message))
+            except:
+                log.info(send_message)
 
 
 class FireFirstMessages(threading.Thread):
@@ -65,18 +100,23 @@ class FireFirstMessages(threading.Thread):
         self.settings = settings
 
     def run(self):
-        show_system_msg = cherrypy.engine.publish('get-settings')[0]['show_system_msg']
+        show_system_msg = self.settings['keys'].get('show_system_msg', True)
         if self.ws.stream:
             for item in self.history:
                 if item['type'] == 'system_message' and not show_system_msg:
                     continue
-                timestamp = datetime.datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S.%f")
+                try:
+                    timestamp = datetime.datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S.%f")
+                except:
+                    timestamp = datetime.datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S")
                 timedelta = datetime.datetime.now() - timestamp
-                timer = int(self.settings['timer'])
+                timer = int(self.settings['keys'].get('timer', 0))
                 if timer > 0:
                     if timedelta > datetime.timedelta(seconds=timer):
                         continue
-                self.ws.send(json.dumps(item))
+
+                message = prepare_message(item, self.settings)
+                self.ws.send(json.dumps(message))
 
 
 class WebChatSocketServer(WebSocket):
@@ -84,7 +124,8 @@ class WebChatSocketServer(WebSocket):
         WebSocket.__init__(self, sock)
         self.daemon = True
         self.clients = []
-        self.settings = cherrypy.engine.publish('get-settings')
+        self.settings = cherrypy.engine.publish('get-settings', 'chat')[0]
+        self.type = 'chat'
 
     def opened(self):
         cherrypy.engine.publish('add-client', self.peer_address, self)
@@ -92,12 +133,20 @@ class WebChatSocketServer(WebSocket):
         timer.start()
 
     def closed(self, code, reason=None):
-        cherrypy.engine.publish('del-client', self.peer_address)
+        cherrypy.engine.publish('del-client', self.peer_address, self)
 
     def fire_history(self):
         send_history = FireFirstMessages(self, cherrypy.engine.publish('get-history')[0],
-                                         cherrypy.engine.publish('get-settings')[0])
+                                         self.settings)
         send_history.start()
+
+
+class WebChatGUISocketServer(WebChatSocketServer):
+    def __init__(self, sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None):
+        WebSocket.__init__(self, sock)
+        self.clients = []
+        self.settings = cherrypy.engine.publish('get-settings', 'gui')[0]
+        self.type = 'gui'
 
 
 class WebChatPlugin(WebSocketPlugin):
@@ -114,8 +163,10 @@ class WebChatPlugin(WebSocketPlugin):
         self.bus.subscribe('get-settings', self.get_settings)
         self.bus.subscribe('add-client', self.add_client)
         self.bus.subscribe('del-client', self.del_client)
+        self.bus.subscribe('get-clients', self.get_clients)
         self.bus.subscribe('add-history', self.add_history)
         self.bus.subscribe('get-history', self.get_history)
+        self.bus.subscribe('del-history', self.del_history)
         self.bus.subscribe('process-command', self.process_command)
 
     def stop(self):
@@ -123,26 +174,44 @@ class WebChatPlugin(WebSocketPlugin):
         self.bus.unsubscribe('get-settings', self.get_settings)
         self.bus.unsubscribe('add-client', self.add_client)
         self.bus.unsubscribe('del-client', self.del_client)
+        self.bus.unsubscribe('get-clients', self.get_clients)
         self.bus.unsubscribe('add-history', self.add_history)
         self.bus.unsubscribe('get-history', self.get_history)
-        self.bus.ubsubscribe('process-command', self.process_command)
+        self.bus.unsubscribe('process-command', self.process_command)
 
     def add_client(self, addr, websocket):
         self.clients.append({'ip': addr[0], 'port': addr[1], 'websocket': websocket})
 
-    def del_client(self, addr):
+    def del_client(self, addr, websocket):
         try:
-            self.clients.remove({'ip': addr[0], 'port': addr[1]})
-        except:
-            pass
+            self.clients.remove({'ip': addr[0], 'port': addr[1], 'websocket': websocket})
+        except Exception as exc:
+            log.exception("Exception %s", exc)
+            log.info('Unable to delete client %s', addr)
+
+    def get_clients(self, client_type):
+        ws_list = []
+        for client in self.clients:
+            ws = client['websocket']
+            if ws.type == client_type:
+                ws_list.append(client['websocket'])
+        return ws_list
 
     def add_history(self, message):
         self.history.append(message)
         if len(self.history) > self.history_size:
             self.history.pop(0)
 
-    def get_settings(self):
-        return self.style_settings['keys']
+    def del_history(self, msg_id):
+        if len(msg_id) > 1:
+            return
+
+        for index, item in enumerate(self.history):
+            if str(item['id']) == msg_id[0]:
+                self.history.pop(index)
+
+    def get_settings(self, style_type):
+        return self.style_settings[style_type]
 
     def get_history(self):
         return self.history
@@ -173,7 +242,7 @@ class WebChatPlugin(WebSocketPlugin):
         for item in ids:
             for index, message in enumerate(self.history):
                 if message.get('id') == item:
-                    self.history[index]['text'] = self.style_settings['keys']['remove_text']
+                    self.history[index]['text'] = REMOVED_TRIGGER
                     if 'emotes' in self.history[index]:
                         del self.history[index]['emotes']
                     if 'bttv_emotes' in self.history[index]:
@@ -183,7 +252,7 @@ class WebChatPlugin(WebSocketPlugin):
         for item in users:
             for index, message in enumerate(self.history):
                 if message.get('user') == item:
-                    self.history[index]['text'] = self.style_settings['keys']['remove_text']
+                    self.history[index]['text'] = REMOVED_TRIGGER
                     if 'emotes' in self.history[index]:
                         del self.history[index]['emotes']
                     if 'bttv_emotes' in self.history[index]:
@@ -203,30 +272,88 @@ class RestRoot(object):
                     self._rest_modules[name] = api
 
     @cherrypy.expose
-    def default(self, *args):
-        if len(args) > 0:
+    def default(self, *args, **kwargs):
+        # Default error state
+        message = 'Incorrect api call'
+        error_code = 400
+
+        body = cherrypy.request.body
+        if cherrypy.request.method in cherrypy.request.methods_with_bodies:
+            data = json.load(body)
+            kwargs.update(data)
+
+        if len(args) > 1:
             module_name = args[0]
-            query = args[1:]
+            rest_path = args[1]
+            query = args[2:] if len(args) > 2 else None
             if module_name in self._rest_modules:
                 method = cherrypy.request.method
                 api = self._rest_modules[module_name]
                 if method in api:
-                    return api[method](query)
+                    if rest_path in api[method]:
+                        return api[method][rest_path](query, **kwargs)
+                error_code = 404
+                message = 'Method not found'
+        cherrypy.response.status = error_code
         return json.dumps({'error': 'Bad Request',
-                           'status': 400,
-                           'message': 'Unable to find module'})
+                           'status': error_code,
+                           'message': message})
 
 
 class CssRoot(object):
     def __init__(self, settings):
+        self.css_map = {
+            'css': self.style_css,
+            'scss': self.style_scss
+        }
         self.settings = settings
 
     @cherrypy.expose
-    def style_css(self):
+    def default(self, *args):
         cherrypy.response.headers['Content-Type'] = 'text/css'
-        with open(os.path.join(self.settings['location'], 'css', 'style.css'), 'r') as css:
+        path = ['css']
+        path.extend(args)
+        file_type = args[-1].split('.')[-1]
+        if file_type in self.css_map:
+            return self.css_map[file_type](*path)
+        return
+
+    def style_css(self, *path):
+        cherrypy.response.headers['Content-Type'] = 'text/css'
+        with open(os.path.join(self.settings['location'], *path), 'r') as css:
+            return css.read()
+
+    def style_scss(self, *path):
+        css_namespace = Namespace()
+        for key, value in self.settings['keys'].items():
+            if isinstance(value, basestring):
+                if value.startswith('#'):
+                    css_value = Color.from_hex(value)
+                else:
+                    css_value = String(value)
+            elif isinstance(value, bool):
+                css_value = Boolean(value)
+            elif isinstance(value, int) or isinstance(value, float):
+                css_value = Number(value)
+            else:
+                raise ValueError("Unable to find comparable values")
+            css_namespace.set_variable('${}'.format(key), css_value)
+
+        cherrypy.response.headers['Content-Type'] = 'text/css'
+        with open(os.path.join(self.settings['location'], *path), 'r') as css:
             css_content = css.read()
-            return Template(css_content).render(**self.settings['keys'])
+            compiler = Compiler(namespace=css_namespace, output_style='nested')
+            # Something wrong with PyScss,
+            #  Syntax error: Found u'100%' but expected one of ADD.
+            # Doesn't happen on next attempt, so we are doing bad thing
+            attempts = 0
+            while attempts < 10:
+                try:
+                    attempts += 1
+                    ret_string = compiler.compile_string(css_content)
+                    return ret_string
+                except Exception as exc:
+                    log.debug(exc)
 
 
 class HttpRoot(object):
@@ -238,12 +365,14 @@ class HttpRoot(object):
         cherrypy.response.headers["Expires"] = -1
         cherrypy.response.headers["Pragma"] = "no-cache"
         cherrypy.response.headers["Cache-Control"] = "private, max-age=0, no-cache, no-store, must-revalidate"
-        return serve_file(os.path.join(self.settings['location'], 'index.html'), 'text/html')
+        if os.path.exists(self.settings['location']):
+            return serve_file(os.path.join(self.settings['location'], 'index.html'), 'text/html')
+        else:
+            return "Style not found"
 
     @cherrypy.expose
     def ws(self):
-        # you can access the class instance through
-        handler = cherrypy.request.ws_handler
+        pass
 
 
 class SocketThread(threading.Thread):
@@ -258,6 +387,9 @@ class SocketThread(threading.Thread):
 
         self.root_config = None
         self.css_config = None
+        self.gui_root_config = None
+        self.gui_css_config = None
+
         self.rest_config = None
 
         cherrypy.config.update({'server.socket_port': int(self.port), 'server.socket_host': self.host,
@@ -271,9 +403,9 @@ class SocketThread(threading.Thread):
             '/ws': {'tools.websocket.on': True,
                     'tools.websocket.handler_cls': WebChatSocketServer},
             '/js': {'tools.staticdir.on': True,
-                    'tools.staticdir.dir': os.path.join(self.style_settings['location'], 'js')},
+                    'tools.staticdir.dir': os.path.join(self.style_settings['chat']['location'], 'js')},
             '/img': {'tools.staticdir.on': True,
-                     'tools.staticdir.dir': os.path.join(self.style_settings['location'], 'img'),
+                     'tools.staticdir.dir': os.path.join(self.style_settings['chat']['location'], 'img'),
                      'tools.caching.on': True,
                      'tools.expires.on': True,
                      'tools.expires.secs': 1}}
@@ -283,6 +415,18 @@ class SocketThread(threading.Thread):
         self.rest_config = {
             '/': {}
         }
+
+        self.gui_root_config = {
+            '/ws': {'tools.websocket.on': True,
+                    'tools.websocket.handler_cls': WebChatGUISocketServer},
+            '/js': {'tools.staticdir.on': True,
+                    'tools.staticdir.dir': os.path.join(self.style_settings['gui']['location'], 'js')},
+            '/img': {'tools.staticdir.on': True,
+                     'tools.staticdir.dir': os.path.join(self.style_settings['gui']['location'], 'img'),
+                     'tools.caching.on': True,
+                     'tools.expires.on': True,
+                     'tools.expires.secs': 1}}
+        self.gui_css_config = {'/': {}}
 
     def run(self):
         cherrypy.log.access_file = ''
@@ -298,8 +442,12 @@ class SocketThread(threading.Thread):
         cherrypy.engine.start()
 
     def mount_dirs(self):
-        cherrypy.tree.mount(HttpRoot(self.style_settings), '', self.root_config)
-        cherrypy.tree.mount(CssRoot(self.style_settings), '/css', self.css_config)
+        cherrypy.tree.mount(CssRoot(self.style_settings['gui']), '/gui/css', self.gui_css_config)
+        cherrypy.tree.mount(CssRoot(self.style_settings['chat']), '/css', self.css_config)
+
+        cherrypy.tree.mount(HttpRoot(self.style_settings['chat']), '', self.root_config)
+        cherrypy.tree.mount(HttpRoot(self.style_settings['gui']), '/gui', self.gui_root_config)
+
         cherrypy.tree.mount(RestRoot(self.style_settings, self.modules), '/rest', self.rest_config)
 
 
@@ -322,50 +470,80 @@ class webchat(MessagingModule):
         conf_dict['server'] = OrderedDict()
         conf_dict['server']['host'] = '127.0.0.1'
         conf_dict['server']['port'] = '8080'
-        conf_dict['style'] = 'czt'
+        conf_dict['style_gui'] = DEFAULT_STYLE
+        conf_dict['style_gui_settings'] = OrderedDict()
+        conf_dict['style'] = DEFAULT_STYLE
         conf_dict['style_settings'] = OrderedDict()
+        conf_dict['style_settings']['show_system_msg'] = True
 
         conf_gui = {
+            'style_gui': {
+                'check': 'http',
+                'check_type': 'dir',
+                'view': 'choose_single'
+            },
+            'style_gui_settings': {},
             'style': {
                 'check': 'http',
                 'check_type': 'dir',
-                'view': 'choose_single'},
+                'view': 'choose_single'
+            },
             'style_settings': {},
             'non_dynamic': ['server.*'],
-            'ignored_sections': ['style_settings']
+            'ignored_sections': ['style_settings', 'style_gui_settings'],
+            'redraw': {
+                'style_settings': {
+                    'redraw_trigger': ['style'],
+                    'type': 'chat',
+                    'get_config': self.load_style_settings,
+                    'get_gui': self.get_style_gui_from_file
+                },
+                'style_gui_settings': {
+                    'redraw_trigger': ['style_gui'],
+                    'type': 'gui',
+                    'get_config': self.load_style_settings,
+                    'get_gui': self.get_style_gui_from_file
+                },
+            }
         }
 
         parser = load_from_config_file(conf_file, conf_dict)
 
-        style_path = self.get_style_path(conf_dict['style'])
+        self._conf_params.update({
+            'folder': conf_folder,
+            'file': conf_file,
+            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+            'parser': parser,
+            'id': conf_dict['gui_information']['id'],
+            'config': conf_dict,
+            'gui': conf_gui,
 
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': parser,
-             'id': conf_dict['gui_information']['id'],
-             'config': conf_dict,
-             'gui': conf_gui,
-             'host': conf_dict['server']['host'],
-             'port': conf_dict['server']['port'],
-             'style_settings': {
-                 'name': conf_dict['style'],
-                 'location': style_path,
-                 'settings_location': os.path.join(style_path, 'settings.json'),
-                 'settings_gui_location': os.path.join(style_path, 'settings_gui.json'),
-                 'keys': OrderedDict([
-                     ('show_system_msg', False)
-                 ])
-             }})
+            'host': conf_dict['server']['host'],
+            'port': conf_dict['server']['port'],
 
-        self.load_style_settings()
+            'style_settings': {
+                'gui': {
+                    'style_name': None,
+                    'location': None,
+                    'keys': {}
+                },
+                'chat': {
+                    'style_name': None,
+                    'location': None,
+                    'keys': {}
+                }
+            }})
+        self.prepare_style_settings()
 
         self.s_thread = None
         self.queue = None
         self.message_threads = []
 
         # Rest Api Settings
-        self._rest_api['GET'] = self.rest_get
+        self.rest_add('GET', 'style', self.rest_get_style_settings)
+        self.rest_add('GET', 'style_gui', self.rest_get_style_settings)
+        self.rest_add('GET', 'history', self.rest_get_history)
+        self.rest_add('DELETE', 'chat', self.rest_delete_history)
 
     def load_module(self, *args, **kwargs):
         MessagingModule.load_module(self, *args, **kwargs)
@@ -381,8 +559,8 @@ class webchat(MessagingModule):
                                          modules=self._loaded_modules)
             self.s_thread.start()
 
-            for thread in range(THREADS+5):
-                self.message_threads.append(MessagingThread(self._conf_params['style_settings']['keys']))
+            for thread in range(WS_THREADS):
+                self.message_threads.append(MessagingThread(self._conf_params['style_settings']))
                 self.message_threads[thread].start()
         else:
             log.error("Port is already used, please change webchat port")
@@ -391,27 +569,45 @@ class webchat(MessagingModule):
     def get_style_path(style):
         path = os.path.abspath(os.path.join(HTTP_FOLDER, style))
         if os.path.exists(path):
-            style_location = path
+            return path
+        elif os.path.exists(os.path.join(HTTP_FOLDER, DEFAULT_STYLE)):
+            return os.path.join(HTTP_FOLDER, DEFAULT_STYLE)
         else:
-            style_location = os.path.join(HTTP_FOLDER, DEFAULT_STYLE)
-        return style_location
+            dirs = os.listdir(HTTP_FOLDER)
+            if dirs:
+                return os.path.join(HTTP_FOLDER, dirs[0])
+        return None
 
     def reload_chat(self):
         self.queue.put({'type': 'command', 'command': 'reload'})
 
     def apply_settings(self, **kwargs):
-        save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections'))
+        save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections', ()))
         if 'system_exit' in kwargs:
             return
 
-        self.update_style_settings()
+        style_changed = False
+
+        chat_style = self._conf_params['config']['style']
+        gui_style = self._conf_params['config']['style_gui']
+        style_config = self._conf_params['style_settings']
+
+        self.update_style_settings(chat_style, gui_style)
         self.reload_chat()
 
-        if self._conf_params['config']['style'] != self._conf_params['style_settings']['name']:
-            log.info("changing style")
-            style_name = self._conf_params['config']['style']
-            self._conf_params['style_settings']['name'] = style_name
-            self._conf_params['style_settings']['location'] = self.get_style_path(style_name)
+        if chat_style != style_config['chat']['style_name']:
+            log.info("changing chat style")
+            self._conf_params['style_settings']['chat']['style_name'] = chat_style
+            self._conf_params['style_settings']['chat']['location'] = self.get_style_path(chat_style)
+            style_changed = True
+
+        if gui_style != style_config['gui']['style_name']:
+            log.info("changing gui style")
+            self._conf_params['style_settings']['gui']['style_name'] = gui_style
+            self._conf_params['style_settings']['gui']['location'] = self.get_style_path(gui_style)
+            style_changed = True
+
+        if style_changed:
             self.s_thread.update_settings()
             self.s_thread.mount_dirs()
 
@@ -434,26 +630,64 @@ class webchat(MessagingModule):
             s_queue.put(message)
             return message
 
-    def rest_get(self, *args):
-        return json.dumps(self._conf_params['style_settings']['keys'])
+    def rest_get_style_settings(self, *args):
+        return json.dumps(self._conf_params['style_settings'][args[0][0]]['keys'])
 
-    def load_style_settings(self):
-        file_path = self._conf_params['style_settings']['settings_location']
-        if os.path.exists(file_path):
+    @staticmethod
+    def rest_get_history(*args, **kwargs):
+        return json.dumps(cherrypy.engine.publish('get-history')[0])
+
+    @staticmethod
+    def rest_delete_history(path, **kwargs):
+        cherrypy.engine.publish('del-history', path)
+        cherrypy.engine.publish('websocket-broadcast', json.dumps(remove_message_by_id(list(path))))
+
+    def get_style_from_file(self, style_name):
+        file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
+        if file_path and os.path.exists(file_path):
             with open(file_path, 'r') as style_file:
-                self._conf_params['style_settings']['keys'].update(json.loads(style_file.read(),
-                                                                              object_pairs_hook=OrderedDict))
+                return json.load(style_file, object_pairs_hook=OrderedDict)
+        return {}
 
-        self._conf_params['style_settings']['keys'].update(self._conf_params['config']['style_settings'])
-        self._conf_params['config']['style_settings'].update(self._conf_params['style_settings']['keys'])
-
-        gui_file_path = self._conf_params['style_settings']['settings_gui_location']
-        if os.path.exists(gui_file_path):
-            with open(gui_file_path, 'r') as gui_file:
-                self._conf_params['gui']['style_settings'].update(json.loads(gui_file.read()))
-
-    def update_style_settings(self):
-        self._conf_params['style_settings']['keys'].update(self._conf_params['config']['style_settings'])
-        file_path = self._conf_params['style_settings']['settings_location']
+    def write_style_to_file(self, style_name, style_type):
+        file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
         with open(file_path, 'w') as style_file:
-            style_file.write(json.dumps(self._conf_params['style_settings']['keys'], indent=2))
+            json.dump(self._conf_params['style_settings'][style_type]['keys'], style_file, indent=2)
+
+    def get_style_gui_from_file(self, style_name):
+        file_path = os.path.join(self.get_style_path(style_name), 'settings_gui.json')
+        if file_path and os.path.exists(file_path):
+            with open(file_path, 'r') as gui_file:
+                return json.load(gui_file)
+        return {}
+
+    def load_style_settings(self, style_name, style_type=None, keys=None):
+        if keys:
+            style_type = keys['all_settings']['type']
+        settings_path = 'style_settings' if style_type == 'chat' else 'style_gui_settings'
+
+        self._conf_params['config'][settings_path] = self.get_style_from_file(style_name)
+        self._conf_params['style_settings'][style_type]['keys'] = self._conf_params['config']['style_settings']
+        self._conf_params['gui'][settings_path] = self.get_style_gui_from_file(style_name)
+        return self._conf_params['config'][settings_path]
+
+    def update_style_settings(self, chat_style, gui_style):
+        self._conf_params['style_settings']['chat']['keys'] = self._conf_params['config']['style_settings']
+        self._conf_params['style_settings']['gui']['keys'] = self._conf_params['config']['style_gui_settings']
+        self.write_style_to_file(chat_style, 'chat')
+        self.write_style_to_file(gui_style, 'gui')
+
+    def prepare_style_settings(self):
+        style_settings = self._conf_params['style_settings']['chat']
+        gui_style_settings = self._conf_params['style_settings']['gui']
+
+        config_style = self._conf_params['config']['style']
+        gui_config_style = self._conf_params['config']['style_gui']
+
+        style_settings['style_name'] = config_style
+        style_settings['location'] = self.get_style_path(config_style)
+        style_settings['keys'] = self.load_style_settings(config_style, 'chat')
+
+        gui_style_settings['style_name'] = gui_config_style
+        gui_style_settings['location'] = self.get_style_path(gui_config_style)
+        gui_style_settings['keys'] = self.load_style_settings(gui_config_style, 'gui')

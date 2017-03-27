@@ -4,65 +4,19 @@
 import os
 import imp
 import Queue
+from time import sleep
 import messaging
-import gui
-import sys
 import logging
 import logging.config
-import requests
 import semantic_version
-import locale
 from collections import OrderedDict
 from modules.helper.parser import load_from_config_file
-from modules.helper.system import load_translations_keys
+from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
+    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException
 from modules.helper.module import BaseModule
 
-VERSION = '0.3.5'
+VERSION = '0.3.6'
 SEM_VERSION = semantic_version.Version(VERSION)
-if hasattr(sys, 'frozen'):
-    PYTHON_FOLDER = os.path.dirname(sys.executable)
-else:
-    PYTHON_FOLDER = os.path.dirname(os.path.abspath('__file__'))
-TRANSLATION_FOLDER = os.path.join(PYTHON_FOLDER, "translations")
-CONF_FOLDER = os.path.join(PYTHON_FOLDER, "conf")
-MODULE_FOLDER = os.path.join(PYTHON_FOLDER, "modules")
-MAIN_CONF_FILE = os.path.join(CONF_FOLDER, "config.cfg")
-GUI_TAG = 'gui'
-
-LOG_FOLDER = os.path.join(PYTHON_FOLDER, "logs")
-if not os.path.exists(LOG_FOLDER):
-    os.makedirs(LOG_FOLDER)
-LOG_FILE = os.path.join(LOG_FOLDER, 'chat_log.log')
-LOG_FORMAT = logging.Formatter("%(asctime)s [%(name)s] [%(levelname)s]  %(message)s")
-
-LANGUAGE_DICT = {
-    'en_US': 'en',
-    'en_GB': 'en',
-    'ru_RU': 'ru'
-}
-
-
-def get_update():
-    github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"
-    try:
-        update_json = requests.get(github_url, timeout=1)
-        if update_json.status_code == 200:
-            update = False
-            update_url = None
-            update_list = update_json.json()
-            for update_item in update_list:
-                if semantic_version.Version.coerce(update_item['tag_name'].lstrip('v')) > SEM_VERSION:
-                    update = True
-                    update_url = update_item['html_url']
-            return update, update_url
-    except Exception as exc:
-        log.info("Got exception: {0}".format(exc))
-    return False, None
-
-
-def get_language():
-    local_name, local_encoding = locale.getdefaultlocale()
-    return LANGUAGE_DICT.get(local_name, 'en')
 
 
 def init():
@@ -94,11 +48,12 @@ def init():
     # Trying to load config file.
     # Create folder if doesn't exist
     if not os.path.isdir(CONF_FOLDER):
-        log.error("Could not find {0} folder".format(CONF_FOLDER))
+        log.error("Could not find %s folder", CONF_FOLDER)
         try:
             os.mkdir(CONF_FOLDER)
-        except:
-            log.error("Was unable to create {0} folder.".format(CONF_FOLDER))
+        except Exception as exc:
+            log.debug("Exception: %s", exc)
+            log.error("Was unable to create %s folder.", CONF_FOLDER)
             exit()
 
     log.info("Loading basic configuration")
@@ -107,7 +62,12 @@ def init():
     main_config_dict['gui_information']['category'] = 'main'
     main_config_dict['gui_information']['width'] = '450'
     main_config_dict['gui_information']['height'] = '500'
+    main_config_dict['system'] = OrderedDict()
+    main_config_dict['system']['log_level'] = 'INFO'
+    main_config_dict['system']['testing_mode'] = False
     main_config_dict['gui'] = OrderedDict()
+    main_config_dict['gui']['cli'] = False
+    main_config_dict['gui']['show_icons'] = False
     main_config_dict['gui']['show_hidden'] = False
     main_config_dict['gui']['gui'] = True
     main_config_dict['gui']['on_top'] = True
@@ -122,9 +82,17 @@ def init():
             'check_type': 'dir',
             'check': 'translations'
         },
-        'non_dynamic': ['language.list_box', 'gui.*']
+        'system': {
+            'hidden': ['log_level', 'testing_mode'],
+        },
+        'gui': {
+            'hidden': ['cli']
+        },
+        'ignored_sections': ['gui.reload'],
+        'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
     }
     config = load_from_config_file(MAIN_CONF_FILE, main_config_dict)
+    root_logger.setLevel(level=logging.getLevelName(main_config_dict['system'].get('log_level', 'INFO')))
     # Adding config for main module
     main_class = BaseModule(
         conf_params={
@@ -150,13 +118,19 @@ def init():
 
     # Checking updates
     log.info("Checking for updates")
-    loaded_modules['main']['update'], loaded_modules['main']['update_url'] = get_update()
+    loaded_modules['main']['update'], loaded_modules['main']['update_url'] = get_update(SEM_VERSION)
     if loaded_modules['main']['update']:
         log.info("There is new update, please update!")
 
     # Starting modules
     log.info("Loading Messaging Handler")
     log.info("Loading Queue for message handling")
+
+    try:
+        load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
+    except Exception as exc:
+        log.debug("Exception: %s", exc)
+        log.exception("Failed loading translations")
 
     # Creating queues for messaging transfer between chat threads
     queue = Queue.Queue()
@@ -171,7 +145,7 @@ def init():
     chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
     chat_conf_dict['gui_information'] = {'category': 'chat'}
-    chat_conf_dict['chats'] = {}
+    chat_conf_dict['chats'] = []
 
     chat_conf_gui = {
         'chats': {
@@ -193,36 +167,40 @@ def init():
     )
     loaded_modules['chat'] = chat_module.conf_params()
 
-    for module, settings in chat_conf_dict['chats'].iteritems():
-        log.info("Loading chat module: {0}".format(module))
-        module_location = os.path.join(chat_location, module + ".py")
+    for chat_module in chat_conf_dict['chats']:
+        log.info("Loading chat module: {0}".format(chat_module))
+        module_location = os.path.join(chat_location, chat_module + ".py")
         if os.path.isfile(module_location):
-            log.info("found {0}".format(module))
+            log.info("found {0}".format(chat_module))
             # After module is find, we are initializing it.
             # Class should be named as in config
             # Also passing core folder to module so it can load it's own
             #  configuration correctly
 
-            tmp = imp.load_source(module, module_location)
-            chat_init = getattr(tmp, module)
+            tmp = imp.load_source(chat_module, module_location)
+            chat_init = getattr(tmp, chat_module)
             class_module = chat_init(queue, PYTHON_FOLDER,
                                      conf_folder=CONF_FOLDER,
-                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(module)))
-            loaded_modules[module] = class_module.conf_params()
+                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module)),
+                                     testing=main_config_dict['system']['testing_mode'])
+            loaded_modules[chat_module] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")
 
     # Actually loading modules
     for f_module, f_config in loaded_modules.iteritems():
         if 'class' in f_config:
-            f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules,
-                                          queue=queue)
-    try:
-        load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
-    except:
-        log.exception("Failed loading translations")
+            try:
+                f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules,
+                                              queue=queue)
+                log.debug('loaded module {}'.format(f_module))
+            except ModuleLoadException:
+                msg.modules.remove(loaded_modules[f_module]['class'])
+                loaded_modules.pop(f_module)
+    log.info('LalkaChat loaded successfully')
 
     if gui_settings['gui']:
+        import gui
         log.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,
                                main_config=loaded_modules['main'],
@@ -230,25 +208,34 @@ def init():
                                queue=queue)
         loaded_modules['gui'] = window.conf_params()
         window.start()
-    try:
-        while True:
-            console = raw_input("> ")
-            log.info(console)
-            if console == "exit":
-                log.info("Exiting now!")
-                close()
-            else:
-                log.info("Incorrect Command")
-    except (KeyboardInterrupt, SystemExit):
-        log.info("Exiting now!")
-        close()
-    except Exception as exc:
-        log.info(exc)
+
+    if main_config_dict['gui']['cli']:
+        try:
+            while True:
+                console = raw_input("> ")
+                log.info(console)
+                if console == "exit":
+                    log.info("Exiting now!")
+                    close()
+                else:
+                    log.info("Incorrect Command")
+        except (KeyboardInterrupt, SystemExit):
+            log.info("Exiting now")
+            close()
+        except Exception as exc:
+            log.info(exc)
+    else:
+        try:
+            while True:
+                sleep(1)
+        except (KeyboardInterrupt, SystemExit):
+            log.info("Exiting now")
+            close()
+
 
 if __name__ == '__main__':
     root_logger = logging.getLogger()
     # Logging level
-    root_logger.setLevel(level=logging.INFO)
     file_handler = logging.FileHandler(LOG_FILE)
     file_handler.setFormatter(LOG_FORMAT)
     root_logger.addHandler(file_handler)

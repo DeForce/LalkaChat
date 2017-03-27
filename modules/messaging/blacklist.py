@@ -22,11 +22,11 @@ class blacklist(MessagingModule):
         conf_dict['gui_information'] = {
             'category': 'messaging',
             'id': DEFAULT_PRIORITY}
-        conf_dict['main'] = {'message': u'ignored message'}
-        conf_dict['users_hide'] = {}
-        conf_dict['users_block'] = {}
-        conf_dict['words_hide'] = {}
-        conf_dict['words_block'] = {}
+        conf_dict['main'] = {'message': 'ignored message'}
+        conf_dict['users_hide'] = []
+        conf_dict['users_block'] = []
+        conf_dict['words_hide'] = []
+        conf_dict['words_block'] = []
 
         conf_gui = {
             'words_hide': {
@@ -56,14 +56,14 @@ class blacklist(MessagingModule):
             if message['type'] in IGNORED_TYPES:
                 return message
 
-            if message['user'].lower() in self._conf_params['config']['users_hide'].keys():
+            if message['user'].lower() in self._conf_params['config']['users_hide']:
                 return
 
             for word in self._conf_params['config']['words_hide']:
                 if re.search(word, message['text'].encode('utf-8')):
                     return
 
-            if message['user'].lower() in self._conf_params['config']['users_block'].keys():
+            if message['user'].lower() in self._conf_params['config']['users_block']:
                 message['text'] = self._conf_params['config']['main']['message']
                 return message
 

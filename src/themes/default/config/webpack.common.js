@@ -7,8 +7,8 @@ module.exports = {
     },
 
     resolve: {
-        extensions: ['', '.ts', '.js', '.json'],
-        modulesDirectories: ['./node_modules', './app'],
+        extensions: ['.ts', '.js', '.json'],
+        modules: ['./node_modules', './app'],
         alias: {
             'vue$': 'vue/dist/vue.common.js'
         }
@@ -19,7 +19,7 @@ module.exports = {
     },
 
     module: {
-        loaders: [
+        rules: [
 
         ]
     },

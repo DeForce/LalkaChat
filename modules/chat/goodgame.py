@@ -2,12 +2,15 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import json
+import random
+import string
 import threading
 import os
 import requests
 import Queue
 import re
 import logging
+import time
 from collections import OrderedDict
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import system_message, translate_key, remove_message_by_id, EMOTE_FORMAT, NA_MESSAGE
@@ -26,14 +29,21 @@ CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
 CONF_DICT['config']['show_pm'] = True
-CONF_DICT['config']['channel_name'] = 'CHANGE_ME'
 CONF_DICT['config']['socket'] = 'ws://chat.goodgame.ru:8081/chat/websocket'
+CONF_DICT['config']['show_channel_names'] = True
+CONF_DICT['config']['channels_list'] = []
+SMILE_REGEXP = r':(\w+|\d+):'
+SMILE_FORMAT = ':{}:'
 
 CONF_GUI = {
     'config': {
-        'hidden': ['socket']
+        'hidden': ['socket'],
+        'channels_list': {
+            'view': 'list',
+            'addable': 'true'
+        }
     },
-    'non_dynamic': ['config.*'],
+    'non_dynamic': ['config.socket'],
     'icon': FILE_ICON}
 
 
@@ -48,7 +58,6 @@ class GoodgameMessageHandler(threading.Thread):
 
         self.nick = kwargs.get('nick')
         self.smiles = kwargs.get('smiles')
-        self.smile_regex = ':(\w+|\d+):'
         self.chat_module = kwargs.get('chat_module')
         self.kwargs = kwargs
 
@@ -131,20 +140,21 @@ class GoodgameMessageHandler(threading.Thread):
 
     def _process_channel_counters(self):
         try:
-            self.chat_module.set_viewers(self.chat_module.get_viewers())
+            self.chat_module.set_viewers(self.ws_class.main_thread.nick,
+                                         self.chat_module.get_viewers(self.ws_class.main_thread.nick))
         except Exception as exc:
             log.exception(exc)
 
+    def _post_process_multiple_channels(self, message):
+        if self.chat_module.conf_params()['config']['config']['show_channel_names']:
+            message['channel_name'] = self.ws_class.main_thread.nick
+
     def _send_message(self, comp):
-        self._post_process_emotes(comp)
+        self._post_process_multiple_channels(comp)
         self.message_queue.put(comp)
 
-    @staticmethod
-    def _post_process_emotes(comp):
-        comp['text'] = re.sub(':(\w+|\d+):', EMOTE_FORMAT.format('\\1'), comp['text'])
-
     def _process_smiles(self, comp, msg):
-        smiles_array = re.findall(self.smile_regex, comp['text'])
+        smiles_array = re.findall(SMILE_REGEXP, comp['text'])
         for smile in smiles_array:
             if smile in self.smiles:
                 smile_info = self.smiles.get(smile)
@@ -172,6 +182,7 @@ class GoodgameMessageHandler(threading.Thread):
                             gif = True
 
                 if allow:
+                    comp['text'] = comp['text'].replace(SMILE_FORMAT.format(smile), EMOTE_FORMAT.format(smile))
                     if smile not in comp['emotes']:
                         if gif and smile_info['urls']['gif']:
                             comp['emotes'][smile] = {'emote_url': smile_info['urls']['gif']}
@@ -197,18 +208,22 @@ class GGChat(WebSocketClient):
         self.chat_module = kwargs.get('chat_module')
         self.crit_error = False
 
-        message_handler = GoodgameMessageHandler(self, gg_queue=self.gg_queue, **kwargs)
-        message_handler.start()
+        self.message_handler = GoodgameMessageHandler(self, gg_queue=self.gg_queue, **kwargs)
+        self.message_handler.start()
 
     def opened(self):
         success_msg = "Connection Successful"
         log.info(success_msg)
-        self.chat_module.set_online()
+        self.chat_module.set_online(self.main_thread.nick)
         try:
-            self.chat_module.set_viewers(self.chat_module.get_viewers())
+            self.chat_module.set_viewers(self.main_thread.nick,
+                                         self.chat_module.get_viewers(self.main_thread.nick))
         except Exception as exc:
             log.exception(exc)
-        self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])), category='connection')
+        self.system_message(
+            translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])).format(self.main_thread.nick),
+            category='connection'
+        )
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
@@ -216,12 +231,25 @@ class GGChat(WebSocketClient):
         log.info("Sent join message")
 
     def closed(self, code, reason=None):
+        """
+        Codes used by LC
+        4000 - Normal disconnect by LC
+        4001 - Invalid Channel ID
+
+        :param code: 
+        :param reason: 
+        """
         log.info("Connection Closed Down")
-        self.chat_module.set_offline()
-        if 'INV_CH_ID' in reason:
+        self.chat_module.set_offline(self.main_thread.nick)
+        if code in [4000, 4001]:
             self.crit_error = True
+            self.system_message(translate_key(
+                MODULE_KEY.join(['goodgame', 'connection_closed'])).format(self.main_thread.nick),
+                                category='connection')
         else:
-            self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_died'])), category='connection')
+            self.system_message(translate_key(
+                MODULE_KEY.join(['goodgame', 'connection_died'])).format(self.main_thread.nick),
+                                category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
@@ -230,7 +258,7 @@ class GGChat(WebSocketClient):
         self.gg_queue.put(json.loads(str(mes)))
 
     def system_message(self, msg, category='system'):
-        system_message(msg, self.queue, SOURCE,
+        system_message(msg, self.queue, source=SOURCE,
                        icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
 
 
@@ -246,6 +274,7 @@ class GGThread(threading.Thread):
         self.nick = nick
         self.ch_id = None
         self.kwargs = kwargs
+        self.ws = None
 
     def load_config(self):
         try:
@@ -293,15 +322,60 @@ class GGThread(threading.Thread):
             log.info("Connecting, try {0}".format(try_count))
             if self.load_config():
                 # Connecting to goodgame websocket
-                ws = GGChat(self.address, protocols=['websocket'], queue=self.queue, ch_id=self.ch_id, nick=self.nick,
-                            heartbeat_freq=30, main_thread=self, **self.kwargs)
+                self.ws = GGChat(self.address, protocols=['websocket'], queue=self.queue,
+                                 ch_id=self.ch_id, nick=self.nick,
+                                 heartbeat_freq=30, main_thread=self, **self.kwargs)
                 try:
-                    ws.connect()
-                    ws.run_forever()
+                    self.ws.connect()
+                    self.ws.run_forever()
                     log.debug("Connection closed")
                     break
                 except Exception as exc:
                     log.exception(exc)
+            time.sleep(5)
+
+    def stop(self):
+        self.ws.close(4000)
+
+
+def gg_message(nickname, text):
+    return {
+        'type': u'message',
+        'data': {
+            u'color': u'streamer',
+            u'hideIcon': 0,
+            u'mobile': 0,
+            u'text': u'{}'.format(text),
+            u'user_name': u'{}'.format(nickname),
+            u'icon': u'none',
+            u'message_id': ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+        }
+    }
+
+
+class TestGG(threading.Thread):
+    def __init__(self, main_class):
+        super(TestGG, self).__init__()
+        self.main_class = main_class  # type: goodgame
+        self.main_class.rest_add('POST', 'push_message', self.send_message)
+        self.gg_handler = None
+
+    def run(self):
+        while True:
+            try:
+                thread = self.main_class.gg.items()[0][1]
+                if thread.ws:
+                    self.gg_handler = thread.ws.message_handler
+                    break
+            except:
+                continue
+        log.info("GG Testing mode online")
+
+    def send_message(self, *args, **kwargs):
+        nickname = kwargs.get('nickname', 'super_tester')
+        text = kwargs.get('text', 'Kappa 123')
+
+        self.gg_handler.process_message(gg_message(nickname, text))
 
 
 class goodgame(ChatModule):
@@ -323,8 +397,16 @@ class goodgame(ChatModule):
 
         self.queue = queue
         self.host = CONF_DICT['config']['socket']
-        self.channel_name = CONF_DICT['config']['channel_name']
-        self.gg = None
+        self.channels_list = CONF_DICT['config']['channels_list']
+        self.gg = {}
+
+        if len(self.channels_list) == 1:
+            if CONF_DICT['config']['show_channel_names']:
+                CONF_DICT['config']['show_channel_names'] = False
+
+        self.testing = kwargs.get('testing')
+        if self.testing:
+            self.testing = TestGG(self)
 
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
@@ -332,18 +414,14 @@ class goodgame(ChatModule):
             self._loaded_modules['webchat']['class'].add_depend('goodgame')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
         # Creating new thread with queue in place for messaging transfers
-        gg = GGThread(self.queue, self.host, self.channel_name,
-                      settings=self._conf_params['settings'], chat_module=self)
-        self.gg = gg
-        gg.start()
+        for channel in self.channels_list:
+            self._set_chat_online(channel)
+        if self.testing:
+            self.testing.start()
 
-    def get_remove_text(self):
-        if self._loaded_modules['webchat']['style_settings']['keys'].get('remove_message'):
-            return self._loaded_modules['webchat']['style_settings']['keys'].get('remove_text')
-        return None
-
-    def get_viewers(self):
-        streams_url = 'http://api2.goodgame.ru/streams/{0}'.format(self.gg.ch_id)
+    @staticmethod
+    def get_viewers(channel):
+        streams_url = 'http://api2.goodgame.ru/streams/{0}'.format(channel)
         try:
             request = requests.get(streams_url)
             if request.status_code == 200:
@@ -357,7 +435,23 @@ class goodgame(ChatModule):
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
+    def _set_chat_offline(self, chat):
+        ChatModule.set_chat_offline(self, chat)
+        try:
+            self.gg[chat].stop()
+        except Exception as exc:
+            log.debug(exc)
+        del self.gg[chat]
+
+    def _set_chat_online(self, chat):
+        ChatModule.set_chat_online(self, chat)
+        gg = GGThread(self.queue, self.host, chat,
+                      settings=self._conf_params['settings'], chat_module=self)
+        self.gg[chat] = gg
+        gg.start()
+
     def apply_settings(self, **kwargs):
-        ChatModule.apply_settings(self, **kwargs)
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
+        self._check_chats(self.gg.keys())
+        ChatModule.apply_settings(self, **kwargs)

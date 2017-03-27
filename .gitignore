@@ -6,8 +6,11 @@ levels.db*
 /dist
 /libs
 /conf
-*.spec
 *.log
 govno_rutony.py
 /node_modules/
 /http
+**/dist
+**/node_modules
+*.gdsl
+modules/**/test*

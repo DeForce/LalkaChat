@@ -2,9 +2,10 @@
   "show_system_msg": true, 
   "remove_message": true,
   "remove_text": "<message removed>",
-  "timer": "-1",
-  "message_opacity": "67",
-  "font_size": "15",
-  "smile_size": "20",
-  "badge_size": "16"
+  "timer": -1,
+  "message_opacity": 67,
+  "font_size": 15,
+  "smile_size": 20,
+  "badge_size": 16,
+  "background_colour": "#FFFFFF"
 }

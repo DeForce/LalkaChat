@@ -10,8 +10,8 @@ import xml.etree.ElementTree as ElementTree
 from collections import OrderedDict
 import datetime
 
-from modules.helper.parser import load_from_config_file
-from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES, random_string
+from modules.helper.parser import load_from_config_file, save_settings
+from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES
 from modules.helper.module import MessagingModule
 
 log = logging.getLogger('levels')
@@ -48,7 +48,23 @@ class levels(MessagingModule):
                     'config': {
                         'experience': {
                             'view': 'dropdown',
-                            'choices': ['static', 'geometrical', 'random']}}}
+                            'choices': ['static', 'geometrical', 'random']},
+                        'exp_for_level': {
+                            'view': 'spin',
+                            'min': 0,
+                            'max': 100000
+                        },
+                        'exp_for_message': {
+                            'view': 'spin',
+                            'min': 0,
+                            'max': 100000
+                        },
+                        'decrease_window': {
+                            'view': 'spin',
+                            'min': 0,
+                            'max': 100000
+                        }
+                    }}
         config = load_from_config_file(conf_file, conf_dict)
 
         self._conf_params.update(
@@ -83,11 +99,7 @@ class levels(MessagingModule):
         self.experience = conf_dict['config'].get('experience')
         self.exp_for_level = float(conf_dict['config'].get('exp_for_level'))
         self.exp_for_message = float(conf_dict['config'].get('exp_for_message'))
-        self.level_file = os.path.abspath(
-            os.path.join(
-                self._loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
-            )
-        )
+        self.level_file = None
         self.levels = []
         self.special_levels = {}
         self.db_location = os.path.join(conf_dict['config'].get('db'))
@@ -95,7 +107,10 @@ class levels(MessagingModule):
         self.threshold_users = {}
 
         # Load levels
-        if not os.path.exists(self.level_file):
+        webchat_location = self._loaded_modules['webchat']['style_settings']['gui']['location']
+        if webchat_location and os.path.exists(webchat_location):
+            self.level_file = os.path.join(webchat_location, 'levels.xml')
+        else:
             log.error("{0} not found, generating from template".format(self.level_file))
             raise ModuleLoadException("{0} not found, generating from template".format(self.level_file))
 
@@ -114,7 +129,7 @@ class levels(MessagingModule):
 
         self.level_file = os.path.abspath(
             os.path.join(
-                self._loaded_modules['webchat']['style_settings']['location'], 'levels.xml'
+                self._loaded_modules['webchat']['style_settings']['gui']['location'], 'levels.xml'
             )
         )
         tree = ElementTree.parse(self.level_file)
@@ -128,10 +143,13 @@ class levels(MessagingModule):
                 else:
                     level_exp = self.exp_for_level * level_count
                 level_data.attrib['exp'] = level_exp
-                level_data.attrib['url'] = '{0}?{1}'.format(level_data.attrib['url'], random_string(5))
+                if not level_data.attrib['url'].startswith('/'):
+                    level_data.attrib['url'] = '/{}'.format(level_data.attrib['url'])
+
                 self.levels.append(level_data.attrib)
 
     def apply_settings(self, **kwargs):
+        save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections', ()))
         if 'webchat' in kwargs.get('from_depend', []):
             self.load_levels()
 
@@ -178,7 +196,7 @@ class levels(MessagingModule):
                 queue, category='module'
             )
         cursor.close()
-        return self.levels[max_level]
+        return self.levels[max_level].copy()
 
     def process_message(self, message, queue, **kwargs):
         if message:
@@ -188,9 +206,9 @@ class levels(MessagingModule):
                 if 'user' in message and message['user'] in self.special_levels:
                     level_info = self.special_levels[message['user']]
                     if 's_levels' in message:
-                        message['s_levels'].append(level_info)
+                        message['s_levels'].append(level_info.copy())
                     else:
-                        message['s_levels'] = [level_info]
+                        message['s_levels'] = [level_info.copy()]
 
                 message['levels'] = self.set_level(message['user'], queue)
             return message

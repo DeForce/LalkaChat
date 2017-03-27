@@ -7,7 +7,7 @@ const DOMPurify = require('dompurify');
     new Vue({
         el: '#chat-container',
         data: function () {
-            var wsUrl = 'ws://' + window.location.host + '/ws';
+            var wsUrl = 'ws://' + window.location.host + window.location.pathname + '/ws';
             var messages = [];
             var socket = new WebSocket(wsUrl);
 
@@ -28,7 +28,12 @@ const DOMPurify = require('dompurify');
             self.socket.onopen = this.onopen;
             self.socket.onclose = this.onclose;
 
-            self.get(window.location.href + 'rest/webchat', function (err, response) {
+            var style_get = 'chat';
+            if(window.location.pathname.indexOf('gui') !== -1) {
+                style_get = 'gui'
+            }
+
+            self.get('http://' + window.location.host + '/rest/webchat/style/' + style_get, function (err, response) {
                 if (!err) {
                     self.messagesInterval = response.timer * 1000 || -1;
                 }
@@ -56,18 +61,19 @@ const DOMPurify = require('dompurify');
             remove: function (message) {
                 var index = this.messages.indexOf(message);
                 if (index >= 0) {
+                    this.del('http://' + window.location.host + '/rest/webchat/chat/' + message.id, function(err, ok) {});
                     this.messages.splice(index, 1);
                 }
             },
             sanitize: function (message) {
-                var html = this.replaceDefaultEmotions(message.text, message.emotes);
-                var clean = Sanitizer.sanitize(html);
+                var sanitized = Sanitizer.sanitize(message.text, { ALLOWED_TAGS: [] });
+                var clean = this.replaceEmotions(sanitized, message.emotes);
 
                 if (!clean) this.remove(message);
 
                 return clean;
             },
-            replaceDefaultEmotions: function (message, emotes) {
+            replaceEmotions: function (message, emotes) {
                 if (!emotes || emotes.length <= 0) {
                     return message;
                 }
@@ -186,11 +192,15 @@ const DOMPurify = require('dompurify');
             load: function (method, url, callback, data) {
                 var xhr = new XMLHttpRequest();
                 xhr.onload = function () {
-                    var obj = JSON.parse(xhr.responseText);
+                    if (xhr.responseText) {
+                        var obj = JSON.parse(xhr.responseText);
+                    }
                     callback(null, obj);
                 };
                 xhr.onerror = function () {
-                    var obj = JSON.parse(xhr.responseText);
+                    if (xhr.responseText) {
+                        var obj = JSON.parse(xhr.responseText);
+                    }
                     callback(obj);
                 };
 
@@ -198,10 +208,13 @@ const DOMPurify = require('dompurify');
                 xhr.send(data);
             },
             get: function (url, callback, data) {
-                return this.load('get', url, callback, data);
+                return this.load('GET', url, callback, data);
             },
             post: function (url, data, callback) {
-                return this.load('post', url, callback, data);
+                return this.load('POST', url, callback, data);
+            },
+            del: function (url, callback) {
+                return this.load('DELETE', url, callback);
             }
         },
         filters: {}
