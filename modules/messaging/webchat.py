@@ -1,10 +1,10 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
+import re
 import threading
 import json
 import Queue
 import socket
-
 import cherrypy
 import logging
 import datetime
@@ -17,7 +17,7 @@ from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from modules.helper.parser import load_from_config_file, save_settings
-from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER
+from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER, remove_message_by_id
 from modules.helper.module import MessagingModule
 from gui import MODULE_KEY
 
@@ -47,6 +47,7 @@ def prepare_message(msg, style_settings):
         if message['command'].startswith('replace'):
             message['text'] = style_settings['keys']['remove_text']
 
+    message['id'] = str(message['id'])
     return message
 
 
@@ -164,6 +165,7 @@ class WebChatPlugin(WebSocketPlugin):
         self.bus.subscribe('get-clients', self.get_clients)
         self.bus.subscribe('add-history', self.add_history)
         self.bus.subscribe('get-history', self.get_history)
+        self.bus.subscribe('del-history', self.del_history)
         self.bus.subscribe('process-command', self.process_command)
 
     def stop(self):
@@ -198,6 +200,14 @@ class WebChatPlugin(WebSocketPlugin):
         self.history.append(message)
         if len(self.history) > self.history_size:
             self.history.pop(0)
+
+    def del_history(self, msg_id):
+        if len(msg_id) > 1:
+            return
+
+        for index, item in enumerate(self.history):
+            if str(item['id']) == msg_id[0]:
+                self.history.pop(index)
 
     def get_settings(self, style_type):
         return self.style_settings[style_type]
@@ -398,8 +408,12 @@ class SocketThread(threading.Thread):
                      'tools.caching.on': True,
                      'tools.expires.on': True,
                      'tools.expires.secs': 1}}
-        self.css_config = {'/': {}}
-        self.rest_config = {'/': {}}
+        self.css_config = {
+            '/': {}
+        }
+        self.rest_config = {
+            '/': {}
+        }
 
         self.gui_root_config = {
             '/ws': {'tools.websocket.on': True,
@@ -528,6 +542,7 @@ class webchat(MessagingModule):
         self.rest_add('GET', 'style', self.rest_get_style_settings)
         self.rest_add('GET', 'style_gui', self.rest_get_style_settings)
         self.rest_add('GET', 'history', self.rest_get_history)
+        self.rest_add('DELETE', 'chat', self.rest_delete_history)
 
     def load_module(self, *args, **kwargs):
         MessagingModule.load_module(self, *args, **kwargs)
@@ -620,6 +635,11 @@ class webchat(MessagingModule):
     @staticmethod
     def rest_get_history(*args, **kwargs):
         return json.dumps(cherrypy.engine.publish('get-history')[0])
+
+    @staticmethod
+    def rest_delete_history(path, **kwargs):
+        cherrypy.engine.publish('del-history', path)
+        cherrypy.engine.publish('websocket-broadcast', json.dumps(remove_message_by_id(list(path))))
 
     def get_style_from_file(self, style_name):
         file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
