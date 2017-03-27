@@ -4,6 +4,10 @@
 import os
 import imp
 import Queue
+
+import signal
+from time import sleep
+
 import messaging
 import logging
 import logging.config
@@ -139,7 +143,7 @@ def init():
     chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
     chat_conf_dict['gui_information'] = {'category': 'chat'}
-    chat_conf_dict['chats'] = {}
+    chat_conf_dict['chats'] = []
 
     chat_conf_gui = {
         'chats': {
@@ -221,7 +225,7 @@ def init():
     else:
         try:
             while True:
-                pass
+                sleep(1)
         except (KeyboardInterrupt, SystemExit):
             log.info("Exiting now")
             close()
