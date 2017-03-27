@@ -33,7 +33,7 @@
                     <div class="channel_name">[{{message.channel_name}}]</div>
                 </template>
 
-                <div class="username" v-bind:style="{color: message.nick_color}">{{message.display_name || message.user}}</div>
+                <div class="username" :style="{color: message.nick_color}">{{message.display_name || message.user}}</div>
                 <div>:</div>
                 <div class="text" v-html="sanitize(message)" :class="{ 'system': message.source === 'sy', 'private': message.pm, 'mention': message.mention }"></div>
             </div>

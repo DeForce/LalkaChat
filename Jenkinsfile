@@ -38,6 +38,7 @@ node('docker-host') {
                 docker_image.inside {
                     stage('Themes') {
                         buildThemes()
+                        junit 'results/javascript-tests/*.xml'
                     }
                     stage('Configuration') {
                         sh '/bin/sh src/jenkins/prep_config.sh'

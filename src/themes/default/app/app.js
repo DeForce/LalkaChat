@@ -29,7 +29,7 @@ const DOMPurify = require('dompurify');
             self.socket.onclose = this.onclose;
 
             var style_get = 'chat';
-            if(window.location.pathname.toString().indexOf('gui') !== -1) {
+            if(window.location.pathname.indexOf('gui') !== -1) {
                 style_get = 'gui'
             }
 
@@ -61,6 +61,7 @@ const DOMPurify = require('dompurify');
             remove: function (message) {
                 var index = this.messages.indexOf(message);
                 if (index >= 0) {
+                    this.del('http://' + window.location.host + '/rest/webchat/chat/' + message.id, function(err, ok) {});
                     this.messages.splice(index, 1);
                 }
             },
@@ -191,11 +192,15 @@ const DOMPurify = require('dompurify');
             load: function (method, url, callback, data) {
                 var xhr = new XMLHttpRequest();
                 xhr.onload = function () {
-                    var obj = JSON.parse(xhr.responseText);
+                    if (xhr.responseText) {
+                        var obj = JSON.parse(xhr.responseText);
+                    }
                     callback(null, obj);
                 };
                 xhr.onerror = function () {
-                    var obj = JSON.parse(xhr.responseText);
+                    if (xhr.responseText) {
+                        var obj = JSON.parse(xhr.responseText);
+                    }
                     callback(obj);
                 };
 
@@ -203,10 +208,13 @@ const DOMPurify = require('dompurify');
                 xhr.send(data);
             },
             get: function (url, callback, data) {
-                return this.load('get', url, callback, data);
+                return this.load('GET', url, callback, data);
             },
             post: function (url, data, callback) {
-                return this.load('post', url, callback, data);
+                return this.load('POST', url, callback, data);
+            },
+            del: function (url, callback) {
+                return this.load('DELETE', url, callback);
             }
         },
         filters: {}
