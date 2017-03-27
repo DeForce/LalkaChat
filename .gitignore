@@ -13,3 +13,4 @@ govno_rutony.py
 **/dist
 **/node_modules
 *.gdsl
+modules/**/test*

@@ -69,21 +69,21 @@ class Message(threading.Thread):
         modules = {}
         # Loading modules from cfg.
         if len(conf_dict['messaging']) > 0:
-            for module in conf_dict['messaging']:
-                log.info("Loading %s" % module)
+            for m_module in conf_dict['messaging']:
+                log.info("Loading %s" % m_module)
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
                 #  same name as module name
-                join_path = [main_config['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(module)]
+                join_path = [main_config['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(m_module)]
                 file_path = os.path.join(*join_path)
 
                 try:
-                    tmp = imp.load_source(module, file_path)
-                    class_init = getattr(tmp, module)
+                    tmp = imp.load_source(m_module, file_path)
+                    class_init = getattr(tmp, m_module)
                     class_module = class_init(main_config['conf_folder'],
                                               root_folder=main_config['root_folder'],
                                               main_settings=settings,
-                                              conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(module)))
+                                              conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(m_module)))
 
                     params = class_module.conf_params()
                     if 'id' in params:
@@ -96,9 +96,9 @@ class Message(threading.Thread):
                     else:
                         modules[int(priority)] = [class_module]
 
-                    modules_list[module] = params
+                    modules_list[m_module] = params
                 except ModuleLoadException:
-                    log.error("Unable to load module {0}".format(module))
+                    log.error("Unable to load module {0}".format(m_module))
         sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
         for sorted_priority, sorted_list in sorted_module:
             for sorted_list_item in sorted_list:
@@ -117,8 +117,8 @@ class Message(threading.Thread):
         # All modules should return the message with modified/not modified
         #  content so it can be passed to new module, or to pass to CLI
 
-        for module in self.modules:
-            message = module.process_message(message, self.queue)
+        for m_module in self.modules:
+            message = m_module.process_message(message, self.queue)
 
     def run(self):
         for thread in range(THREADS):

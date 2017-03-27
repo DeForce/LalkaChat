@@ -77,7 +77,7 @@ class RestApiException(Exception):
 
 def load_translations_keys(translation_folder, language):
     def load_language(language_folder):
-        files_list = [f_item for f_item in os.listdir(language_folder) if f_item.endswith(TRANSLATION_FILETYPE)]
+        files_list = [r_item for r_item in os.listdir(language_folder) if r_item.endswith(TRANSLATION_FILETYPE)]
         for f_file in files_list:
             with open(os.path.join(language_folder, f_file)) as r_file:
                 for line in r_file.readlines():
@@ -130,10 +130,6 @@ def translate_key(item):
     if re.match('\*', translation):
         return old_item
     return translation.replace('\\n', '\n').decode('utf-8')
-
-
-def translate(text):
-    pass
 
 
 def cleanup_tags(message):

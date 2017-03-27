@@ -4,10 +4,7 @@
 import os
 import imp
 import Queue
-
-import signal
 from time import sleep
-
 import messaging
 import logging
 import logging.config
@@ -51,11 +48,12 @@ def init():
     # Trying to load config file.
     # Create folder if doesn't exist
     if not os.path.isdir(CONF_FOLDER):
-        log.error("Could not find {0} folder".format(CONF_FOLDER))
+        log.error("Could not find %s folder", CONF_FOLDER)
         try:
             os.mkdir(CONF_FOLDER)
-        except:
-            log.error("Was unable to create {0} folder.".format(CONF_FOLDER))
+        except Exception as exc:
+            log.debug("Exception: %s", exc)
+            log.error("Was unable to create %s folder.", CONF_FOLDER)
             exit()
 
     log.info("Loading basic configuration")
@@ -85,7 +83,10 @@ def init():
             'check': 'translations'
         },
         'system': {
-            'hidden': ['log_level', 'testing_mode']
+            'hidden': ['log_level', 'testing_mode'],
+        },
+        'gui': {
+            'hidden': ['cli']
         },
         'ignored_sections': ['gui.reload'],
         'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
@@ -127,7 +128,8 @@ def init():
 
     try:
         load_translations_keys(TRANSLATION_FOLDER, gui_settings['language'])
-    except:
+    except Exception as exc:
+        log.debug("Exception: %s", exc)
         log.exception("Failed loading translations")
 
     # Creating queues for messaging transfer between chat threads
@@ -165,23 +167,23 @@ def init():
     )
     loaded_modules['chat'] = chat_module.conf_params()
 
-    for module in chat_conf_dict['chats']:
-        log.info("Loading chat module: {0}".format(module))
-        module_location = os.path.join(chat_location, module + ".py")
+    for chat_module in chat_conf_dict['chats']:
+        log.info("Loading chat module: {0}".format(chat_module))
+        module_location = os.path.join(chat_location, chat_module + ".py")
         if os.path.isfile(module_location):
-            log.info("found {0}".format(module))
+            log.info("found {0}".format(chat_module))
             # After module is find, we are initializing it.
             # Class should be named as in config
             # Also passing core folder to module so it can load it's own
             #  configuration correctly
 
-            tmp = imp.load_source(module, module_location)
-            chat_init = getattr(tmp, module)
+            tmp = imp.load_source(chat_module, module_location)
+            chat_init = getattr(tmp, chat_module)
             class_module = chat_init(queue, PYTHON_FOLDER,
                                      conf_folder=CONF_FOLDER,
-                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(module)),
+                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module)),
                                      testing=main_config_dict['system']['testing_mode'])
-            loaded_modules[module] = class_module.conf_params()
+            loaded_modules[chat_module] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")
 

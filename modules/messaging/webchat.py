@@ -182,8 +182,9 @@ class WebChatPlugin(WebSocketPlugin):
     def del_client(self, addr, websocket):
         try:
             self.clients.remove({'ip': addr[0], 'port': addr[1], 'websocket': websocket})
-        except:
-            log.info('Unable to delete client {}'.format(addr))
+        except Exception as exc:
+            log.exception("Exception %s", exc)
+            log.info('Unable to delete client %s', addr)
 
     def get_clients(self, client_type):
         ws_list = []
@@ -360,8 +361,7 @@ class HttpRoot(object):
 
     @cherrypy.expose
     def ws(self):
-        # you can access the class instance through
-        handler = cherrypy.request.ws_handler
+        pass
 
 
 class SocketThread(threading.Thread):

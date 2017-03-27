@@ -220,8 +220,10 @@ class GGChat(WebSocketClient):
                                          self.chat_module.get_viewers(self.main_thread.nick))
         except Exception as exc:
             log.exception(exc)
-        self.system_message(translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])).format(self.main_thread.nick),
-                            category='connection')
+        self.system_message(
+            translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])).format(self.main_thread.nick),
+            category='connection'
+        )
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
