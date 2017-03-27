@@ -29,7 +29,7 @@ ITEM_SPACING_VERT = 6
 ITEM_SPACING_HORZ = 30
 
 
-def get_id_from_name(name, error=False):
+def get_id_from_name(name):
     for item, item_id in IDS.iteritems():
         if item_id == name:
             return item

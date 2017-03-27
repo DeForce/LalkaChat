@@ -1,6 +1,4 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import Queue
-
 from parser import save_settings
 from system import RestApiException
 BASE_DICT = {

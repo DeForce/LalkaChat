@@ -11,7 +11,7 @@ from collections import OrderedDict
 import datetime
 
 from modules.helper.parser import load_from_config_file, save_settings
-from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES, random_string
+from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES
 from modules.helper.module import MessagingModule
 
 log = logging.getLogger('levels')
