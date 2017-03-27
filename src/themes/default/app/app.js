@@ -4,8 +4,6 @@ const DOMPurify = require('dompurify');
 (function (WebSocket, Vue, Sanitizer) {
     'use strict';
 
-    var COUNT = 0;
-
     new Vue({
         el: '#chat-container',
         data: function () {
