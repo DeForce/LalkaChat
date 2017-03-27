@@ -15,7 +15,7 @@ from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FO
     LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException
 from modules.helper.module import BaseModule
 
-VERSION = '0.3.5'
+VERSION = '0.3.6'
 SEM_VERSION = semantic_version.Version(VERSION)
 
 
