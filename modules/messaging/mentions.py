@@ -1,39 +1,37 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import os
 import re
 from collections import OrderedDict
 
-from modules.helper.parser import load_from_config_file
 from modules.helper.module import MessagingModule
 from modules.helper.system import IGNORED_TYPES
 
+CONF_DICT = OrderedDict()
+CONF_DICT['gui_information'] = {'category': 'messaging'}
+CONF_DICT['mentions'] = []
+CONF_DICT['address'] = []
+
+CONF_GUI = {
+    'mentions': {
+        'addable': 'true',
+        'view': 'list'},
+    'address': {
+        'addable': 'true',
+        'view': 'list'}
+}
+
 
 class mentions(MessagingModule):
-    def __init__(self, conf_folder, **kwargs):
-        MessagingModule.__init__(self)
+    def __init__(self, *args, **kwargs):
+        MessagingModule.__init__(self, *args, **kwargs)
         # Creating filter and replace strings.
-        conf_file = os.path.join(conf_folder, "mentions.cfg")
-        conf_dict = OrderedDict()
-        conf_dict['gui_information'] = {'category': 'messaging'}
-        conf_dict['mentions'] = []
-        conf_dict['address'] = []
 
-        conf_gui = {
-            'mentions': {
-                'addable': 'true',
-                'view': 'list'},
-            'address': {
-                'addable': 'true',
-                'view': 'list'}}
-        config = load_from_config_file(conf_file, conf_dict)
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': config,
-             'config': conf_dict,
-             'gui': conf_gui})
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
+
+    def _gui_settings(self, *args, **kwargs):
+        return CONF_GUI
 
     def process_message(self, message, queue, **kwargs):
         # Replacing the message if needed.

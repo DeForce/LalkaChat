@@ -347,7 +347,7 @@ class TestSc2tv(threading.Thread):
     def run(self):
         while True:
             try:
-                thread = self.main_class.fs_thread.items()[0][1]
+                thread = self.main_class.channels.items()[0][1]
                 if thread.ws:
                     self.fs_thread = thread.ws
                     break
@@ -363,41 +363,20 @@ class TestSc2tv(threading.Thread):
 
 
 class sc2tv(ChatModule):
-    def __init__(self, queue, python_folder, **kwargs):
-        ChatModule.__init__(self)
+    def __init__(self, *args, **kwargs):
         log.info("Initializing funstream chat")
+        ChatModule.__init__(self, *args, **kwargs)
 
-        # Reading config from main directory.
-        conf_folder = os.path.join(python_folder, "conf")
-        conf_file = os.path.join(conf_folder, "sc2tv.cfg")
-        config = load_from_config_file(conf_file, CONF_DICT)
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': config,
-             'config': CONF_DICT,
-             'gui': CONF_GUI})
-
-        self.queue = queue
         self.socket = CONF_DICT['config']['socket']
-        self.channels_list = CONF_DICT['config']['channels_list']
-        self.fs_thread = {}
 
-        if len(self.channels_list) == 1:
-            if CONF_DICT['config']['show_channel_names']:
-                CONF_DICT['config']['show_channel_names'] = False
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
 
-        self.testing = kwargs.get('testing')
-        if self.testing:
-            self.testing = TestSc2tv(self)
+    def _gui_settings(self, *args, **kwargs):
+        return CONF_GUI
 
-    def load_module(self, *args, **kwargs):
-        ChatModule.load_module(self, *args, **kwargs)
-        # Creating new thread with queue in place for messaging transfers
-        for channel in self.channels_list:
-            self._set_chat_online(channel)
-        if self.testing:
-            self.testing.start()
+    def _test_class(self):
+        return TestSc2tv(self)
 
     def get_viewers(self, ws):
         user_data = {'name': ws.channel_name}
@@ -426,16 +405,16 @@ class sc2tv(ChatModule):
     def _set_chat_offline(self, chat):
         ChatModule.set_chat_offline(self, chat)
         try:
-            self.fs_thread[chat].stop()
+            self.channels[chat].stop()
         except Exception as exc:
             log.debug(exc)
-        del self.fs_thread[chat]
+        del self.channels[chat]
 
     def _set_chat_online(self, chat):
         ChatModule.set_chat_online(self, chat)
-        self.fs_thread[chat] = FsThread(self.queue, self.socket, chat, chat_module=self)
-        self.fs_thread[chat].start()
+        self.channels[chat] = FsThread(self.queue, self.socket, chat, chat_module=self)
+        self.channels[chat].start()
 
     def apply_settings(self, **kwargs):
-        self._check_chats(self.fs_thread.keys())
+        self._check_chats(self.channels.keys())
         ChatModule.apply_settings(self, **kwargs)

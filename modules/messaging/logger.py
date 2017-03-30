@@ -5,49 +5,45 @@ import os
 import datetime
 from collections import OrderedDict
 
-from modules.helper.parser import load_from_config_file
 from modules.helper.module import MessagingModule
-from modules.helper.system import IGNORED_TYPES
+from modules.helper.system import IGNORED_TYPES, CONF_FOLDER
 
 DEFAULT_PRIORITY = 20
 
+CONF_DICT = OrderedDict()
+CONF_DICT['gui_information'] = {
+    'category': 'messaging',
+    'id': DEFAULT_PRIORITY
+}
+CONF_DICT['config'] = OrderedDict()
+CONF_DICT['config']['logging'] = True
+CONF_DICT['config']['file_format'] = '%Y-%m-%d'
+CONF_DICT['config']['message_date_format'] = '%Y-%m-%d %H:%M:%S'
+CONF_DICT['config']['rotation'] = 'daily'
+
+CONF_GUI = {'non_dynamic': ['config.*']}
+
 
 class logger(MessagingModule):
-    def __init__(self, conf_folder, **kwargs):
-        MessagingModule.__init__(self)
+    def __init__(self, *args, **kwargs):
+        MessagingModule.__init__(self, *args, **kwargs)
         # Creating filter and replace strings.
-        conf_file = os.path.join(conf_folder, "logger.cfg")
-        conf_dict = OrderedDict()
-        conf_dict['gui_information'] = {
-            'category': 'messaging',
-            'id': DEFAULT_PRIORITY
-        }
-        conf_dict['config'] = OrderedDict()
-        conf_dict['config']['logging'] = True
-        conf_dict['config']['file_format'] = '%Y-%m-%d'
-        conf_dict['config']['message_date_format'] = '%Y-%m-%d %H:%M:%S'
-        conf_dict['config']['rotation'] = 'daily'
-        conf_gui = {'non_dynamic': ['config.*']}
-
-        config = load_from_config_file(conf_file, conf_dict)
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': config,
-             'id': conf_dict['gui_information']['id'],
-             'config': conf_dict,
-             'gui': conf_gui})
-
-        self.format = conf_dict['config']['file_format']
-        self.ts_format = conf_dict['config']['message_date_format']
-        self.logging = conf_dict['config']['logging']
-        self.rotation = conf_dict['config']['rotation']
+        self.format = CONF_DICT['config']['file_format']
+        self.ts_format = CONF_DICT['config']['message_date_format']
+        self.logging = CONF_DICT['config']['logging']
+        self.rotation = CONF_DICT['config']['rotation']
 
         self.folder = 'logs'
 
-        self.destination = os.path.join(conf_folder, '..', self.folder)
+        self.destination = os.path.join(CONF_FOLDER, '..', self.folder)
         if not os.path.exists(self.destination):
             os.makedirs(self.destination)
+
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
+
+    def _gui_settings(self, *args, **kwargs):
+        return CONF_GUI
 
     def process_message(self, message, queue, **kwargs):
         if message:

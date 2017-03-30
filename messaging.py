@@ -62,7 +62,9 @@ class Message(threading.Thread):
                 'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
                 'parser': config,
                 'config': conf_dict,
-                'gui': conf_gui})
+                'gui': conf_gui},
+            conf_file_name='messaging_modules.cfg'
+        )
 
         modules_list['messaging'] = messaging_module.conf_params()
 

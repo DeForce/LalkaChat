@@ -1,19 +1,43 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-from parser import save_settings
-from system import RestApiException
+import copy
+import os
+from collections import OrderedDict
+from parser import save_settings, load_from_config_file
+from system import RestApiException, CONF_FOLDER
+
 BASE_DICT = {
     'custom_renderer': False
 }
+
+CHAT_DICT = OrderedDict()
+CHAT_DICT['show_channel_names'] = True
+CHAT_DICT['channels_list'] = []
 
 
 class BaseModule:
     def __init__(self, *args, **kwargs):
         self._conf_params = BASE_DICT.copy()
-        self._conf_params.update(kwargs.get('conf_params', {}))
-        self._loaded_modules = None
+        self._conf_params['dependencies'] = set()
+
+        self._loaded_modules = {}
         self._rest_api = {}
         self._module_name = self.__class__.__name__
         self._load_queue = {}
+
+        if 'conf_file_name' in kwargs:
+            conf_file_name = kwargs.get('conf_file_name')
+        else:
+            conf_file_name = os.path.join(CONF_FOLDER, "{}.cfg".format(self._module_name))
+        conf_file = os.path.join(CONF_FOLDER, conf_file_name)
+
+        self._conf_params.update(
+            {'folder': CONF_FOLDER, 'file': conf_file,
+             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
+             'config': load_from_config_file(conf_file, self._conf_settings()),
+             'gui': self._gui_settings(),
+             'settings': {}})
+
+        self._conf_params.update(kwargs.get('conf_params', {}))
 
     def add_to_queue(self, q_type, data):
         if q_type not in self._load_queue:
@@ -23,10 +47,30 @@ class BaseModule:
     def get_queue(self, q_type):
         return self._load_queue.get(q_type, {})
 
+    def add_depend(self, module_name):
+        self._conf_params['dependencies'].add(module_name)
+
+    def remove_depend(self, module_name):
+        self._conf_params['dependencies'].discard(module_name)
+
     def conf_params(self):
         params = self._conf_params
         params['class'] = self
         return params
+
+    def _conf_settings(self, *args, **kwargs):
+        """
+            Override this method
+        :rtype: object
+        """
+        return {}
+
+    def _gui_settings(self, *args, **kwargs):
+        """
+            Override this method
+        :return: Settings for GUI (dict)
+        """
+        return {}
 
     def load_module(self, *args, **kwargs):
         self._loaded_modules = kwargs.get('loaded_modules')
@@ -70,21 +114,39 @@ class BaseModule:
 class MessagingModule(BaseModule):
     def __init__(self, *args, **kwargs):
         BaseModule.__init__(self, *args, **kwargs)
-        self._conf_params['dependencies'] = set()
 
     def process_message(self, message, queue, **kwargs):
         return message
-
-    def add_depend(self, module_name):
-        self._conf_params['dependencies'].add(module_name)
-
-    def remove_depend(self, module_name):
-        self._conf_params['dependencies'].discard(module_name)
 
 
 class ChatModule(BaseModule):
     def __init__(self, *args, **kwargs):
         BaseModule.__init__(self, *args, **kwargs)
+        self.queue = kwargs.get('queue')
+        self.channels = {}
+
+        conf_params = self._conf_params['config']
+
+        self.channels_list = conf_params['config']['channels_list']
+        if len(self.channels_list) == 1:
+            if conf_params['config']['show_channel_names']:
+                conf_params['config']['show_channel_names'] = False
+
+        self.testing = kwargs.get('testing')
+        if self.testing:
+            self.testing = self._test_class()
+
+    def load_module(self, *args, **kwargs):
+        BaseModule.load_module(self, *args, **kwargs)
+        for channel in self.channels_list:
+            self._set_chat_online(channel)
+
+    def _test_class(self):
+        """
+            Override this method
+        :return: Chat test class (object/Class)
+        """
+        return object()
 
     def apply_settings(self, **kwargs):
         BaseModule.apply_settings(self, **kwargs)
@@ -96,6 +158,14 @@ class ChatModule(BaseModule):
             if gui_class.gui:
                 if gui_class.gui.status_frame:
                     gui_class.gui.status_frame.refresh_labels(self._module_name)
+
+    def get_viewers(self, *args, **kwargs):
+        """
+            Overwrite this method
+        :param args: 
+        :param kwargs: 
+        """
+        pass
 
     def set_viewers(self, channel, viewers):
         if 'gui' in self._loaded_modules:

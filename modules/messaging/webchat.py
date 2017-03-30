@@ -1,6 +1,5 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
-import re
 import threading
 import json
 import Queue
@@ -16,7 +15,7 @@ from collections import OrderedDict
 from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
-from modules.helper.parser import load_from_config_file, save_settings
+from modules.helper.parser import save_settings
 from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER, remove_message_by_id
 from modules.helper.module import MessagingModule
 from gui import MODULE_KEY
@@ -32,6 +31,20 @@ log = logging.getLogger('webchat')
 REMOVED_TRIGGER = '%%REMOVED%%'
 
 WS_THREADS = THREADS + 3
+
+CONF_DICT = OrderedDict()
+CONF_DICT['gui_information'] = {
+    'category': 'main',
+    'id': DEFAULT_PRIORITY
+}
+CONF_DICT['server'] = OrderedDict()
+CONF_DICT['server']['host'] = '127.0.0.1'
+CONF_DICT['server']['port'] = '8080'
+CONF_DICT['style_gui'] = DEFAULT_STYLE
+CONF_DICT['style_gui_settings'] = OrderedDict()
+CONF_DICT['style'] = DEFAULT_STYLE
+CONF_DICT['style_settings'] = OrderedDict()
+CONF_DICT['style_settings']['show_system_msg'] = True
 
 
 def prepare_message(msg, style_settings):
@@ -458,68 +471,13 @@ def socket_open(host, port):
 
 
 class webchat(MessagingModule):
-    def __init__(self, conf_folder, **kwargs):
-        MessagingModule.__init__(self)
-        # Module configuration
-        conf_file = os.path.join(conf_folder, "webchat.cfg")
-        conf_dict = OrderedDict()
-        conf_dict['gui_information'] = {
-            'category': 'main',
-            'id': DEFAULT_PRIORITY
-        }
-        conf_dict['server'] = OrderedDict()
-        conf_dict['server']['host'] = '127.0.0.1'
-        conf_dict['server']['port'] = '8080'
-        conf_dict['style_gui'] = DEFAULT_STYLE
-        conf_dict['style_gui_settings'] = OrderedDict()
-        conf_dict['style'] = DEFAULT_STYLE
-        conf_dict['style_settings'] = OrderedDict()
-        conf_dict['style_settings']['show_system_msg'] = True
-
-        conf_gui = {
-            'style_gui': {
-                'check': 'http',
-                'check_type': 'dir',
-                'view': 'choose_single'
-            },
-            'style_gui_settings': {},
-            'style': {
-                'check': 'http',
-                'check_type': 'dir',
-                'view': 'choose_single'
-            },
-            'style_settings': {},
-            'non_dynamic': ['server.*'],
-            'ignored_sections': ['style_settings', 'style_gui_settings'],
-            'redraw': {
-                'style_settings': {
-                    'redraw_trigger': ['style'],
-                    'type': 'chat',
-                    'get_config': self.load_style_settings,
-                    'get_gui': self.get_style_gui_from_file
-                },
-                'style_gui_settings': {
-                    'redraw_trigger': ['style_gui'],
-                    'type': 'gui',
-                    'get_config': self.load_style_settings,
-                    'get_gui': self.get_style_gui_from_file
-                },
-            }
-        }
-
-        parser = load_from_config_file(conf_file, conf_dict)
+    def __init__(self, *args, **kwargs):
+        MessagingModule.__init__(self, *args, **kwargs)
+        conf_params = self._conf_params['config']
 
         self._conf_params.update({
-            'folder': conf_folder,
-            'file': conf_file,
-            'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-            'parser': parser,
-            'id': conf_dict['gui_information']['id'],
-            'config': conf_dict,
-            'gui': conf_gui,
-
-            'host': conf_dict['server']['host'],
-            'port': conf_dict['server']['port'],
+            'host': conf_params['server']['host'],
+            'port': conf_params['server']['port'],
 
             'style_settings': {
                 'gui': {
@@ -691,3 +649,39 @@ class webchat(MessagingModule):
         gui_style_settings['style_name'] = gui_config_style
         gui_style_settings['location'] = self.get_style_path(gui_config_style)
         gui_style_settings['keys'] = self.load_style_settings(gui_config_style, 'gui')
+
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
+
+    def _gui_settings(self):
+        return {
+            'style_gui': {
+                'check': 'http',
+                'check_type': 'dir',
+                'view': 'choose_single'
+            },
+            'style_gui_settings': {},
+            'style': {
+                'check': 'http',
+                'check_type': 'dir',
+                'view': 'choose_single'
+            },
+            'style_settings': {},
+            'non_dynamic': ['server.*'],
+            'ignored_sections': ['style_settings', 'style_gui_settings'],
+            'redraw': {
+                'style_settings': {
+                    'redraw_trigger': ['style'],
+                    'type': 'chat',
+                    'get_config': self.load_style_settings,
+                    'get_gui': self.get_style_gui_from_file
+                },
+                'style_gui_settings': {
+                    'redraw_trigger': ['style_gui'],
+                    'type': 'gui',
+                    'get_config': self.load_style_settings,
+                    'get_gui': self.get_style_gui_from_file
+                },
+            }
+        }
+

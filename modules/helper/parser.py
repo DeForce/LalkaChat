@@ -16,13 +16,16 @@ def update(d, u):
     return d
 
 
-def load_from_config_file(conf_file, conf_dict):
+def load_from_config_file(conf_file, conf_dict={}):
     if not os.path.exists(conf_file):
-        return
+        return {}
     with open(conf_file, 'r') as conf_f:
         loaded_dict = yaml.safe_load(conf_f.read())
     if loaded_dict:
         update(conf_dict, loaded_dict)
+
+    if conf_dict:
+        return conf_dict
 
 
 def return_type(item):
