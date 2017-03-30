@@ -155,7 +155,7 @@ def remove_message_by_user(user, text=None):
 def remove_message_by_id(ids, text=None):
     command = {'type': 'command',
                'command': 'remove_by_id',
-               'ids': ids}
+               'ids': ids if isinstance(ids, list) else [ids]}
     if text:
         command['text'] = text
         command['command'] = 'replace_by_id'

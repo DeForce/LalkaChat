@@ -20,6 +20,11 @@ while [ ${ATTEMPTS} -lt 20 ]; do
     if ! grep "twitch Testing mode online" chat.log; then
         continue
     fi
+
+    if ! grep "BeamPro Testing mode online" chat.log; then
+        continue
+    fi
+
     sleep 5
     exit 0
 done

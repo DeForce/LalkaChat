@@ -1,17 +1,32 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import copy
+import logging
 import os
 from collections import OrderedDict
+
+from modules.helper import parser
 from parser import save_settings, load_from_config_file
 from system import RestApiException, CONF_FOLDER
+
 
 BASE_DICT = {
     'custom_renderer': False
 }
 
 CHAT_DICT = OrderedDict()
-CHAT_DICT['show_channel_names'] = True
-CHAT_DICT['channels_list'] = []
+CHAT_DICT['config'] = OrderedDict()
+CHAT_DICT['config']['show_channel_names'] = True
+CHAT_DICT['config']['channels_list'] = []
+
+CHAT_GUI = {
+    'config': {
+        'channels_list': {
+            'view': 'list',
+            'addable': 'true'
+        }
+    }
+}
+
+log = logging.getLogger('modules')
 
 
 class BaseModule:
@@ -125,12 +140,11 @@ class ChatModule(BaseModule):
         self.queue = kwargs.get('queue')
         self.channels = {}
 
+        parser.update(self._conf_params['config'], CHAT_DICT, overwrite=False)
         conf_params = self._conf_params['config']
+        parser.update(self._conf_params['gui'], CHAT_GUI)
 
         self.channels_list = conf_params['config']['channels_list']
-        if len(self.channels_list) == 1:
-            if conf_params['config']['show_channel_names']:
-                conf_params['config']['show_channel_names'] = False
 
         self.testing = kwargs.get('testing')
         if self.testing:
@@ -140,6 +154,9 @@ class ChatModule(BaseModule):
         BaseModule.load_module(self, *args, **kwargs)
         for channel in self.channels_list:
             self._set_chat_online(channel)
+
+        if self.testing and self.channels:
+            self.testing = self.testing.start()
 
     def _test_class(self):
         """
@@ -210,21 +227,25 @@ class ChatModule(BaseModule):
         else:
             self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'remove'})
 
-    def _set_chat_offline(self, *args, **kwargs):
+    def _set_chat_offline(self, chat):
         """
-            Overwite this method
-        :param args: 
-        :param kwargs: 
+        :param chat: 
         """
-        pass
+        self.set_chat_offline(chat)
+        try:
+            self.channels[chat].stop()
+        except Exception as exc:
+            log.info("Unable to stop chat %s", chat)
+            log.debug(exc)
+        del self.channels[chat]
 
-    def _set_chat_online(self, *args, **kwargs):
+    def _set_chat_online(self, chat):
         """
             Overwite this method
         :param args: 
         :param kwargs: 
         """
-        pass
+        self.set_chat_online(chat)
 
     def _check_chats(self, online_chats):
         chats = self._conf_params['config']['config']['channels_list']

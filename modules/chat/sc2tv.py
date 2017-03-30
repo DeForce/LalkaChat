@@ -11,7 +11,6 @@ import logging
 from collections import OrderedDict
 from ws4py.client.threadedclient import WebSocketClient
 from modules.helper.module import ChatModule
-from modules.helper.parser import load_from_config_file
 from modules.helper.system import system_message, translate_key, EMOTE_FORMAT
 from gui import MODULE_KEY
 
@@ -401,14 +400,6 @@ class sc2tv(ChatModule):
 
         except requests.ConnectionError:
             log.error("Unable to get smiles")
-
-    def _set_chat_offline(self, chat):
-        ChatModule.set_chat_offline(self, chat)
-        try:
-            self.channels[chat].stop()
-        except Exception as exc:
-            log.debug(exc)
-        del self.channels[chat]
 
     def _set_chat_online(self, chat):
         ChatModule.set_chat_online(self, chat)

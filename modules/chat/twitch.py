@@ -34,10 +34,10 @@ PING_DELAY = 10
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = OrderedDict()
-CONF_DICT['config']['show_pm'] = True
-CONF_DICT['config']['bttv'] = True
 CONF_DICT['config']['host'] = 'irc.twitch.tv'
 CONF_DICT['config']['port'] = 6667
+CONF_DICT['config']['show_pm'] = True
+CONF_DICT['config']['bttv'] = True
 CONF_DICT['config']['show_channel_names'] = True
 CONF_DICT['config']['show_nickname_colors'] = False
 CONF_DICT['config']['channels_list'] = []
@@ -600,14 +600,6 @@ class twitch(ChatModule):
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
-
-    def _set_chat_offline(self, chat):
-        ChatModule.set_chat_offline(self, chat)
-        try:
-            self.channels[chat].stop()
-        except Exception as exc:
-            log.debug(exc)
-        del self.channels[chat]
 
     def _set_chat_online(self, chat):
         ChatModule.set_chat_online(self, chat)
