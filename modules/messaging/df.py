@@ -5,38 +5,28 @@ import re
 import os
 from collections import OrderedDict
 
-from modules.helper.parser import load_from_config_file
 from modules.helper.module import MessagingModule
 from modules.helper.system import IGNORED_TYPES
 
+CONF_DICT = OrderedDict()
+CONF_DICT['gui_information'] = {'category': 'messaging'}
+CONF_DICT['grep'] = OrderedDict()
+CONF_DICT['grep']['symbol'] = '#'
+CONF_DICT['grep']['file'] = 'logs/df.txt'
+CONF_DICT['prof'] = OrderedDict()
+
+CONF_GUI = {
+    'prof': {
+        'view': 'list_dual',
+        'addable': True},
+    'non_dynamic': ['grep.*']}
+
 
 class df(MessagingModule):
-    def __init__(self, conf_folder, **kwargs):
-        MessagingModule.__init__(self)
+    def __init__(self, *args, **kwargs):
+        MessagingModule.__init__(self, *args, **kwargs)
         # Dwarf professions.
-        conf_file = os.path.join(conf_folder, "df.cfg")
-
-        conf_dict = OrderedDict()
-        conf_dict['gui_information'] = {'category': 'messaging'}
-        conf_dict['grep'] = OrderedDict()
-        conf_dict['grep']['symbol'] = '#'
-        conf_dict['grep']['file'] = 'logs/df.txt'
-        conf_dict['prof'] = OrderedDict()
-
-        conf_gui = {
-            'prof': {
-                'view': 'list_dual',
-                'addable': True},
-            'non_dynamic': ['grep.*']}
-        config = load_from_config_file(conf_file, conf_dict)
-
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': config,
-             'config': conf_dict,
-             'gui': conf_gui})
-        self.file = conf_dict['grep']['file']
+        self.file = CONF_DICT['grep']['file']
 
         dir_name = os.path.dirname(self.file)
         if not os.path.exists(dir_name):
@@ -45,6 +35,12 @@ class df(MessagingModule):
         if not os.path.isfile(self.file):
             with open(self.file, 'w'):
                 pass
+
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
+
+    def _gui_settings(self, *args, **kwargs):
+        return CONF_GUI
 
     def write_to_file(self, user, role):
         with open(self.file, 'r') as f:

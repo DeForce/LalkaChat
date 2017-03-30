@@ -91,20 +91,16 @@ def init():
         'ignored_sections': ['gui.reload'],
         'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
     }
-    config = load_from_config_file(MAIN_CONF_FILE, main_config_dict)
     root_logger.setLevel(level=logging.getLevelName(main_config_dict['system'].get('log_level', 'INFO')))
     # Adding config for main module
     main_class = BaseModule(
         conf_params={
-            'folder': CONF_FOLDER,
-            'file': main_config['main_conf_file_loc'],
-            'filename': main_config['main_conf_file_name'],
-            'parser': config,
             'root_folder': main_config['root_folder'],
             'logs_folder': LOG_FOLDER,
-            'config': main_config_dict,
+            'config': load_from_config_file(MAIN_CONF_FILE, main_config_dict),
             'gui': main_config_gui
-        }
+        },
+        conf_file_name='config.cfg'
     )
     loaded_modules['main'] = main_class.conf_params()
 
@@ -154,16 +150,13 @@ def init():
             'check': os.path.sep.join(['modules', 'chat']),
             'file_extension': False},
         'non_dynamic': ['chats.list_box']}
-    chat_config = load_from_config_file(chat_modules, chat_conf_dict)
 
     chat_module = BaseModule(
         conf_params={
-            'folder': CONF_FOLDER, 'file': chat_modules,
-            'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
-            'parser': chat_config,
-            'config': chat_conf_dict,
+            'config': load_from_config_file(chat_modules, chat_conf_dict),
             'gui': chat_conf_gui
-        }
+        },
+        conf_file_name='chat_modules.cfg'
     )
     loaded_modules['chat'] = chat_module.conf_params()
 
@@ -179,7 +172,7 @@ def init():
 
             tmp = imp.load_source(chat_module, module_location)
             chat_init = getattr(tmp, chat_module)
-            class_module = chat_init(queue, PYTHON_FOLDER,
+            class_module = chat_init(queue=queue,
                                      conf_folder=CONF_FOLDER,
                                      conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module)),
                                      testing=main_config_dict['system']['testing_mode'])

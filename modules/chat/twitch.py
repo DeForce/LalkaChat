@@ -545,7 +545,7 @@ class TestTwitch(threading.Thread):
     def run(self):
         while True:
             try:
-                thread = self.main_class.tw_dict.items()[0][1]
+                thread = self.main_class.channels.items()[0][1]
                 if thread.irc.twitch_queue:
                     self.tw_queue = thread.irc.twitch_queue
                     break
@@ -563,47 +563,28 @@ class TestTwitch(threading.Thread):
 
 
 class twitch(ChatModule):
-    def __init__(self, queue, python_folder, **kwargs):
-        ChatModule.__init__(self)
+    def __init__(self, *args, **kwargs):
         log.info("Initializing twitch chat")
+        ChatModule.__init__(self, *args, **kwargs)
 
-        # Reading config from main directory.
-        conf_folder = os.path.join(python_folder, "conf")
-        conf_file = os.path.join(conf_folder, "twitch.cfg")
-
-        config = load_from_config_file(conf_file, CONF_DICT)
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': config,
-             'config': CONF_DICT,
-             'gui': CONF_GUI,
-             'settings': {}})
-
-        self.queue = queue
         self.host = CONF_DICT['config']['host']
         self.port = int(CONF_DICT['config']['port'])
-        self.channels_list = CONF_DICT['config']['channels_list']
         self.bttv = CONF_DICT['config']['bttv']
-        self.tw_dict = {}
 
-        if len(self.channels_list) == 1:
-            if CONF_DICT['config']['show_channel_names']:
-                CONF_DICT['config']['show_channel_names'] = False
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
 
-        self.testing = kwargs.get('testing')
-        if self.testing:
-            self.testing = TestTwitch(self)
+    def _gui_settings(self, *args, **kwargs):
+        return CONF_GUI
+
+    def _test_class(self):
+        return TestTwitch(self)
 
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
         if 'webchat' in self._loaded_modules:
             self._loaded_modules['webchat']['class'].add_depend('twitch')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        for channel in self.channels_list:
-            self._set_chat_online(channel)
-        if self.testing:
-            self.testing.start()
 
     @staticmethod
     def get_viewers(channel):
@@ -623,19 +604,19 @@ class twitch(ChatModule):
     def _set_chat_offline(self, chat):
         ChatModule.set_chat_offline(self, chat)
         try:
-            self.tw_dict[chat].stop()
+            self.channels[chat].stop()
         except Exception as exc:
             log.debug(exc)
-        del self.tw_dict[chat]
+        del self.channels[chat]
 
     def _set_chat_online(self, chat):
         ChatModule.set_chat_online(self, chat)
-        self.tw_dict[chat] = TWThread(self.queue, self.host, self.port, chat, self.bttv,
-                                      settings=self._conf_params['settings'], chat_module=self)
-        self.tw_dict[chat].start()
+        self.channels[chat] = TWThread(self.queue, self.host, self.port, chat, self.bttv,
+                                       settings=self._conf_params['settings'], chat_module=self)
+        self.channels[chat].start()
 
     def apply_settings(self, **kwargs):
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        self._check_chats(self.tw_dict.keys())
+        self._check_chats(self.channels.keys())
         ChatModule.apply_settings(self, **kwargs)

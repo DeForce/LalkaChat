@@ -363,7 +363,7 @@ class TestGG(threading.Thread):
     def run(self):
         while True:
             try:
-                thread = self.main_class.gg.items()[0][1]
+                thread = self.main_class.channels.items()[0][1]
                 if thread.ws:
                     self.gg_handler = thread.ws.message_handler
                     break
@@ -379,45 +379,23 @@ class TestGG(threading.Thread):
 
 
 class goodgame(ChatModule):
-    def __init__(self, queue, python_folder, **kwargs):
-        ChatModule.__init__(self)
-        # Reading config from main directory.
-        conf_folder = os.path.join(python_folder, "conf")
-
+    def __init__(self, *args, **kwargs):
         log.info("Initializing goodgame chat")
-        conf_file = os.path.join(conf_folder, "goodgame.cfg")
-        config = load_from_config_file(conf_file, CONF_DICT)
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': config,
-             'config': CONF_DICT,
-             'gui': CONF_GUI,
-             'settings': {}})
+        ChatModule.__init__(self, *args, **kwargs)
 
-        self.queue = queue
         self.host = CONF_DICT['config']['socket']
-        self.channels_list = CONF_DICT['config']['channels_list']
-        self.gg = {}
-
-        if len(self.channels_list) == 1:
-            if CONF_DICT['config']['show_channel_names']:
-                CONF_DICT['config']['show_channel_names'] = False
-
-        self.testing = kwargs.get('testing')
-        if self.testing:
-            self.testing = TestGG(self)
 
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
         if 'webchat' in self._loaded_modules:
             self._loaded_modules['webchat']['class'].add_depend('goodgame')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        # Creating new thread with queue in place for messaging transfers
-        for channel in self.channels_list:
-            self._set_chat_online(channel)
-        if self.testing:
-            self.testing.start()
+
+    def _gui_settings(self):
+        return CONF_GUI
+
+    def _test_class(self):
+        return TestGG(self)
 
     @staticmethod
     def get_viewers(channel):
@@ -438,20 +416,20 @@ class goodgame(ChatModule):
     def _set_chat_offline(self, chat):
         ChatModule.set_chat_offline(self, chat)
         try:
-            self.gg[chat].stop()
+            self.channels[chat].stop()
         except Exception as exc:
             log.debug(exc)
-        del self.gg[chat]
+        del self.channels[chat]
 
     def _set_chat_online(self, chat):
         ChatModule.set_chat_online(self, chat)
         gg = GGThread(self.queue, self.host, chat,
                       settings=self._conf_params['settings'], chat_module=self)
-        self.gg[chat] = gg
+        self.channels[chat] = gg
         gg.start()
 
     def apply_settings(self, **kwargs):
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        self._check_chats(self.gg.keys())
+        self._check_chats(self.channels.keys())
         ChatModule.apply_settings(self, **kwargs)

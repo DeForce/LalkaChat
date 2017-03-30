@@ -1456,6 +1456,9 @@ class GuiThread(threading.Thread, BaseModule):
         app.MainLoop()
         self.quit()
 
+    def apply_settings(self, **kwargs):
+        pass
+
     def quit(self):
         try:
             self.gui.on_close('event')

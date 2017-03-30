@@ -2,33 +2,32 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import re
-import os
 from collections import OrderedDict
-from modules.helper.parser import load_from_config_file
 from modules.helper.module import MessagingModule
 from modules.helper.system import IGNORED_TYPES
 
 DEFAULT_PRIORITY = 30
 
+CONF_DICT = OrderedDict()
+CONF_DICT['gui_information'] = {
+    'category': 'messaging',
+    'id': DEFAULT_PRIORITY}
+CONF_DICT['main'] = {'message': 'ignored message'}
+CONF_DICT['users_hide'] = []
+CONF_DICT['users_block'] = []
+CONF_DICT['words_hide'] = []
+CONF_DICT['words_block'] = []
+
 
 class blacklist(MessagingModule):
-    def __init__(self, conf_folder, **kwargs):
-        MessagingModule.__init__(self)
-        # Dwarf professions.
-        conf_file = os.path.join(conf_folder, "blacklist.cfg")
+    def __init__(self, *args, **kwargs):
+        MessagingModule.__init__(self, *args, **kwargs)
 
-        # Ordered because order matters
-        conf_dict = OrderedDict()
-        conf_dict['gui_information'] = {
-            'category': 'messaging',
-            'id': DEFAULT_PRIORITY}
-        conf_dict['main'] = {'message': 'ignored message'}
-        conf_dict['users_hide'] = []
-        conf_dict['users_block'] = []
-        conf_dict['words_hide'] = []
-        conf_dict['words_block'] = []
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
 
-        conf_gui = {
+    def _gui_settings(self):
+        return {
             'words_hide': {
                 'addable': True,
                 'view': 'list'},
@@ -41,15 +40,8 @@ class blacklist(MessagingModule):
             'users_block': {
                 'view': 'list',
                 'addable': 'true'},
-            'non_dynamic': ['main.*']}
-        config = load_from_config_file(conf_file, conf_dict)
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': config,
-             'id': conf_dict['gui_information']['id'],
-             'config': OrderedDict(conf_dict),
-             'gui': conf_gui})
+            'non_dynamic': ['main.*']
+        }
 
     def process_message(self, message, queue, **kwargs):
         if message:
