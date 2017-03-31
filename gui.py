@@ -1317,9 +1317,16 @@ class ChatGui(wx.Frame):
         self.status_frame = None
         self.browser = None
 
-        wx.Frame.__init__(self, parent, title=title, size=self.gui_settings.get('size'))
+        wx.Frame.__init__(self, parent, title=title, size=self.gui_settings.get('size'), pos=self.gui_settings.get('position'))
         # Set window style
-        styles = wx.DEFAULT_FRAME_STYLE
+        if self.gui_settings.get('transparent', False):
+            log.info("Application is transparent")
+            self.SetTransparent(200)
+        if self.gui_settings.get('borderless', False):
+            log.info("Application is in borderless mode")
+            styles = wx.CLIP_CHILDREN | wx.BORDER_NONE | wx.FRAME_SHAPED
+        else:
+            styles = wx.DEFAULT_FRAME_STYLE
         if self.gui_settings.get('on_top', False):
             log.info("Application is on top")
             styles = styles | wx.STAY_ON_TOP
@@ -1386,6 +1393,8 @@ class ChatGui(wx.Frame):
         size = self.Size
         config['width'] = size[0]
         config['height'] = size[1]
+        config['pos_x'] = self.Position.x
+        config['pos_y'] = self.Position.y
 
         for module_name, module_dict in self.loaded_modules.iteritems():
             module_dict['class'].apply_settings(system_exit=True)

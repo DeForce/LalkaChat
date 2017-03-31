@@ -62,6 +62,8 @@ def init():
     main_config_dict['gui_information']['category'] = 'main'
     main_config_dict['gui_information']['width'] = '450'
     main_config_dict['gui_information']['height'] = '500'
+    main_config_dict['gui_information']['pos_x'] = '10'
+    main_config_dict['gui_information']['pos_y'] = '10'
     main_config_dict['system'] = OrderedDict()
     main_config_dict['system']['log_level'] = 'INFO'
     main_config_dict['system']['testing_mode'] = False
@@ -73,6 +75,8 @@ def init():
     main_config_dict['gui']['on_top'] = True
     main_config_dict['gui']['show_browser'] = True
     main_config_dict['gui']['show_counters'] = True
+    main_config_dict['gui']['transparent'] = False
+    main_config_dict['gui']['borderless'] = False
     main_config_dict['gui']['reload'] = None
     main_config_dict['language'] = get_language()
 
@@ -106,10 +110,14 @@ def init():
 
     gui_settings['gui'] = main_config_dict[GUI_TAG].get('gui')
     gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
+    gui_settings['transparent'] = main_config_dict[GUI_TAG].get('transparent')
+    gui_settings['borderless'] = main_config_dict[GUI_TAG].get('borderless')
     gui_settings['language'] = main_config_dict.get('language')
     gui_settings['show_hidden'] = main_config_dict[GUI_TAG].get('show_hidden')
     gui_settings['size'] = (int(main_config_dict['gui_information'].get('width')),
                             int(main_config_dict['gui_information'].get('height')))
+    gui_settings['position'] = (int(main_config_dict['gui_information'].get('pos_x')),
+                                int(main_config_dict['gui_information'].get('pos_y')))
     gui_settings['show_browser'] = main_config_dict['gui'].get('show_browser')
 
     # Checking updates
