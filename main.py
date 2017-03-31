@@ -75,7 +75,7 @@ def init():
     main_config_dict['gui']['on_top'] = True
     main_config_dict['gui']['show_browser'] = True
     main_config_dict['gui']['show_counters'] = True
-    main_config_dict['gui']['transparent'] = False
+    main_config_dict['gui']['transparency'] = 50
     main_config_dict['gui']['borderless'] = False
     main_config_dict['gui']['reload'] = None
     main_config_dict['language'] = get_language()
@@ -90,7 +90,12 @@ def init():
             'hidden': ['log_level', 'testing_mode'],
         },
         'gui': {
-            'hidden': ['cli']
+            'hidden': ['cli'],
+            'transparency': {
+                'view': 'slider',
+                'min': 10,
+                'max': 100
+            }
         },
         'ignored_sections': ['gui.reload'],
         'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
@@ -110,7 +115,7 @@ def init():
 
     gui_settings['gui'] = main_config_dict[GUI_TAG].get('gui')
     gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
-    gui_settings['transparent'] = main_config_dict[GUI_TAG].get('transparent')
+    gui_settings['transparency'] = main_config_dict[GUI_TAG].get('transparency')
     gui_settings['borderless'] = main_config_dict[GUI_TAG].get('borderless')
     gui_settings['language'] = main_config_dict.get('language')
     gui_settings['show_hidden'] = main_config_dict[GUI_TAG].get('show_hidden')
