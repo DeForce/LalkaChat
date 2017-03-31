@@ -1325,11 +1325,13 @@ class ChatGui(wx.Frame):
         self.status_frame = None
         self.browser = None
 
-        wx.Frame.__init__(self, parent, title=title, size=self.gui_settings.get('size'), pos=self.gui_settings.get('position'))
+        wx.Frame.__init__(self, parent, title=title,
+                          size=self.gui_settings.get('size'),
+                          pos=self.gui_settings.get('position'))
         # Set window style
-        if self.gui_settings.get('transparent', False):
+        if self.gui_settings.get('transparency') < 100:
             log.info("Application is transparent")
-            self.SetTransparent(200)
+            self.SetTransparent(self.gui_settings['transparency'] * 2.55)
         if self.gui_settings.get('borderless', False):
             log.info("Application is in borderless mode")
             styles = wx.CLIP_CHILDREN | wx.BORDER_NONE | wx.FRAME_SHAPED
