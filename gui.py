@@ -212,6 +212,10 @@ class MainMenuToolBar(wx.ToolBar):
         return button
 
 
+class GuiCreationError(Exception):
+    pass
+
+
 class SettingsWindow(wx.Frame):
     main_grid = None
     page_list = []
@@ -285,6 +289,10 @@ class SettingsWindow(wx.Frame):
                 'bind': self.on_textctrl
             },
             unicode: {
+                'function': self.create_textctrl,
+                'bind': self.on_textctrl
+            },
+            int: {
                 'function': self.create_textctrl,
                 'bind': self.on_textctrl
             },
@@ -740,7 +748,7 @@ class SettingsWindow(wx.Frame):
 
     def create_static_box(self, **kwargs):
         panel = kwargs.get('panel')
-        value = kwargs.get('value')
+        item_value = kwargs.get('value')
         gui = kwargs.get('gui')
         key = kwargs.get('key')
 
@@ -755,7 +763,7 @@ class SettingsWindow(wx.Frame):
         spacer = False
         hidden_items = gui.get('hidden', [])
 
-        for item, value in value.items():
+        for item, value in item_value.items():
             if item in hidden_items and not self.show_hidden:
                 continue
             view = gui.get(item, {}).get('view', type(value))
@@ -764,7 +772,7 @@ class SettingsWindow(wx.Frame):
             elif callable(value):
                 fnction = self.value_map['button']
             else:
-                return
+                raise GuiCreationError('Unable to create item, bad value map')
             item_dict = fnction['function'](panel=static_box, item=item, value=value, key=key + [item],
                                             bind=fnction['bind'], gui=gui.get(item, {}), from_sb=True)
             if 'text_size' in item_dict:

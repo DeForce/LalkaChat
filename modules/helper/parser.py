@@ -6,19 +6,25 @@ from collections import OrderedDict
 from ConfigParser import RawConfigParser
 
 
-def update(d, u):
+def update(d, u, overwrite=True):
     for k, v in u.iteritems():
         if isinstance(v, collections.Mapping):
-            r = update(d.get(k, {}), v)
+            r = update(d.get(k, {}), v, overwrite=overwrite)
             d[k] = r
         else:
-            d[k] = u[k]
+            if not overwrite:
+                if k not in d:
+                    d[k] = u[k]
+                else:
+                    continue
+            else:
+                d[k] = u[k]
     return d
 
 
 def load_from_config_file(conf_file, conf_dict={}):
     if not os.path.exists(conf_file):
-        return {}
+        return conf_dict
     with open(conf_file, 'r') as conf_f:
         loaded_dict = yaml.safe_load(conf_f.read())
     if loaded_dict:

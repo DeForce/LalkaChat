@@ -20,13 +20,13 @@ from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER, remove_me
 from modules.helper.module import MessagingModule
 from gui import MODULE_KEY
 
+logging.getLogger('ws4py').setLevel(logging.ERROR)
 DEFAULT_STYLE = 'default'
 DEFAULT_PRIORITY = 9001
 HISTORY_SIZE = 20
 HISTORY_TYPES = ['system_message', 'message']
 HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
-logging.getLogger('ws4py').setLevel(logging.ERROR)
 log = logging.getLogger('webchat')
 REMOVED_TRIGGER = '%%REMOVED%%'
 
@@ -360,13 +360,14 @@ class CssRoot(object):
             #  Syntax error: Found u'100%' but expected one of ADD.
             # Doesn't happen on next attempt, so we are doing bad thing
             attempts = 0
-            while attempts < 10:
+            while attempts < 100:
                 try:
                     attempts += 1
                     ret_string = compiler.compile_string(css_content)
                     return ret_string
                 except Exception as exc:
-                    log.debug(exc)
+                    if attempts == 100:
+                        log.debug(exc)
 
 
 class HttpRoot(object):

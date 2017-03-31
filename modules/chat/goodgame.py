@@ -12,7 +12,6 @@ import re
 import logging
 import time
 from collections import OrderedDict
-from modules.helper.parser import load_from_config_file
 from modules.helper.system import system_message, translate_key, remove_message_by_id, EMOTE_FORMAT, NA_MESSAGE
 from modules.helper.module import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
@@ -391,6 +390,9 @@ class goodgame(ChatModule):
             self._loaded_modules['webchat']['class'].add_depend('goodgame')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
 
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
+
     def _gui_settings(self):
         return CONF_GUI
 
@@ -412,14 +414,6 @@ class goodgame(ChatModule):
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
-
-    def _set_chat_offline(self, chat):
-        ChatModule.set_chat_offline(self, chat)
-        try:
-            self.channels[chat].stop()
-        except Exception as exc:
-            log.debug(exc)
-        del self.channels[chat]
 
     def _set_chat_online(self, chat):
         ChatModule.set_chat_online(self, chat)

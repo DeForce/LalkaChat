@@ -91,7 +91,6 @@ def init():
         'ignored_sections': ['gui.reload'],
         'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
     }
-    root_logger.setLevel(level=logging.getLevelName(main_config_dict['system'].get('log_level', 'INFO')))
     # Adding config for main module
     main_class = BaseModule(
         conf_params={
@@ -103,6 +102,7 @@ def init():
         conf_file_name='config.cfg'
     )
     loaded_modules['main'] = main_class.conf_params()
+    root_logger.setLevel(level=logging.getLevelName(main_config_dict['system'].get('log_level', 'INFO')))
 
     gui_settings['gui'] = main_config_dict[GUI_TAG].get('gui')
     gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
