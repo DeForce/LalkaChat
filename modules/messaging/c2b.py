@@ -58,7 +58,7 @@ class c2b(MessagingModule):
             for item, replace in self._conf_params['config']['config'].iteritems():
                 if item in message['text']:
                     replace_word = random.choice(replace.split('/'))
-                    message['text'] = re.sub(r'\b{}\b'.format(item), replace_word, message['text'])
+                    message['text'] = re.sub(ur'\b{}\b'.format(item), replace_word, message['text'], flags=re.UNICODE)
             return message
 
     def _conf_settings(self, *args, **kwargs):
