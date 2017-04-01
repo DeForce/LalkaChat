@@ -407,5 +407,4 @@ class sc2tv(ChatModule):
         self.channels[chat].start()
 
     def apply_settings(self, **kwargs):
-        self._check_chats(self.channels.keys())
         ChatModule.apply_settings(self, **kwargs)

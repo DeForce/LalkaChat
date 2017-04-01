@@ -22,6 +22,7 @@ CONF_GUI = {
         'addable': 'true',
         'view': 'list_dual'},
     'non_dynamic': ['config.*']}
+C2B_REGEXP = ur'(^|\s)({})(?=(\s|$))'
 
 
 def twitch_replace_indexes(filter_name, text, filter_size, replace_size, emotes_list):
@@ -58,7 +59,9 @@ class c2b(MessagingModule):
             for item, replace in self._conf_params['config']['config'].iteritems():
                 if item in message['text']:
                     replace_word = random.choice(replace.split('/'))
-                    message['text'] = re.sub(ur'\b{}\b'.format(item), replace_word, message['text'], flags=re.UNICODE)
+                    message['text'] = re.sub(C2B_REGEXP.format(item),
+                                             r'\1{}\3'.format(replace_word),
+                                             message['text'], flags=re.UNICODE)
             return message
 
     def _conf_settings(self, *args, **kwargs):
