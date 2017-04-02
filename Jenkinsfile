@@ -75,6 +75,8 @@ node('docker-host') {
                             }
                         } finally {
                             sh 'cat chat.log'
+                            sh "python src/jenkins/tests_to_xml.py ${container}"
+                            junit 'results/chat_tests.xml'
                             archive 'results/**'
                         }
                     }
