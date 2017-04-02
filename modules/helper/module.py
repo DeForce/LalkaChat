@@ -163,10 +163,11 @@ class ChatModule(BaseModule):
             Override this method
         :return: Chat test class (object/Class)
         """
-        return object()
+        return {}
 
     def apply_settings(self, **kwargs):
         BaseModule.apply_settings(self, **kwargs)
+        self._check_chats(self.channels.keys())
         self.refresh_channel_names()
 
     def refresh_channel_names(self):

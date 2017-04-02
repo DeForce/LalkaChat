@@ -338,5 +338,4 @@ class beampro(ChatModule):
     def apply_settings(self, **kwargs):
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        self._check_chats(self.channels.keys())
         ChatModule.apply_settings(self, **kwargs)

@@ -145,7 +145,7 @@ def random_string(length):
 def remove_message_by_user(user, text=None):
     command = {'type': 'command',
                'command': 'remove_by_user',
-               'user': user}
+               'user': user if isinstance(user, list) else [user]}
     if text:
         command['text'] = text
         command['command'] = 'replace_by_user'

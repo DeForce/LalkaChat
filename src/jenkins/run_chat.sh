@@ -25,6 +25,10 @@ while [ ${ATTEMPTS} -lt 20 ]; do
         continue
     fi
 
+    if ! grep "Hitbox Testing mode online" chat.log; then
+        continue
+    fi
+
     sleep 5
     exit 0
 done
