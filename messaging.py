@@ -8,7 +8,7 @@ import operator
 import logging
 from collections import OrderedDict
 
-from modules.helper.module import BaseModule
+from modules.helper.module import BaseModule, MessagingModule
 from modules.helper.system import ModuleLoadException, THREADS, CONF_FOLDER
 from modules.helper.parser import load_from_config_file
 
@@ -34,7 +34,6 @@ class Message(threading.Thread):
         # Creating dict for dynamic modules
         self.modules = []
         self.daemon = True
-        self.msg_counter = 0
         self.queue = queue
         self.module_tag = "modules.messaging"
         self.threads = []
@@ -109,18 +108,11 @@ class Message(threading.Thread):
         return modules_list
 
     def msg_process(self, message):
-        if ('to' in message) and (message['to'] is not None):
-            message['text'] = ', '.join([message['to'], message['text']])
-
-        if 'id' not in message:
-            message['id'] = self.msg_counter
-            self.msg_counter += 1
         # When we receive message we pass it via all loaded modules
         # All modules should return the message with modified/not modified
         #  content so it can be passed to new module, or to pass to CLI
-
-        for m_module in self.modules:
-            message = m_module.process_message(message, self.queue)
+        for m_module in self.modules:  # type: MessagingModule
+            message = m_module.process_message(message, queue=self.queue)
 
     def run(self):
         for thread in range(THREADS):

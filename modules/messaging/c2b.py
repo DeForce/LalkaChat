@@ -5,8 +5,9 @@ import logging
 import random
 import re
 from collections import OrderedDict
+
+from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
-from modules.helper.system import IGNORED_TYPES
 
 DEFAULT_PRIORITY = 10
 log = logging.getLogger('c2b')
@@ -49,20 +50,18 @@ class c2b(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
 
-    def process_message(self, message, queue, **kwargs):
+    @process_text_messages
+    @ignore_system_messages
+    def process_message(self, message, **kwargs):
         # Replacing the message if needed.
         # Please do the needful
-        if message:
-            if message['type'] in IGNORED_TYPES:
-                return message
-
-            for item, replace in self._conf_params['config']['config'].iteritems():
-                if item in message['text']:
-                    replace_word = random.choice(replace.split('/'))
-                    message['text'] = re.sub(C2B_REGEXP.format(item),
-                                             r'\1{}\3'.format(replace_word),
-                                             message['text'], flags=re.UNICODE)
-            return message
+        for item, replace in self._conf_params['config']['config'].iteritems():
+            if item in message.text:
+                replace_word = random.choice(replace.split('/'))
+                message.text = re.sub(C2B_REGEXP.format(item),
+                                      r'\1{}\3'.format(replace_word),
+                                      message.text, flags=re.UNICODE)
+        return message
 
     def _conf_settings(self, *args, **kwargs):
         return CONF_DICT

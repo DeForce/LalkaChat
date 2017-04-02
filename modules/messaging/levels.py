@@ -10,8 +10,9 @@ import xml.etree.ElementTree as ElementTree
 from collections import OrderedDict
 import datetime
 
+from modules.helper.message import process_text_messages, SystemMessage, ignore_system_messages
 from modules.helper.parser import save_settings
-from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES
+from modules.helper.system import ModuleLoadException
 from modules.helper.module import MessagingModule
 
 log = logging.getLogger('levels')
@@ -152,8 +153,6 @@ class levels(MessagingModule):
             self.load_levels()
 
     def set_level(self, user, queue):
-        if user == 'System':
-            return []
         db = sqlite3.connect(self.db_location)
 
         cursor = db.cursor()
@@ -187,29 +186,31 @@ class levels(MessagingModule):
                 db.commit()
             else:
                 max_level += 1
-            system_message(
-                self._conf_params['config']['config']['message'].decode('utf-8').format(
-                    user,
-                    self.levels[max_level]['name']),
-                queue, category='module'
+            queue.put(
+                SystemMessage(
+                    self._conf_params['config']['config']['message'].decode('utf-8').format(
+                        user,
+                        self.levels[max_level]['name']),
+                    category='module'
+                )
             )
         cursor.close()
         return self.levels[max_level].copy()
 
-    def process_message(self, message, queue, **kwargs):
-        if message:
-            if message['type'] in IGNORED_TYPES:
-                return message
-            if 'system_msg' not in message or not message['system_msg']:
-                if 'user' in message and message['user'] in self.special_levels:
-                    level_info = self.special_levels[message['user']]
-                    if 's_levels' in message:
-                        message['s_levels'].append(level_info.copy())
-                    else:
-                        message['s_levels'] = [level_info.copy()]
+    @process_text_messages
+    @ignore_system_messages
+    def process_message(self, message, queue=None, **kwargs):
+        if message.user in self.special_levels:
+            level_info = self.special_levels[message.user]
+            try:
+                message.s_levels.append(level_info.copy())
+            except AttributeError:
+                message.s_levels = [level_info.copy()]
+                message.jsonable.append('s_levels')
 
-                message['levels'] = self.set_level(message['user'], queue)
-            return message
+        message.levels = self.set_level(message.user, queue)
+        message.jsonable.append('levels')
+        return message
 
     def calculate_experience(self, user):
         exp_to_add = self.exp_for_message

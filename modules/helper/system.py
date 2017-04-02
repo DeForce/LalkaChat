@@ -142,26 +142,6 @@ def random_string(length):
     return ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(length))
 
 
-def remove_message_by_user(user, text=None):
-    command = {'type': 'command',
-               'command': 'remove_by_user',
-               'user': user if isinstance(user, list) else [user]}
-    if text:
-        command['text'] = text
-        command['command'] = 'replace_by_user'
-    return command
-
-
-def remove_message_by_id(ids, text=None):
-    command = {'type': 'command',
-               'command': 'remove_by_id',
-               'ids': ids if isinstance(ids, list) else [ids]}
-    if text:
-        command['text'] = text
-        command['command'] = 'replace_by_id'
-    return command
-
-
 def get_update(sem_version):
     github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"
     try:

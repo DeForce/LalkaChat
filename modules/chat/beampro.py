@@ -12,11 +12,11 @@ from collections import OrderedDict
 
 import time
 
+from modules.helper.message import TextMessage, SystemMessage, RemoveMessageByUser, RemoveMessageByID
 from modules.helper.module import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 
-from modules.helper.system import NA_MESSAGE, system_message, translate_key, remove_message_by_id, \
-    remove_message_by_user
+from modules.helper.system import NA_MESSAGE, translate_key
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('beampro')
@@ -48,6 +48,18 @@ class BeamProAPIException(Exception):
     pass
 
 
+class BeamProTextMessage(TextMessage):
+    def __init__(self, user, text, mid):
+        TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+                             user=user, text=text, mid=mid)
+
+
+class BeamProSystemMessage(SystemMessage):
+    def __init__(self, text, category='system'):
+        SystemMessage.__init__(self, text, source=SOURCE, source_icon=SOURCE_ICON,
+                               user=SYSTEM_USER, category=category)
+
+
 class BeamProMessageHandler(threading.Thread):
     def __init__(self, *args, **kwargs):
         threading.Thread.__init__(self)
@@ -77,17 +89,13 @@ class BeamProMessageHandler(threading.Thread):
             self._process_purge_event(message)
 
     def _process_chat_message(self, message):
-        log.info(message)
+        log.debug(message)
 
-        msg = {
-            'id': ID_PREFIX.format(message['data']['id']),
-            'source': SOURCE,
-            'source_icon': SOURCE_ICON,
-            'user': message['data']['user_name'],
-            'text': self._get_text_message(message),
-            'emotes': {},
-            'type': 'message'
-        }
+        msg = BeamProTextMessage(
+            message['data']['user_name'],
+            self._get_text_message(message),
+            ID_PREFIX.format(message['data']['id'])
+        )
         self._send_message(msg)
 
     @staticmethod
@@ -97,8 +105,8 @@ class BeamProMessageHandler(threading.Thread):
 
     def _process_delete_event(self, message):
         id_to_delete = ID_PREFIX.format(message['data']['id'])
-        self._send_message(
-            remove_message_by_id(
+        self.message_queue.put(
+            RemoveMessageByID(
                 id_to_delete,
                 text=self.main_class.conf_params()['settings'].get('remove_text')
             )
@@ -111,7 +119,7 @@ class BeamProMessageHandler(threading.Thread):
             raise BeamProAPIException("Unable to get user nickname")
         nickname = nickname_req.json()
         self._send_message(
-            remove_message_by_user(
+            RemoveMessageByUser(
                 nickname,
                 text=self.main_class.conf_params()['settings'].get('remove_text')
             )
@@ -119,7 +127,7 @@ class BeamProMessageHandler(threading.Thread):
 
     def _post_process_multiple_channels(self, message):
         if self.main_class.conf_params()['config']['config']['show_channel_names']:
-            message['channel_name'] = self.channel_nick
+            message.channel_name = self.channel_nick
 
     def _send_message(self, message):
         self._post_process_multiple_channels(message)
@@ -186,8 +194,11 @@ class BeamProClient(WebSocketClient):
         self.ws_queue.put(json.loads(message.data))
 
     def system_message(self, msg, category='system'):
-        system_message(msg, self.main_class.queue, source=SOURCE,
-                       icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
+        self.main_class.queue.put(
+            BeamProSystemMessage(
+                msg, category
+            )
+        )
 
     def send_payload(self, payload):
         payload['id'] = self.id

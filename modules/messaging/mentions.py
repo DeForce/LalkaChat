@@ -4,8 +4,8 @@
 import re
 from collections import OrderedDict
 
+from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
-from modules.helper.system import IGNORED_TYPES
 
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'messaging'}
@@ -33,24 +33,25 @@ class mentions(MessagingModule):
     def _gui_settings(self, *args, **kwargs):
         return CONF_GUI
 
-    def process_message(self, message, queue, **kwargs):
+    @process_text_messages
+    @ignore_system_messages
+    def process_message(self, message, **kwargs):
         # Replacing the message if needed.
         # Please do the needful
-        if message:
-            if message['type'] in IGNORED_TYPES:
-                return message
+        self._check_addressed(message)
+        if not message.pm:
+            self._check_mentions(message)
+        return message
 
-            for mention in self._conf_params['config']['mentions']:
-                if re.search(mention, message['text'].lower()):
-                    message['mention'] = True
-                    break
+    def _check_mentions(self, message):
+        for mention in self._conf_params['config']['mentions']:
+            if re.search(mention, message.text.lower()):
+                message.mention = True
+                message.jsonable += ['mention']
+                break
 
-            for address in self._conf_params['config']['address']:
-                if re.match(address, message['text'].lower()):
-                    message['pm'] = True
-                    break
-
-            if 'mention' in message and 'pm' in message:
-                message.pop('mention')
-
-            return message
+    def _check_addressed(self, message):
+        for address in self._conf_params['config']['address']:
+            if re.match(address, message.text.lower()):
+                message.pm = True
+                break

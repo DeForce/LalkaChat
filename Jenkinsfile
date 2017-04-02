@@ -87,7 +87,7 @@ node('docker-host') {
             if (env.BRANCH_NAME == 'develop' || env.BRANCH_NAME == 'master') {
                 def ZipName = env.BUILD_TAG.replace('jenkins-', '')
                 echo ZipName
-                def container = 'deforce/ubuntu-builder'
+                def container = 'deforce/lc-ubuntu-builder'
                 sh "cp requires_windows.txt requirements.txt"
                 def binariesLocation = "http://repo.intra.czt.lv/lalkachat/"
                 sh "wget -r --cut-dirs=1 -nH -np --reject index.html ${binariesLocation} "

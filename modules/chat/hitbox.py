@@ -7,14 +7,14 @@ import threading
 import os
 import logging
 from collections import OrderedDict
-import HTMLParser
 import time
 
 import requests
 from ws4py.client.threadedclient import WebSocketClient
+
+from modules.helper.message import TextMessage, Emote, SystemMessage, RemoveMessageByUser
 from modules.helper.module import ChatModule
-from modules.helper.system import translate_key, system_message, remove_message_by_id, remove_message_by_user, \
-    EMOTE_FORMAT
+from modules.helper.system import translate_key, EMOTE_FORMAT
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('hitbox')
@@ -48,6 +48,18 @@ CONF_GUI = {
 
 class HitboxAPIError(Exception):
     pass
+
+
+class HitboxTextMessage(TextMessage):
+    def __init__(self, user, text, mid, nick_colour):
+        TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+                             user=user, text=text, mid=mid, nick_colour=nick_colour)
+
+
+class HitboxSystemMessage(SystemMessage):
+    def __init__(self, text, category='system'):
+        SystemMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+                               user=SYSTEM_USER, text=text, category=category)
 
 
 class HitboxMessageHandler(threading.Thread):
@@ -100,22 +112,19 @@ class HitboxMessageHandler(threading.Thread):
         self.main_class.set_viewers(self.channel, viewers)
 
     def _process_chat_msg(self, message):
-        msg = {
-            'id': ID_PREFIX.format(message['id']),
-            'source': SOURCE,
-            'source_icon': SOURCE_ICON,
-            'user': message['name'],
-            'text': message['text'],
-            'emotes': {},
-            'nick_color': '#{}'.format(message['nameColor']) if self._show_color() else None,
-            'type': 'message'
-        }
+        msg = HitboxTextMessage(
+            user=message['name'],
+            text=message['text'],
+            mid=ID_PREFIX.format(message['id']),
+            nick_colour='#{}'.format(message['nameColor']) if self._show_color() else None,
+        )
+
         self._send_message(msg)
 
     def _process_info_msg(self, message):
         user_to_delete = message['variables']['user']
-        self._send_message(
-            remove_message_by_user(
+        self.message_queue.put(
+            RemoveMessageByUser(
                 user_to_delete,
                 text=self.main_class.conf_params()['settings'].get('remove_text')
             )
@@ -125,16 +134,16 @@ class HitboxMessageHandler(threading.Thread):
         return self.main_class.conf_params()['config']['config']['show_nickname_colors']
 
     def _post_process_emotes(self, message):
-        for word in message['text'].split():
+        for word in message.text.split():
             if word in self.smiles:
-                if word not in message['emotes']:
-                    message['text'] = re.sub(SMILE_REGEXP.format(re.escape(word)),
-                                             r'\1{}\3'.format(EMOTE_FORMAT.format(word)),
-                                             message['text'])
-                    message['emotes'][word] = {
-                        'emote_id': word,
-                        'emote_url': CDN_URL.format(self.smiles[word])
-                    }
+                message.text = re.sub(SMILE_REGEXP.format(re.escape(word)),
+                                      r'\1{}\3'.format(EMOTE_FORMAT.format(word)),
+                                      message.text)
+                message.emotes.append(Emote(word, CDN_URL.format(self.smiles[word])))
+
+    def _post_process_multiple_channels(self, message):
+        if self.main_class.conf_params()['config']['config']['show_channel_names']:
+            message.channel_name = self.channel
 
     def _send_message(self, message):
         self._post_process_emotes(message)
@@ -268,8 +277,9 @@ class HitboxClient(WebSocketClient):
         return 'wss://{}/socket.io/1/websocket/{}'.format(url, user_id)
 
     def system_message(self, msg, category='system'):
-        system_message(msg, self.main_class.queue, source=SOURCE,
-                       icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
+        self.main_class.queue.put(
+            HitboxSystemMessage(msg, category=category)
+        )
 
 
 class HitboxInitThread(threading.Thread):

@@ -9,9 +9,10 @@ import logging.config
 import Queue
 import time
 from collections import OrderedDict
-from modules.helper.parser import load_from_config_file
+
+from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUser
 from modules.helper.module import ChatModule
-from modules.helper.system import system_message, translate_key, remove_message_by_user, EMOTE_FORMAT, NA_MESSAGE
+from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
 from gui import MODULE_KEY
 
 logging.getLogger('irc').setLevel(logging.ERROR)
@@ -59,6 +60,25 @@ class TwitchUserError(Exception):
 
 class TwitchNormalDisconnect(Exception):
     """Normal Disconnect exception"""
+
+
+class TwitchTextMessage(TextMessage):
+    def __init__(self, user, text):
+        self.bttv_emotes = {}
+        TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+                             user=user, text=text)
+
+
+class TwitchSystemMessage(SystemMessage):
+    def __init__(self, text, category='system', emotes=None):
+        SystemMessage.__init__(self, text, source=SOURCE, source_icon=SOURCE_ICON,
+                               user=SYSTEM_USER, emotes=emotes, category=category)
+
+
+class TwitchEmote(Emote):
+    def __init__(self, emote_id, emote_url, positions):
+        Emote.__init__(self, emote_id=emote_id, emote_url=emote_url)
+        self.positions = positions
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -114,37 +134,41 @@ class TwitchMessageHandler(threading.Thread):
                 url = badge_info.get('image_url_4x')
             else:
                 url = NOT_FOUND
-            message['badges'].append({'badge': badge_tag, 'size': badge_size, 'url': url})
+            message.badges.append(Badge(badge_tag, url))
 
     @staticmethod
     def _handle_display_name(message, name):
-        message['display_name'] = name if name else message['user']
+        message.display_name = name if name else message.user
+        message.jsonable += ['display_name']
 
     @staticmethod
     def _handle_emotes(message, tag_value):
         for emote in tag_value.split('/'):
             emote_id, emote_pos_diap = emote.split(':')
-            message['emotes'].append({'emote_id': emote_id,
-                                      'positions': emote_pos_diap.split(','),
-                                      'emote_url': EMOTE_SMILE_URL.format(id=emote_id)})
+            message.emotes.append(
+                TwitchEmote(emote_id,
+                            EMOTE_SMILE_URL.format(id=emote_id),
+                            emote_pos_diap.split(','))
+            )
 
     def _handle_bttv_smiles(self, message):
-        for word in message['text'].split():
+        for word in message.text.split():
             if word in self.bttv:
                 bttv_smile = self.bttv.get(word)
-                message['bttv_emotes'][bttv_smile['regex']] = {
-                    'emote_id': bttv_smile['regex'],
-                    'emote_url': 'https:{0}'.format(bttv_smile['url'])
-                }
+                message.bttv_emotes[bttv_smile['regex']] = Emote(
+                    bttv_smile['regex'],
+                    'https:{0}'.format(bttv_smile['url'])
+                )
 
     def _handle_pm(self, message):
-        if re.match('^@?{0}[ ,]?'.format(self.nick), message['text'].lower()):
+        if re.match('^@?{0}[ ,]?'.format(self.nick), message.text.lower()):
             if self.chat_module.conf_params()['config']['config'].get('show_pm'):
-                message['pm'] = True
+                message.pm = True
 
     def _handle_clearchat(self, msg):
-        self.message_queue.put(remove_message_by_user(msg.arguments,
-                                                      text=self.kwargs['settings'].get('remove_text')))
+        self.message_queue.put(
+            RemoveMessageByUser(msg.arguments,
+                                text=self.kwargs['settings'].get('remove_text')))
 
     def _handle_usernotice(self, msg):
         for tag in msg.tags:
@@ -157,20 +181,9 @@ class TwitchMessageHandler(threading.Thread):
             self._handle_message(msg, sub_message=True)
 
     def _handle_message(self, msg, sub_message=False):
-        message = {'source': self.source,
-                   'source_icon': SOURCE_ICON,
-                   'badges': [],
-                   'emotes': [],
-                   'bttv_emotes': {},
-                   'user': msg.source.split('!')[0],
-                   'type': 'message',
-                   'msg_type': msg.type}
-
-        if message['user'] == 'twitchnotify':
-            self.irc_class.system_message(msg.arguments.pop(), category='chat')
-            return
-
-        message['text'] = msg.arguments.pop()
+        message = TwitchTextMessage(msg.source.split('!')[0], msg.arguments.pop())
+        if message.user == 'twitchnotify':
+            self.irc_class.queue.put(TwitchSystemMessage(message.text, category='chat'))
 
         for tag in msg.tags:
             tag_value, tag_key = tag.values()
@@ -195,11 +208,11 @@ class TwitchMessageHandler(threading.Thread):
 
     def _handle_viewer_color(self, message, value):
         if self.irc_class.chat_module.conf_params()['config']['config']['show_nickname_colors']:
-            message['nick_color'] = value
+            message.nick_color = value
 
     @staticmethod
     def _handle_bits(message, amount):
-        regexp = re.search(BITS_REGEXP.format(amount), message['text'])
+        regexp = re.search(BITS_REGEXP.format(amount), message.text)
         emote = regexp.group(2)
         emote_smile = '{}{}'.format(emote, amount)
 
@@ -214,7 +227,7 @@ class TwitchMessageHandler(threading.Thread):
         else:
             color = 'gray'
 
-        message['bits'] = {
+        message.bits = {
             'bits': emote_smile,
             'amount': amount,
             'theme': BITS_THEME,
@@ -222,11 +235,12 @@ class TwitchMessageHandler(threading.Thread):
             'color': color,
             'size': 4
         }
-        message['text'] = message['text'].replace(emote_smile, EMOTE_FORMAT.format(emote_smile))
+        message.text = message.text.replace(emote_smile, EMOTE_FORMAT.format(emote_smile))
 
     @staticmethod
     def _handle_sub_message(message):
-        message['sub_message'] = True
+        message.sub_message = True
+        message.jsonable += ['sub_message']
 
     def _send_message(self, message):
         self._post_process_emotes(message)
@@ -237,45 +251,45 @@ class TwitchMessageHandler(threading.Thread):
 
     @staticmethod
     def _post_process_bits(message):
-        if 'bits' not in message:
+        if not hasattr(message, 'bits'):
             return
-        bits = message['bits']
-        message['emotes'].append({
-            'emote_id': bits['bits'],
-            'emote_url': BITS_URL.format(
+        bits = message.bits
+        message['emotes'].append(Emote(
+            bits['bits'],
+            BITS_URL.format(
                 theme=bits['theme'],
                 type=bits['type'],
                 color=bits['color'],
                 size=bits['size']
             )
-        })
+        ))
 
     @staticmethod
     def _post_process_emotes(message):
         conveyor_emotes = []
-        for emote in message['emotes']:
-            for position in emote['positions']:
+        for emote in message.emotes:
+            for position in emote.positions:
                 start, end = position.split('-')
-                conveyor_emotes.append({'emote_id': emote['emote_id'],
+                conveyor_emotes.append({'emote_id': emote.id,
                                         'start': int(start),
                                         'end': int(end)})
         conveyor_emotes = sorted(conveyor_emotes, key=lambda k: k['start'], reverse=True)
 
         for emote in conveyor_emotes:
-            message['text'] = u'{start}{emote}{end}'.format(start=message['text'][:emote['start']],
-                                                            end=message['text'][emote['end'] + 1:],
-                                                            emote=EMOTE_FORMAT.format(emote['emote_id']))
+            message.text = u'{start}{emote}{end}'.format(start=message.text[:emote['start']],
+                                                         end=message.text[emote['end'] + 1:],
+                                                         emote=EMOTE_FORMAT.format(emote['emote_id']))
 
     @staticmethod
     def _post_process_bttv_emotes(message):
-        for emote, data in message['bttv_emotes'].iteritems():
-            message['text'] = message['text'].replace(emote, EMOTE_FORMAT.format(emote))
-            message['emotes'].append(data)
+        for emote, data in message.bttv_emotes.iteritems():
+            message.text = message.text.replace(emote, EMOTE_FORMAT.format(emote))
+            message.emotes.append(data)
 
     def _post_process_multiple_channels(self, message):
         channel_class = self.irc_class.main_class
         if channel_class.chat_module.conf_params()['config']['config']['show_channel_names']:
-            message['channel_name'] = channel_class.display_name
+            message.channel_name = channel_class.display_name
 
 
 class TwitchPingHandler(threading.Thread):
@@ -316,8 +330,7 @@ class IRC(irc.client.SimpleIRCClient):
         self.msg_handler.start()
 
     def system_message(self, message, category='system'):
-        system_message(message, self.queue,
-                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
+        self.queue.put(TwitchSystemMessage(message, category=category))
 
     def on_disconnect(self, connection, event):
         if 'CLOSE_OK' in event.arguments:
