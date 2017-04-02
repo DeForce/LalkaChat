@@ -112,7 +112,8 @@ node('docker-host') {
                 currentBuild.result = 'UNSTABLE'
             }
             sh 'rm -rf dist/'
-            sh 'docker rmi -f $(docker images | grep \'^<none>\' | awk \'{print \$3}\') || true'
+            sh 'docker rm $(docker ps -aq) || true'
+            sh 'docker rmi -f $(docker images -a | grep \'^<none>\' | awk \'{print \$3}\') || true'
             deleteDir()
         }
     }
