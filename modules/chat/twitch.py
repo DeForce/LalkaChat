@@ -1,19 +1,20 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import irc.client
-import threading
-import os
-import re
-import random
-import requests
-import logging.config
 import Queue
+import logging.config
+import os
+import random
+import re
+import threading
 import time
 from collections import OrderedDict
 
+import irc.client
+import requests
+
+from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUser
 from modules.helper.module import ChatModule
 from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
-from gui import MODULE_KEY
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)

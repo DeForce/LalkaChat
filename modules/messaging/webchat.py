@@ -1,26 +1,27 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import os
-import threading
-import json
 import Queue
-import socket
-import cherrypy
-import logging
-import datetime
 import copy
+import datetime
+import json
+import logging
+import os
+import socket
+import threading
+from collections import OrderedDict
+
+import cherrypy
+from cherrypy.lib.static import serve_file
 from scss import Compiler
 from scss.namespace import Namespace
 from scss.types import Color, Boolean, String, Number
-from collections import OrderedDict
-from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
+from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByID
+from modules.helper.module import MessagingModule
 from modules.helper.parser import save_settings
 from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER
-from modules.helper.module import MessagingModule
-from gui import MODULE_KEY
 
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 DEFAULT_STYLE = 'default'

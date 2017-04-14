@@ -1,20 +1,21 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import json
+import logging
+import os
 import random
+import re
 import string
 import threading
 import time
-import re
-import requests
-import os
-import logging
 from collections import OrderedDict
+
+import requests
 from ws4py.client.threadedclient import WebSocketClient
 
+from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Emote
 from modules.helper.module import ChatModule
 from modules.helper.system import translate_key, EMOTE_FORMAT
-from gui import MODULE_KEY
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')

@@ -1,4 +1,8 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
+from modules.interface.controls import KeyListBox, MainMenuToolBar
+
+import modules.interface.functions
+
 try:
     from cefpython3.wx import chromectrl as browser
     HAS_CHROME = True
@@ -12,13 +16,11 @@ import os
 import logging
 import webbrowser
 import wx
-import wx.grid
-from modules.helper.system import MODULE_KEY, translate_key, PYTHON_FOLDER
+from modules.helper.system import MODULE_KEY, translate_key
 from modules.helper.parser import return_type
 from modules.helper.module import BaseModule
 # ToDO: Support customization of borders/spacings
 
-IDS = {}
 log = logging.getLogger('chat_gui')
 INFORMATION_TAG = 'gui_information'
 SECTION_GUI_TAG = '__gui'
@@ -27,37 +29,6 @@ SKIP_TXT_CONTROLS = ['list_input', 'list_input2']
 SKIP_BUTTONS = ['list_add', 'list_remove', 'apply_button', 'cancel_button', 'ok_button']
 ITEM_SPACING_VERT = 6
 ITEM_SPACING_HORZ = 30
-
-
-def get_id_from_name(name):
-    for item, item_id in IDS.iteritems():
-        if item_id == name:
-            return item
-    return None
-
-
-def id_renew(name, update=False, multiple=False):
-    module_id = get_id_from_name(name)
-    if not multiple and module_id:
-        del IDS[module_id]
-    new_id = wx.Window.NewControlId(1)
-    if update:
-        IDS[new_id] = name
-    return new_id
-
-
-def get_list_of_ids_from_module_name(name, id_group=1, return_tuple=False):
-    split_key = MODULE_KEY
-
-    id_array = []
-    for item_key, item in IDS.items():
-        item_name = split_key.join(item.split(split_key)[:id_group])
-        if item_name == name:
-            if return_tuple:
-                id_array.append((item_key, item))
-            else:
-                id_array.append(item_key)
-    return id_array
 
 
 def check_duplicate(item, window):
@@ -99,123 +70,6 @@ class ModuleKeyError(Exception):
     pass
 
 
-class CustomColourPickerCtrl(object):
-    def __init__(self):
-        self.panel = None
-        self.button = None
-        self.text = None
-        self.event = None
-        self.key = None
-
-    def create(self, panel, value="#FFFFFF", orientation=wx.HORIZONTAL, event=None, key=None,
-               *args, **kwargs):
-        item_sizer = wx.BoxSizer(orientation)
-
-        self.event = event
-        self.key = key
-        label_panel = wx.Panel(panel, style=wx.BORDER_SIMPLE)
-        label_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        label_sizer2 = wx.BoxSizer(wx.VERTICAL)
-        label_text = wx.StaticText(label_panel, label=unicode(value), style=wx.ALIGN_CENTER)
-        self.text = label_text
-        label_sizer.Add(label_text, 1, wx.ALIGN_CENTER)
-        label_sizer2.Add(label_sizer, 1, wx.ALIGN_CENTER)
-        label_panel.SetSizer(label_sizer2)
-        label_panel.SetBackgroundColour(value)
-        self.panel = label_panel
-
-        button = wx.Button(panel, label=translate_key(MODULE_KEY.join(key + ['button'])))
-        button.Bind(wx.EVT_BUTTON, self.on_button_press)
-        border_size = wx.SystemSettings_GetMetric(wx.SYS_BORDER_Y)
-        button_size = button.GetSize()
-        if button_size[0] > 150:
-            button_size[0] = 150
-        button_size[1] -= border_size*2
-        self.button = button
-
-        label_panel.SetMinSize(button_size)
-        label_panel.SetSize(button_size)
-
-        item_sizer.Add(label_panel, 0, wx.ALIGN_CENTER)
-        item_sizer.AddSpacer(2)
-        item_sizer.Add(button, 0, wx.EXPAND)
-        return item_sizer
-
-    def on_button_press(self, event):
-        dialog = wx.ColourDialog(self.panel)
-        if dialog.ShowModal() == wx.ID_OK:
-            colour = dialog.GetColourData()
-            hex_colour = colour.Colour.GetAsString(flags=wx.C2S_HTML_SYNTAX)
-            self.panel.SetBackgroundColour(colour.Colour)
-            self.panel.Refresh()
-            self.text.SetLabel(hex_colour)
-            self.panel.Layout()
-            col = colour.Colour
-            if (col.red * 0.299 + col.green * 0.587 + col.blue * 0.114) > 186:
-                self.text.SetForegroundColour('black')
-            else:
-                self.text.SetForegroundColour('white')
-
-            self.event({'colour': colour.Colour, 'hex': hex_colour, 'key': self.key})
-
-
-class KeyListBox(wx.ListBox):
-    def __init__(self, *args, **kwargs):
-        self.keys = kwargs.pop('keys', [])
-        wx.ListBox.__init__(self, *args, **kwargs)
-
-    def get_key_from_index(self, index):
-        return self.keys[index]
-
-
-class KeyCheckListBox(wx.CheckListBox):
-    def __init__(self, *args, **kwargs):
-        self.keys = kwargs.pop('keys', [])
-        wx.CheckListBox.__init__(self, *args, **kwargs)
-
-    def get_key_from_index(self, index):
-        return self.keys[index]
-
-
-class KeyChoice(wx.Choice):
-    def __init__(self, *args, **kwargs):
-        self.keys = kwargs.pop('keys', [])
-        wx.Choice.__init__(self, *args, **kwargs)
-
-    def get_key_from_index(self, index):
-        return self.keys[index]
-
-
-class MainMenuToolBar(wx.ToolBar):
-    def __init__(self, *args, **kwargs):
-        self.main_class = kwargs['main_class']  # type: ChatGui
-        kwargs.pop('main_class')
-
-        kwargs["style"] = wx.TB_NOICONS | wx.TB_TEXT
-
-        wx.ToolBar.__init__(self, *args, **kwargs)
-        self.SetToolBitmapSize((0, 0))
-
-        self.create_tool('menu.settings', self.main_class.on_settings)
-        self.create_tool('menu.reload', self.main_class.on_toolbar_button)
-
-        self.Realize()
-
-    def create_tool(self, name, binding=None, style=wx.ITEM_NORMAL, s_help="", l_help=""):
-        l_id = id_renew(name)
-        IDS[l_id] = name
-        label_text = translate_key(IDS[l_id])
-        button = self.AddLabelTool(l_id, label_text, wx.NullBitmap, wx.NullBitmap,
-                                   style, s_help, l_help)
-        if binding:
-            self.main_class.Bind(wx.EVT_TOOL, binding, id=l_id)
-        return button
-
-
-class GuiCreationError(Exception):
-    pass
-
-
 class SettingsWindow(wx.Frame):
     main_grid = None
     page_list = []
@@ -235,17 +89,17 @@ class SettingsWindow(wx.Frame):
         self.sizer_dict = {}
         self.changes = {}
         self.buttons = {}
-        self.function_map = {
+        self.groups = {
             dict: {
-                'function': self.create_static_box,
+                'function': modules.interface.functions.create_static_box,
                 'bind': None
             },
             OrderedDict: {
-                'function': self.create_static_box,
+                'function': modules.interface.functions.create_static_box,
                 'bind': None
             },
             'list_dual': {
-                'function': self.create_list,
+                'function': modules.interface.functions.create_list,
                 'bind': {
                     'add': self.button_clicked,
                     'remove': self.button_clicked,
@@ -253,7 +107,7 @@ class SettingsWindow(wx.Frame):
                 }
             },
             'list': {
-                'function': self.create_list,
+                'function': modules.interface.functions.create_list,
                 'bind': {
                     'add': self.button_clicked,
                     'remove': self.button_clicked,
@@ -261,59 +115,59 @@ class SettingsWindow(wx.Frame):
                 }
             },
             'choose_multiple': {
-                'function': self.create_choose,
+                'function': modules.interface.functions.create_choose,
                 'bind': {
                     'change': self.on_listbox_change,
                     'check_change': self.on_checklist_box_change
                 }
             },
             'choose_single': {
-                'function': self.create_choose,
+                'function': modules.interface.functions.create_choose,
                 'bind': {
                     'change': self.on_listbox_change,
                     'check_change': self.on_checklist_box_change
                 }
             }
         }
-        self.value_map = {
+        self.controls = {
             type(None): {
-                'function': self.create_button,
+                'function': modules.interface.functions.create_button,
                 'bind': self.button_clicked
             },
             bool: {
-                'function': self.create_checkbox,
+                'function': modules.interface.functions.create_checkbox,
                 'bind': self.on_check_change
             },
             str: {
-                'function': self.create_textctrl,
+                'function': modules.interface.functions.create_textctrl,
                 'bind': self.on_textctrl
             },
             unicode: {
-                'function': self.create_textctrl,
+                'function': modules.interface.functions.create_textctrl,
                 'bind': self.on_textctrl
             },
             int: {
-                'function': self.create_textctrl,
+                'function': modules.interface.functions.create_textctrl,
                 'bind': self.on_textctrl
             },
             'spin': {
-                'function': self.create_spin,
+                'function': modules.interface.functions.create_spin,
                 'bind': self.on_spinctrl
             },
             'dropdown': {
-                'function': self.create_dropdown,
+                'function': modules.interface.functions.create_dropdown,
                 'bind': self.on_dropdown
             },
             'slider': {
-                'function': self.create_slider,
+                'function': modules.interface.functions.create_slider,
                 'bind': self.on_sliderctrl
             },
             'colour_picker': {
-                'function': self.create_colour_picker,
+                'function': modules.interface.functions.create_colour_picker,
                 'bind': self.on_color_picker
             },
             'list': {
-                'function': self.create_list,
+                'function': modules.interface.functions.create_list,
                 'bind': {
                     'add': self.button_clicked,
                     'remove': self.button_clicked,
@@ -321,7 +175,7 @@ class SettingsWindow(wx.Frame):
                 }
             },
             'button': {
-                'function': self.create_button,
+                'function': modules.interface.functions.create_button,
                 'bind': self.button_clicked
             }
         }
@@ -356,15 +210,17 @@ class SettingsWindow(wx.Frame):
         selection = item_object.get_key_from_index(item_object.GetSelection())
         description = translate_key(MODULE_KEY.join([selection, 'description']))
 
-        item_key = IDS[event.GetId()].split(MODULE_KEY)
+        item_key = modules.interface.controls.IDS[event.GetId()].split(MODULE_KEY)
         show_description = self.main_class.loaded_modules[item_key[0]]['gui'][item_key[1]].get('description', False)
 
         if isinstance(item_object, KeyListBox):
-            self.on_change(IDS[event.GetId()], selection, item_type='listbox', section=True)
+            self.on_change(modules.interface.controls.IDS[event.GetId()], selection, item_type='listbox', section=True)
 
         if show_description:
             item_id_key = MODULE_KEY.join(item_key[:-1])
-            descr_static_text = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([item_id_key, 'descr_explain'])))
+            descr_static_text = wx.FindWindowById(
+                modules.interface.controls.get_id_from_name(MODULE_KEY.join([item_id_key, 'descr_explain']))
+            )
             descr_static_text.SetLabel(description)
             descr_static_text.Wrap(descr_static_text.GetSize()[0])
 
@@ -372,7 +228,7 @@ class SettingsWindow(wx.Frame):
         window = event.EventObject
         item_ids = window.GetChecked()
         items_values = [window.get_key_from_index(item_id) for item_id in item_ids]
-        self.on_change(IDS[event.GetId()], items_values, item_type='listbox_check', section=True)
+        self.on_change(modules.interface.controls.IDS[event.GetId()], items_values, item_type='listbox_check', section=True)
 
     def on_change(self, key, value, item_type=None, section=False):
         def enable_button():
@@ -457,35 +313,35 @@ class SettingsWindow(wx.Frame):
 
     def on_textctrl(self, event):
         text_ctrl = event.EventObject
-        self.on_change(IDS[event.GetId()], text_ctrl.GetValue().encode('utf-8'), item_type='textctrl')
+        self.on_change(modules.interface.controls.IDS[event.GetId()], text_ctrl.GetValue().encode('utf-8'), item_type='textctrl')
         event.Skip()
 
     def on_spinctrl(self, event):
         spin_ctrl = event.EventObject
-        self.on_change(IDS[event.GetId()], spin_ctrl.GetValue(), item_type='spinctrl')
+        self.on_change(modules.interface.controls.IDS[event.GetId()], spin_ctrl.GetValue(), item_type='spinctrl')
         event.Skip()
 
     def on_sliderctrl(self, event):
         ctrl = event.EventObject
-        self.on_change(IDS[event.GetId()], ctrl.GetValue(), item_type='sliderctrl')
+        self.on_change(modules.interface.controls.IDS[event.GetId()], ctrl.GetValue(), item_type='sliderctrl')
         event.Skip()
 
     def on_dropdown(self, event):
         drop_ctrl = event.EventObject
-        self.on_change(IDS[event.GetId()], drop_ctrl.GetString(drop_ctrl.GetCurrentSelection()),
+        self.on_change(modules.interface.controls.IDS[event.GetId()], drop_ctrl.GetString(drop_ctrl.GetCurrentSelection()),
                        item_type='dropctrl')
         event.Skip()
 
     def on_check_change(self, event):
         check_ctrl = event.EventObject
-        self.on_change(IDS[event.GetId()], check_ctrl.IsChecked(), item_type='checkbox')
+        self.on_change(modules.interface.controls.IDS[event.GetId()], check_ctrl.IsChecked(), item_type='checkbox')
         event.Skip()
 
     def on_list_operation(self, key, action):
-        list_box = wx.FindWindowById(get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
+        list_box = wx.FindWindowById(modules.interface.controls.get_id_from_name(MODULE_KEY.join([key, 'list_box'])))
         if action == 'list_add':
             list_input_value = wx.FindWindowById(
-                get_id_from_name(MODULE_KEY.join([key, 'list_input']))).GetValue().strip()
+                modules.interface.controls.get_id_from_name(MODULE_KEY.join([key, 'list_input']))).GetValue().strip()
 
             row_count = list_box.GetNumberRows()
             row_values = [list_box.GetCellValue(f_row, 0).lower() for f_row in range(0, row_count)]
@@ -493,7 +349,7 @@ class SettingsWindow(wx.Frame):
                 list_box.AppendRows(1)
                 list_box.SetCellValue(row_count, 0, list_input_value)
 
-            list_input2_id = get_id_from_name(MODULE_KEY.join([key, 'list_input2']))
+            list_input2_id = modules.interface.controls.get_id_from_name(MODULE_KEY.join([key, 'list_input2']))
             if list_input2_id:
                 list_input2_value = wx.FindWindowById(list_input2_id).GetValue().strip()
                 row_values = [list_box.GetCellValue(f_row, 1).lower() for f_row in range(0, row_count)]
@@ -551,7 +407,7 @@ class SettingsWindow(wx.Frame):
 
         image_list = wx.ImageList(16, 16)
 
-        tree_ctrl_id = id_renew('settings.tree', update=True)
+        tree_ctrl_id = modules.interface.functions.id_renew('settings.tree', update=True)
         tree_ctrl = wx.TreeCtrl(self, id=tree_ctrl_id, style=style)
         root_key = MODULE_KEY.join(['settings', 'tree', 'root'])
         root_node = tree_ctrl.AddRoot(translate_key(root_key))
@@ -585,7 +441,7 @@ class SettingsWindow(wx.Frame):
 
         self.main_grid.Add(tree_ctrl, 7, wx.EXPAND | wx.ALL, 7)
 
-        content_page_id = id_renew(MODULE_KEY.join(['settings', 'content']))
+        content_page_id = modules.interface.functions.id_renew(MODULE_KEY.join(['settings', 'content']))
         self.content_page = wx.Panel(self, id=content_page_id)
         self.main_grid.Add(self.content_page, 15, wx.EXPAND)
 
@@ -653,7 +509,7 @@ class SettingsWindow(wx.Frame):
         self.create_page_buttons(sizer=page_sizer, panel=panel)
 
     def create_page_items(self, page_sizer, panel, config, gui, key):
-        page_sc_window = wx.ScrolledWindow(panel, id=id_renew(gui), style=wx.VSCROLL)
+        page_sc_window = wx.ScrolledWindow(panel, id=modules.interface.functions.id_renew(gui), style=wx.VSCROLL)
         page_sc_window.SetScrollbars(5, 5, 10, 10)
         sizer = wx.BoxSizer(wx.VERTICAL)
         joined_keys = MODULE_KEY.join(key)
@@ -678,12 +534,13 @@ class SettingsWindow(wx.Frame):
                 continue
 
             view = gui.get(section_key, {}).get('view', type(section_items))
-            if view in self.function_map.keys():
-                data = self.function_map[view]
+            if view in self.groups.keys():
+                data = self.groups[view]
                 gui_settings = gui.get(section_key, {}).copy()
                 item_keys = key + [section_key]
                 sizer_item = data['function'](
-                    panel=page_sc_window, item=section_key, value=section_items, bind=data['bind'],
+                    source_class=self, panel=page_sc_window, item=section_key,
+                    value=section_items, bind=data['bind'],
                     gui=gui_settings, key=item_keys, from_sb=False)
                 if joined_keys in self.redraw_map.keys():
                     if section_key in self.redraw_map[joined_keys]:
@@ -702,372 +559,21 @@ class SettingsWindow(wx.Frame):
     def create_page_buttons(self, sizer, panel):
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         button_sizer.Add(
-            self.create_button(
-                panel=panel, key=['settings', 'ok_button'],
+            modules.interface.functions.create_button(
+                self, panel=panel, key=['settings', 'ok_button'],
                 bind=self.button_clicked, multiple=True)['item'],
             0, wx.ALIGN_RIGHT)
         button_sizer.Add(
-            self.create_button(
-                panel=panel, key=['settings', 'apply_button'],
+            modules.interface.functions.create_button(
+                self, panel=panel, key=['settings', 'apply_button'],
                 bind=self.button_clicked, enabled=False, multiple=True)['item'],
             0, wx.ALIGN_RIGHT)
         button_sizer.Add(
-            self.create_button(
-                panel=panel, key=['settings', 'cancel_button'],
+            modules.interface.functions.create_button(
+                self, panel=panel, key=['settings', 'cancel_button'],
                 bind=self.button_clicked, multiple=True)['item'],
             0, wx.ALIGN_RIGHT)
         sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 4)
-
-    def create_button(self, **kwargs):
-        panel = kwargs.get('panel')
-        key = kwargs.get('key')
-        value = kwargs.get('value')
-        bind = kwargs.get('bind')
-        enabled = kwargs.get('enabled', True)
-        multiple = kwargs.get('multiple')
-
-        item_sizer = wx.BoxSizer(wx.VERTICAL)
-        item_name = MODULE_KEY.join(key)
-        button_id = id_renew(item_name, update=True, multiple=multiple)
-        c_button = wx.Button(panel, id=button_id, label=translate_key(item_name))
-        if not enabled:
-            c_button.Disable()
-
-        if item_name in self.buttons:
-            self.buttons[item_name].append(c_button)
-        else:
-            self.buttons[item_name] = [c_button]
-
-        if value:
-            c_button.Bind(wx.EVT_BUTTON, value, id=button_id)
-        else:
-            c_button.Bind(wx.EVT_BUTTON, bind, id=button_id)
-
-        item_sizer.Add(c_button)
-        return {'item': item_sizer}
-
-    def create_static_box(self, **kwargs):
-        panel = kwargs.get('panel')
-        item_value = kwargs.get('value')
-        gui = kwargs.get('gui')
-        key = kwargs.get('key')
-
-        static_box = wx.StaticBox(panel, label=translate_key(MODULE_KEY.join(key)))
-        static_sizer = wx.StaticBoxSizer(static_box, wx.VERTICAL)
-        instatic_sizer = wx.BoxSizer(wx.VERTICAL)
-        spacer_size = 7
-
-        max_text_size = 0
-        text_ctrls = []
-        log.debug("Working on {0}".format(MODULE_KEY.join(key)))
-        spacer = False
-        hidden_items = gui.get('hidden', [])
-
-        for item, value in item_value.items():
-            if item in hidden_items and not self.show_hidden:
-                continue
-            view = gui.get(item, {}).get('view', type(value))
-            if view in self.value_map.keys():
-                fnction = self.value_map[view]
-            elif callable(value):
-                fnction = self.value_map['button']
-            else:
-                raise GuiCreationError('Unable to create item, bad value map')
-            item_dict = fnction['function'](panel=static_box, item=item, value=value, key=key + [item],
-                                            bind=fnction['bind'], gui=gui.get(item, {}), from_sb=True)
-            if 'text_size' in item_dict:
-                if max_text_size < item_dict.get('text_size'):
-                    max_text_size = item_dict['text_size']
-
-                text_ctrls.append(item_dict['text_ctrl'])
-            spacer = True if not spacer else instatic_sizer.AddSpacer(spacer_size)
-            instatic_sizer.Add(item_dict['item'], 0, wx.EXPAND, 5)
-
-        if max_text_size:
-            for ctrl in text_ctrls:
-                ctrl.SetMinSize((max_text_size + 50, ctrl.GetSize()[1]))
-
-        item_count = instatic_sizer.GetItemCount()
-        if not item_count:
-            static_sizer.Destroy()
-            return wx.BoxSizer(wx.VERTICAL)
-
-        static_sizer.Add(instatic_sizer, 0, wx.EXPAND | wx.ALL, 5)
-        return static_sizer
-
-    @staticmethod
-    def create_checkbox(**kwargs):
-        panel = kwargs.get('panel')
-        value = kwargs.get('value')
-        key = kwargs.get('key')
-        bind = kwargs.get('bind')
-
-        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        style = wx.ALIGN_CENTER_VERTICAL
-        item_key = MODULE_KEY.join(key)
-        item_box = wx.CheckBox(panel, id=id_renew(item_key, update=True),
-                               label=translate_key(item_key), style=style)
-        item_box.SetValue(value)
-        item_box.Bind(wx.EVT_CHECKBOX, bind)
-        item_sizer.Add(item_box, 0, wx.ALIGN_LEFT)
-        return {'item': item_sizer}
-
-    @staticmethod
-    def create_textctrl(**kwargs):
-        panel = kwargs.get('panel')
-        value = kwargs.get('value')
-        key = kwargs.get('key')
-        bind = kwargs.get('bind')
-
-        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        item_name = MODULE_KEY.join(key)
-        item_box = wx.TextCtrl(panel, id=id_renew(item_name, update=True),
-                               value=unicode(value))
-        item_box.Bind(wx.EVT_TEXT, bind)
-        item_text = wx.StaticText(panel, label=translate_key(item_name))
-        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
-        item_sizer.Add(item_box)
-        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
-
-    @staticmethod
-    def create_spin(**kwargs):
-        panel = kwargs.get('panel')
-        value = kwargs.get('value')
-        key = kwargs.get('key')
-        bind = kwargs.get('bind')
-        gui = kwargs.get('gui')
-
-        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        item_name = MODULE_KEY.join(key)
-        style = wx.ALIGN_LEFT
-        item_box = wx.SpinCtrl(panel, id=id_renew(item_name, update=True), min=gui['min'], max=gui['max'],
-                               initial=int(value), style=style)
-        item_text = wx.StaticText(panel, label=translate_key(item_name))
-        item_box.Bind(wx.EVT_SPINCTRL, bind)
-        item_box.Bind(wx.EVT_TEXT, bind)
-        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
-        item_sizer.Add(item_box)
-        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
-
-    @staticmethod
-    def create_list(**kwargs):
-        panel = kwargs.get('panel')
-        value = kwargs.get('value')
-        key = kwargs.get('key')
-        bind = kwargs.get('bind')
-        gui = kwargs.get('gui')
-        from_sb = kwargs.get('from_sb')
-
-        view = gui.get('view')
-        is_dual = True if 'dual' in view else False
-        style = wx.ALIGN_CENTER_VERTICAL
-        border_sizer = wx.BoxSizer(wx.VERTICAL)
-        item_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        static_label = MODULE_KEY.join(key)
-        static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
-        item_sizer.Add(static_text)
-
-        addable_sizer = wx.BoxSizer(wx.HORIZONTAL) if gui.get('addable') else None
-        if addable_sizer:
-            item_input_key = MODULE_KEY.join(key + ['list_input'])
-            addable_sizer.Add(wx.TextCtrl(panel, id=id_renew(item_input_key, update=True)), 0, style)
-            if is_dual:
-                item_input2_key = MODULE_KEY.join(key + ['list_input2'])
-                addable_sizer.Add(wx.TextCtrl(panel, id=id_renew(item_input2_key, update=True)), 0, style)
-
-            item_apply_key = MODULE_KEY.join(key + ['list_add'])
-            item_apply_id = id_renew(item_apply_key, update=True)
-            item_apply = wx.Button(panel, id=item_apply_id, label=translate_key(item_apply_key))
-            addable_sizer.Add(item_apply, 0, style)
-            item_apply.Bind(wx.EVT_BUTTON, bind['add'], id=item_apply_id)
-
-            item_remove_key = MODULE_KEY.join(key + ['list_remove'])
-            item_remove_id = id_renew(item_remove_key, update=True)
-            item_remove = wx.Button(panel, id=item_remove_id, label=translate_key(item_remove_key))
-            addable_sizer.Add(item_remove, 0, style)
-            item_remove.Bind(wx.EVT_BUTTON, bind['remove'], id=item_remove_id)
-
-            item_sizer.Add(addable_sizer, 0, wx.EXPAND)
-
-        list_box = wx.grid.Grid(panel, id=id_renew(MODULE_KEY.join(key + ['list_box']), update=True))
-        list_box.CreateGrid(0, 2 if is_dual else 1)
-        list_box.DisableDragColSize()
-        list_box.DisableDragRowSize()
-        list_box.Bind(wx.grid.EVT_GRID_SELECT_CELL, bind['select'])
-
-        if is_dual:
-            for index, (item, item_value) in enumerate(value.items()):
-                list_box.AppendRows(1)
-                list_box.SetCellValue(index, 0, item)
-                list_box.SetCellValue(index, 1, item_value)
-        else:
-            for index, item in enumerate(value):
-                list_box.AppendRows(1)
-                list_box.SetCellValue(index, 0, item)
-
-        list_box.SetColLabelSize(1)
-        list_box.SetRowLabelSize(1)
-
-        if addable_sizer:
-            col_size = addable_sizer.GetMinSize()[0] - 2
-            if is_dual:
-                first_col_size = list_box.GetColSize(0)
-                second_col_size = col_size - first_col_size if first_col_size < col_size else -1
-                list_box.SetColSize(1, second_col_size)
-            else:
-                list_box.SetDefaultColSize(col_size, resizeExistingCols=True)
-        else:
-            list_box.AutoSize()
-
-        item_sizer.Add(list_box)
-
-        border_sizer.Add(item_sizer, 0, wx.EXPAND | wx.ALL, 5)
-        if from_sb:
-            return {'item': border_sizer}
-        else:
-            return border_sizer
-
-    @staticmethod
-    def create_colour_picker(**kwargs):
-        panel = kwargs.get('panel')
-        value = kwargs.get('value')
-        key = kwargs.get('key')
-        bind = kwargs.get('bind')
-
-        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
-
-        item_name = MODULE_KEY.join(key)
-        colour_picker = CustomColourPickerCtrl()
-        item_box = colour_picker.create(panel, value=value, event=bind, key=key)
-
-        item_text = wx.StaticText(panel, label=translate_key(item_name))
-        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
-        item_sizer.Add(item_box, 1, wx.EXPAND)
-        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
-
-    @staticmethod
-    def create_choose(**kwargs):
-        panel = kwargs.get('panel')
-        item_list = kwargs.get('value')
-        key = kwargs.get('key')
-        bind = kwargs.get('bind')
-        gui = kwargs.get('gui')
-
-        view = gui.get('view')
-        is_single = True if 'single' in view else False
-        description = gui.get('description', False)
-        style = wx.LB_SINGLE if is_single else wx.LB_EXTENDED
-        border_sizer = wx.BoxSizer(wx.VERTICAL)
-        item_sizer = wx.BoxSizer(wx.VERTICAL)
-        list_items = []
-        translated_items = []
-
-        static_label = MODULE_KEY.join(key)
-        static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
-        item_sizer.Add(static_text)
-
-        if gui['check_type'] in ['dir', 'folder', 'files']:
-            check_type = gui['check_type']
-            keep_extension = gui['file_extension'] if 'file_extension' in gui else False
-            for item_in_list in os.listdir(os.path.join(PYTHON_FOLDER, gui['check'])):
-                item_path = os.path.join(PYTHON_FOLDER, gui['check'], item_in_list)
-                if check_type in ['dir', 'folder'] and os.path.isdir(item_path):
-                    list_items.append(item_in_list)
-                elif check_type == 'files' and os.path.isfile(item_path):
-                    if not keep_extension:
-                        item_in_list = ''.join(os.path.basename(item_path).split('.')[:-1])
-                    if '__init__' not in item_in_list:
-                        if item_in_list not in list_items:
-                            list_items.append(item_in_list)
-                            translated_items.append(translate_key(item_in_list))
-
-        item_key = MODULE_KEY.join(key + ['list_box'])
-        label_text = translate_key(item_key)
-        if label_text:
-            item_sizer.Add(wx.StaticText(panel, label=label_text, style=wx.ALIGN_RIGHT))
-        if is_single:
-            item_list_box = KeyListBox(panel, id=id_renew(item_key, update=True), keys=list_items,
-                                       choices=translated_items if translated_items else list_items, style=style)
-        else:
-            item_list_box = KeyCheckListBox(panel, id=id_renew(item_key, update=True), keys=list_items,
-                                            choices=translated_items if translated_items else list_items)
-            item_list_box.Bind(wx.EVT_CHECKLISTBOX, bind['check_change'])
-        item_list_box.Bind(wx.EVT_LISTBOX, bind['change'])
-
-        section_for = item_list if not is_single else {item_list: None}
-        if is_single:
-            item, value = section_for.items()[0]
-            if item not in item_list_box.GetItems():
-                if item_list_box.GetItems():
-                    item_list_box.SetSelection(0)
-            else:
-                item_list_box.SetSelection(list_items.index(item))
-        else:
-            check_items = [list_items.index(item) for item in section_for]
-            item_list_box.SetChecked(check_items)
-
-        if description:
-            adv_sizer = wx.BoxSizer(wx.HORIZONTAL)
-            adv_sizer.Add(item_list_box, 0, wx.EXPAND)
-
-            descr_key = MODULE_KEY.join(key + ['descr_explain'])
-            descr_text = wx.StaticText(panel, id=id_renew(descr_key, update=True),
-                                       label=translate_key(descr_key), style=wx.ST_NO_AUTORESIZE)
-            adv_sizer.Add(descr_text, 0, wx.EXPAND | wx.LEFT, 10)
-
-            sizes = descr_text.GetSize()
-            sizes[0] -= 20
-            descr_text.SetMinSize(sizes)
-            descr_text.Fit()
-            item_sizer.Add(adv_sizer)
-        else:
-            item_sizer.Add(item_list_box)
-        border_sizer.Add(item_sizer, 0, wx.EXPAND | wx.ALL, 5)
-        return border_sizer
-
-    @staticmethod
-    def create_dropdown(**kwargs):
-        panel = kwargs.get('panel')
-        value = kwargs.get('value')
-        key = kwargs.get('key')
-        bind = kwargs.get('bind')
-        gui = kwargs.get('gui')
-
-        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        choices = gui.get('choices', [])
-        item_name = MODULE_KEY.join(key)
-        item_text = wx.StaticText(panel, label=translate_key(item_name))
-        item_box = KeyChoice(panel, id=id_renew(item_name, update=True),
-                             keys=choices, choices=choices)
-        item_box.Bind(wx.EVT_CHOICE, bind)
-        item_box.SetSelection(choices.index(value))
-        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
-        item_sizer.Add(item_box)
-        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
-
-    @staticmethod
-    def create_slider(**kwargs):
-        panel = kwargs.get('panel')
-        value = kwargs.get('value')
-        key = kwargs.get('key')
-        bind = kwargs.get('bind')
-        gui = kwargs.get('gui')
-
-        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        item_name = MODULE_KEY.join(key)
-        style = wx.SL_VALUE_LABEL | wx.SL_AUTOTICKS
-        item_box = wx.Slider(panel, id=id_renew(item_name, update=True),
-                             minValue=gui['min'], maxValue=gui['max'],
-                             value=int(value), style=style)
-        freq = (gui['max'] - gui['min'])/5
-        item_box.SetTickFreq(freq)
-        item_box.SetLineSize(4)
-        item_box.Bind(wx.EVT_SCROLL, bind)
-        item_text = wx.StaticText(panel, label=translate_key(item_name))
-        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
-        item_sizer.Add(item_box, 1, wx.EXPAND)
-        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
     def redraw_item(self, redraw_keys, redraw_value):
         sizer = redraw_keys['item']
@@ -1112,9 +618,9 @@ class SettingsWindow(wx.Frame):
             sizer.Remove(index)
 
     def button_clicked(self, event):
-        log.debug("[Settings] Button clicked: {0}".format(IDS[event.GetId()]))
+        log.debug("[Settings] Button clicked: {0}".format(modules.interface.controls.IDS[event.GetId()]))
         button_id = event.GetId()
-        keys = IDS[button_id].split(MODULE_KEY)
+        keys = modules.interface.controls.IDS[button_id].split(MODULE_KEY)
         last_key = keys[-1]
         if last_key in ['list_add', 'list_remove']:
             self.on_list_operation(MODULE_KEY.join(keys[:-1]), action=last_key)
@@ -1417,10 +923,10 @@ class ChatGui(wx.Frame):
         event.Skip()
 
     def on_settings(self, event):
-        log.debug("Got event from {0}".format(IDS[event.GetId()]))
-        module_groups = IDS[event.GetId()].split(MODULE_KEY)
+        log.debug("Got event from {0}".format(modules.interface.controls.IDS[event.GetId()]))
+        module_groups = modules.interface.controls.IDS[event.GetId()].split(MODULE_KEY)
         settings_category = MODULE_KEY.join(module_groups[1:-1])
-        settings_menu_id = id_renew(settings_category, update=True)
+        settings_menu_id = modules.interface.functions.id_renew(settings_category, update=True)
         if self.settings_window:
             self.settings_window.SetFocus()
         else:
@@ -1434,13 +940,13 @@ class ChatGui(wx.Frame):
     @staticmethod
     def button_clicked(event):
         button_id = event.GetId()
-        keys = IDS[event.GetId()].split(MODULE_KEY)
+        keys = modules.interface.controls.IDS[event.GetId()].split(MODULE_KEY)
         log.debug("[ChatGui] Button clicked: {0}, {1}".format(keys, button_id))
         event.Skip()
 
     def on_toolbar_button(self, event):
         button_id = event.GetId()
-        list_keys = IDS[event.GetId()].split(MODULE_KEY)
+        list_keys = modules.interface.controls.IDS[event.GetId()].split(MODULE_KEY)
         log.debug("[ChatGui] Toolbar clicked: {0}, {1}".format(list_keys, button_id))
         if list_keys[0] in self.loaded_modules:
             self.loaded_modules[list_keys[0]]['class'].gui_button_press(self, event, list_keys)
