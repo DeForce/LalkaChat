@@ -121,7 +121,12 @@ class TwitchMessageHandler(threading.Thread):
             # Fix some of the names
             badge_tag = badge_tag.replace('moderator', 'mod')
 
-            if badge_tag in self.badges:
+            if badge_tag in self.custom_badges:
+                badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
+                url = badge_info.get('image_url_4x',
+                                     badge_info.get('image_url_2x',
+                                                    badge_info.get('image_url_1x')))
+            elif badge_tag in self.badges:
                 badge_info = self.badges.get(badge_tag)
                 if 'svg' in badge_info:
                     url = badge_info.get('svg')
@@ -129,9 +134,6 @@ class TwitchMessageHandler(threading.Thread):
                     url = badge_info.get('image')
                 else:
                     url = 'none'
-            elif badge_tag in self.custom_badges:
-                badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
-                url = badge_info.get('image_url_4x')
             else:
                 url = NOT_FOUND
             message.badges.append(Badge(badge_tag, url))
@@ -208,7 +210,7 @@ class TwitchMessageHandler(threading.Thread):
 
     def _handle_viewer_color(self, message, value):
         if self.irc_class.chat_module.conf_params()['config']['config']['show_nickname_colors']:
-            message.nick_color = value
+            message.nick_colour = value
 
     @staticmethod
     def _handle_bits(message, amount):
@@ -422,6 +424,7 @@ class TWThread(threading.Thread):
         self.kwargs = kwargs
         self.chat_module = kwargs.get('chat_module')
         self.display_name = None
+        self.channel_id = None
         self.irc = None
 
         if bttv_smiles:
@@ -471,6 +474,7 @@ class TWThread(threading.Thread):
                 log.info("Channel found, continuing")
                 data = request.json()
                 self.display_name = data['display_name']
+                self.channel_id = data['_id']
             elif request.status_code == 404:
                 raise TwitchUserError
             else:
@@ -520,6 +524,19 @@ class TWThread(threading.Thread):
             request = requests.get("https://badges.twitch.tv/v1/badges/global/display")
             if request.status_code == 200:
                 self.kwargs['custom_badges'] = request.json()['badge_sets']
+            else:
+                raise Exception("Not successful status code: {0}".format(request.status_code))
+        except Exception as exc:
+            log.warning("Unable to get twitch undocumented api badges, error {0}\n"
+                        "Args: {1}".format(exc.message, exc.args))
+
+        try:
+            # Warning, undocumented, can change a LOT
+            # Getting CUSTOM twitch badges
+            badges_url = "https://badges.twitch.tv/v1/badges/channels/{0}/display"
+            request = requests.get(badges_url.format(self.channel_id))
+            if request.status_code == 200:
+                self.kwargs['custom_badges'].update(request.json()['badge_sets'])
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:

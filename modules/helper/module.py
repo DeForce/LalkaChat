@@ -15,7 +15,7 @@ BASE_DICT = {
 
 CHAT_DICT = OrderedDict()
 CHAT_DICT['config'] = OrderedDict()
-CHAT_DICT['config']['show_channel_names'] = True
+CHAT_DICT['config']['show_channel_names'] = False
 CHAT_DICT['config']['channels_list'] = []
 
 CHAT_GUI = {

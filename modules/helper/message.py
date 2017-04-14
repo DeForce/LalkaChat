@@ -105,7 +105,7 @@ class RemoveMessageByID(CommandMessage):
         else:
             CommandMessage.__init__(self, command='replace_by_user')
         self._message_ids = message_id if isinstance(message_id, list) else [message_id]
-        self._jsonable += ['user']
+        self._jsonable += ['message_ids']
 
     @property
     def message_ids(self):
