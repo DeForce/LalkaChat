@@ -1,19 +1,19 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import os
-import imp
 import Queue
-from time import sleep
-import messaging
+import imp
 import logging
 import logging.config
-import semantic_version
+import os
 from collections import OrderedDict
+from time import sleep
+import semantic_version
+import messaging
+from modules.helper.module import BaseModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
     LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException
-from modules.helper.module import BaseModule
 
 VERSION = '0.3.6'
 SEM_VERSION = semantic_version.Version(VERSION)
@@ -206,7 +206,7 @@ def init():
     log.info('LalkaChat loaded successfully')
 
     if gui_settings['gui']:
-        import gui
+        from modules import gui
         log.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,
                                main_config=loaded_modules['main'],

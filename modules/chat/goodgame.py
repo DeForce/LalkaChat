@@ -1,23 +1,24 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
+import Queue
 import json
+import logging
+import os
 import random
+import re
 import string
 import threading
-import os
-import requests
-import Queue
-import re
-import logging
 import time
 from collections import OrderedDict
 
-from modules.helper.message import TextMessage, SystemMessage, Emote, RemoveMessageByID
-from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
-from modules.helper.module import ChatModule
+import requests
 from ws4py.client.threadedclient import WebSocketClient
-from gui import MODULE_KEY
+
+from modules.gui import MODULE_KEY
+from modules.helper.message import TextMessage, SystemMessage, Emote, RemoveMessageByID
+from modules.helper.module import ChatModule
+from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('goodgame')
