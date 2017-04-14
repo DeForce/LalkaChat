@@ -15,16 +15,17 @@ from collections import OrderedDict
 from cherrypy.lib.static import serve_file
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
+
+from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByID
 from modules.helper.parser import save_settings
-from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER, remove_message_by_id
+from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER
 from modules.helper.module import MessagingModule
 from gui import MODULE_KEY
 
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 DEFAULT_STYLE = 'default'
 DEFAULT_PRIORITY = 9001
-HISTORY_SIZE = 20
-HISTORY_TYPES = ['system_message', 'message']
+HISTORY_SIZE = 5
 HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
 log = logging.getLogger('webchat')
@@ -46,8 +47,21 @@ CONF_DICT['style'] = DEFAULT_STYLE
 CONF_DICT['style_settings'] = OrderedDict()
 CONF_DICT['style_settings']['show_system_msg'] = True
 
+TYPE_DICT = {
+    TextMessage: 'message',
+    CommandMessage: 'command'
+}
 
-def prepare_message(msg, style_settings):
+
+def process_emotes(emotes):
+    return [{'emote_id': emote.id, 'emote_url': emote.url} for emote in emotes]
+
+
+def process_badges(badges):
+    return [{'badge': badge.id, 'url': badge.url} for badge in badges]
+
+
+def prepare_message(msg, style_settings, msg_class):
     message = copy.deepcopy(msg)
 
     if 'levels' in message:
@@ -56,12 +70,34 @@ def prepare_message(msg, style_settings):
     if 'text' in message and message['text'] == REMOVED_TRIGGER:
         message['text'] = style_settings.get('remove_text')
 
+    if 'type' not in message:
+        for m_class, m_type in TYPE_DICT.items():
+            if issubclass(msg_class, m_class):
+                message['type'] = m_type
+
+    if 'emotes' in message:
+        message['emotes'] = process_emotes(message['emotes'])
+
+    if 'badges' in message:
+        message['badges'] = process_badges(message['badges'])
+
     if 'command' in message:
         if message['command'].startswith('replace'):
             message['text'] = style_settings['keys']['remove_text']
+        return message
 
     message['id'] = str(message['id'])
     return message
+
+
+def add_to_history(message):
+    if isinstance(message, TextMessage):
+        cherrypy.engine.publish('add-history', message)
+
+
+def process_command(message):
+    if isinstance(message, CommandMessage):
+        cherrypy.engine.publish('process-command', message.command, message)
 
 
 class MessagingThread(threading.Thread):
@@ -75,18 +111,16 @@ class MessagingThread(threading.Thread):
         while self.running:
             message = s_queue.get()
 
-            if 'timestamp' not in message:
-                message['timestamp'] = datetime.datetime.now().isoformat()
+            if isinstance(message, dict):
+                raise Exception("Got dict message {}".format(message))
 
-            if message['type'] in HISTORY_TYPES:
-                cherrypy.engine.publish('add-history', message)
-            elif message['type'] == 'command':
-                cherrypy.engine.publish('process-command', message['command'], message)
+            add_to_history(message)
+            process_command(message)
 
-            if message['type'] == 'system_message' and not self.settings['chat']['keys'].get('show_system_msg', True):
+            if isinstance(message, SystemMessage) and not self.settings['chat']['keys'].get('show_system_msg', True):
                 continue
 
-            log.debug("%s", message)
+            log.debug("%s", message.json())
             self.send_message(message, 'chat')
             self.send_message(message, 'gui')
         log.info("Messaging thread stopping")
@@ -95,12 +129,13 @@ class MessagingThread(threading.Thread):
         self.running = False
 
     def send_message(self, message, chat_type):
-        send_message = prepare_message(message, self.settings[chat_type])
+        send_message = prepare_message(message.json(), self.settings[chat_type], type(message))
         ws_list = cherrypy.engine.publish('get-clients', chat_type)[0]
         for ws in ws_list:
             try:
                 ws.send(json.dumps(send_message))
-            except:
+            except Exception as exc:
+                log.exception(exc)
                 log.info(send_message)
 
 
@@ -116,19 +151,16 @@ class FireFirstMessages(threading.Thread):
         show_system_msg = self.settings['keys'].get('show_system_msg', True)
         if self.ws.stream:
             for item in self.history:
-                if item['type'] == 'system_message' and not show_system_msg:
+                if isinstance(item, SystemMessage) and not show_system_msg:
                     continue
-                try:
-                    timestamp = datetime.datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S.%f")
-                except:
-                    timestamp = datetime.datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S")
+                timestamp = datetime.datetime.strptime(item.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
                 timedelta = datetime.datetime.now() - timestamp
                 timer = int(self.settings['keys'].get('timer', 0))
                 if timer > 0:
                     if timedelta > datetime.timedelta(seconds=timer):
                         continue
 
-                message = prepare_message(item, self.settings)
+                message = prepare_message(item.json(), self.settings, type(item))
                 self.ws.send(json.dumps(message))
 
 
@@ -220,7 +252,7 @@ class WebChatPlugin(WebSocketPlugin):
             return
 
         for index, item in enumerate(self.history):
-            if str(item['id']) == msg_id[0]:
+            if str(item.id) == msg_id[0]:
                 self.history.pop(index)
 
     def get_settings(self, style_type):
@@ -231,13 +263,13 @@ class WebChatPlugin(WebSocketPlugin):
 
     def process_command(self, command, values):
         if command == 'remove_by_id':
-            self._remove_by_id(values['ids'])
+            self._remove_by_id(values.message_ids)
         elif command == 'remove_by_user':
-            self._remove_by_user(values['user'])
+            self._remove_by_user(values.user)
         elif command == 'replace_by_id':
-            self._replace_by_id(values['ids'])
+            self._replace_by_id(values.message_ids)
         elif command == 'replace_by_user':
-            self._replace_by_user(values['user'])
+            self._replace_by_user(values.user)
 
     def _remove_by_id(self, ids):
         for item in ids:
@@ -248,7 +280,7 @@ class WebChatPlugin(WebSocketPlugin):
     def _remove_by_user(self, users):
         for item in users:
             for message in reversed(self.history):
-                if message.get('item') == item:
+                if message.user == item:
                     self.history.remove(message)
 
     def _replace_by_id(self, ids):
@@ -493,6 +525,7 @@ class webchat(MessagingModule):
                 }
             }})
         self.prepare_style_settings()
+        self.style_settings = self._conf_params['style_settings']
 
         self.s_thread = None
         self.queue = None
@@ -538,7 +571,7 @@ class webchat(MessagingModule):
         return None
 
     def reload_chat(self):
-        self.queue.put({'type': 'command', 'command': 'reload'})
+        self.queue.put(CommandMessage('reload'))
 
     def apply_settings(self, **kwargs):
         save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections', ()))
@@ -581,25 +614,28 @@ class webchat(MessagingModule):
             self.reload_chat()
         event.Skip()
 
-    def process_message(self, message, queue, **kwargs):
-        if message:
-            if 'flags' in message:
-                if 'hidden' in message['flags']:
-                    return message
+    def process_message(self, message, **kwargs):
+        if not hasattr(message, 'hidden'):
             s_queue.put(message)
-            return message
+        return message
 
     def rest_get_style_settings(self, *args):
         return json.dumps(self._conf_params['style_settings'][args[0][0]]['keys'])
 
-    @staticmethod
-    def rest_get_history(*args, **kwargs):
-        return json.dumps(cherrypy.engine.publish('get-history')[0])
+    def rest_get_history(self, *args, **kwargs):
+        return json.dumps(
+            [prepare_message(
+                message.json(),
+                self.style_settings['chat'],
+                type(message))
+                for message in cherrypy.engine.publish('get-history')[0]]
+        )
 
     @staticmethod
     def rest_delete_history(path, **kwargs):
         cherrypy.engine.publish('del-history', path)
-        cherrypy.engine.publish('websocket-broadcast', json.dumps(remove_message_by_id(list(path))))
+        cherrypy.engine.publish('websocket-broadcast',
+                                RemoveMessageByID(list(path)).json())
 
     def get_style_from_file(self, style_name):
         file_path = os.path.join(self.get_style_path(style_name), 'settings.json')

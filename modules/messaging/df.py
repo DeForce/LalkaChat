@@ -5,8 +5,8 @@ import re
 import os
 from collections import OrderedDict
 
+from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
-from modules.helper.system import IGNORED_TYPES
 
 CONF_DICT = OrderedDict()
 CONF_DICT['gui_information'] = {'category': 'messaging'}
@@ -50,13 +50,12 @@ class df(MessagingModule):
         with open(self.file, 'a') as a_file:
             a_file.write("{0},{1}\n".format(user, role))
 
-    def process_message(self, message, queue, **kwargs):
-        if message:
-            if message['type'] in IGNORED_TYPES:
-                return message
-            for role, regexp in self._conf_params['config']['prof'].iteritems():
-                if re.search('{0}{1}'.format(self._conf_params['config']['grep']['symbol'], regexp).decode('utf-8'),
-                             message['text']):
-                    self.write_to_file(message['user'], role.capitalize())
-                    break
-            return message
+    @process_text_messages
+    @ignore_system_messages
+    def process_message(self, message, **kwargs):
+        for role, regexp in self._conf_params['config']['prof'].iteritems():
+            if re.search('{0}{1}'.format(self._conf_params['config']['grep']['symbol'], regexp).decode('utf-8'),
+                         message.text):
+                self.write_to_file(message.user, role.capitalize())
+                break
+        return message

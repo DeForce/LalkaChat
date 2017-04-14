@@ -4,6 +4,7 @@ import os
 from collections import OrderedDict
 
 from modules.helper import parser
+from modules.helper.message import TextMessage, Message
 from parser import save_settings, load_from_config_file
 from system import RestApiException, CONF_FOLDER
 
@@ -130,7 +131,16 @@ class MessagingModule(BaseModule):
     def __init__(self, *args, **kwargs):
         BaseModule.__init__(self, *args, **kwargs)
 
-    def process_message(self, message, queue, **kwargs):
+    def process_message(self, message, queue=None):
+        """
+
+        :param message: Received Message class
+        :type message: TextMessage
+        :param queue: Main queue
+        :type queue: Queue.Queue
+        :return: Message Class, could be None if message is "cleared"
+        :rtype: Message
+        """
         return message
 
 

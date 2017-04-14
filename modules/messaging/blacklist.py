@@ -3,8 +3,11 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import re
 from collections import OrderedDict
+
+import logging
+
+from modules.helper.message import ignore_system_messages, process_text_messages
 from modules.helper.module import MessagingModule
-from modules.helper.system import IGNORED_TYPES
 
 DEFAULT_PRIORITY = 30
 
@@ -17,6 +20,7 @@ CONF_DICT['users_hide'] = []
 CONF_DICT['users_block'] = []
 CONF_DICT['words_hide'] = []
 CONF_DICT['words_block'] = []
+log = logging.getLogger('blacklist')
 
 
 class blacklist(MessagingModule):
@@ -43,24 +47,26 @@ class blacklist(MessagingModule):
             'non_dynamic': ['main.*']
         }
 
-    def process_message(self, message, queue, **kwargs):
-        if message:
-            if message['type'] in IGNORED_TYPES:
-                return message
+    @process_text_messages
+    @ignore_system_messages
+    def process_message(self, message, **kwargs):
+        self._blocked(message)
+        if self._hidden(message):
+            message.hidden = True
+        return message
 
-            if message['user'].lower() in self._conf_params['config']['users_hide']:
-                return
+    def _hidden(self, message):
+        if message.user.lower() in self._conf_params['config']['users_hide']:
+            return True
 
-            for word in self._conf_params['config']['words_hide']:
-                if re.search(word, message['text'].encode('utf-8')):
-                    return
+        for word in self._conf_params['config']['words_hide']:
+            if re.search(word, message.text.encode('utf-8')):
+                return True
 
-            if message['user'].lower() in self._conf_params['config']['users_block']:
-                message['text'] = self._conf_params['config']['main']['message']
-                return message
+    def _blocked(self, message):
+        if message.user.lower() in self._conf_params['config']['users_block']:
+            message.text = self._conf_params['config']['main']['message']
 
-            for word in self._conf_params['config']['words_block']:
-                if re.search(word, message['text'].encode('utf-8')):
-                    message['text'] = self._conf_params['config']['main']['message']
-                    return message
-            return message
+        for word in self._conf_params['config']['words_block']:
+            if re.search(word, message.text.encode('utf-8')):
+                message.text = self._conf_params['config']['main']['message']

@@ -10,8 +10,10 @@ import os
 import logging
 from collections import OrderedDict
 from ws4py.client.threadedclient import WebSocketClient
+
+from modules.helper.message import TextMessage, SystemMessage, Emote
 from modules.helper.module import ChatModule
-from modules.helper.system import system_message, translate_key, EMOTE_FORMAT
+from modules.helper.system import translate_key, EMOTE_FORMAT
 from gui import MODULE_KEY
 
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -22,6 +24,7 @@ FILE_ICON = os.path.join('img', 'fs.png')
 SYSTEM_USER = 'Peka2.tv'
 SMILE_REGEXP = r':(\w+|\d+):'
 SMILE_FORMAT = ':{}:'
+API_URL = 'http://funstream.tv/api{}'
 
 PING_DELAY = 10
 
@@ -45,6 +48,65 @@ CONF_GUI = {
     'icon': FILE_ICON}
 
 
+class Peka2TVAPIError(Exception):
+    pass
+
+
+def get_channel_name(channel_name):
+    payload = {
+        'slug': channel_name
+    }
+    channel_req = requests.post(API_URL.format('/stream'), timeout=5, data=payload)
+    if channel_req.ok:
+        return channel_req.json()['owner']['name']
+    raise Peka2TVAPIError("Unable to get channel name")
+
+
+def allow_smile(smile, subscriptions, allow=False):
+    if smile['user']:
+        channel_id = smile['user']['id']
+        for sub in subscriptions:
+            if sub == channel_id:
+                allow = True
+    else:
+        allow = True
+    return allow
+
+
+class FsChatMessage(TextMessage):
+    def __init__(self, user, text, subscr):
+        self._user = user
+        self._text = text
+        self._subscriptions = subscr
+
+        TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+                             user=self.user, text=self.text)
+
+    def process_smiles(self, smiles):
+        smiles_array = re.findall(SMILE_REGEXP, self._text)
+        for smile in smiles_array:
+            for smile_find in smiles:
+                if smile_find['code'] == smile.lower():
+                    if allow_smile(smile_find, self._subscriptions):
+                        self._text = self._text.replace(SMILE_FORMAT.format(smile),
+                                                        EMOTE_FORMAT.format(smile))
+                        self._emotes.append(Emote(smile, smile_find['url']))
+
+    def process_pm(self, to_name, channel_name, show_pm):
+        self.text = u'@{},{}'.format(to_name, self.text)
+        if to_name == channel_name:
+            if show_pm:
+                self._pm = True
+
+
+class FsSystemMessage(SystemMessage):
+    def __init__(self, text, emotes=None, category='system'):
+        if emotes is None:
+            emotes = []
+        SystemMessage.__init__(self, text, source=SOURCE, source_icon=SOURCE_ICON,
+                               user=SYSTEM_USER, emotes=emotes, category=category)
+
+
 class FsChat(WebSocketClient):
     def __init__(self, ws, queue, channel_name, **kwargs):
         super(self.__class__, self).__init__(ws, protocols=kwargs.get('protocols', None))
@@ -52,8 +114,9 @@ class FsChat(WebSocketClient):
         self.source = SOURCE
         self.queue = queue
         self.channel_name = channel_name
+        self.glob = kwargs.get('glob')
         self.main_thread = kwargs.get('main_thread')  # type: FsThread
-        self.chat_module = kwargs.get('chat_module')
+        self.chat_module = kwargs.get('chat_module')  # type: sc2tv
         self.crit_error = False
 
         self.channel_id = self.fs_get_id()
@@ -79,36 +142,22 @@ class FsChat(WebSocketClient):
         :param code: 
         :param reason: 
         """
-        self.chat_module.set_offline(self.channel_name)
+        self.chat_module.set_offline(self.glob)
         if code in [4000, 4001]:
             self.crit_error = True
             self.fs_system_message(translate_key(
-                MODULE_KEY.join(['sc2tv', 'connection_closed'])).format(self.channel_name),
+                MODULE_KEY.join(['sc2tv', 'connection_closed'])).format(self.glob),
                                 category='connection')
         else:
             log.info("Websocket Connection Closed Down")
             self.fs_system_message(
-                translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])).format(self.channel_name),
+                translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])).format(self.glob),
                 category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
     def fs_system_message(self, message, category='system'):
-        system_message(message, self.queue, source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
-
-    @staticmethod
-    def allow_smile(smile, subscriptions):
-        allow = False
-
-        if smile['user']:
-            channel_id = smile['user']['id']
-            for sub in subscriptions:
-                if sub == channel_id:
-                    allow = True
-        else:
-            allow = True
-
-        return allow
+        self.queue.put(FsSystemMessage(message, category=category))
 
     def received_message(self, mes):
         if mes.data == '40':
@@ -132,7 +181,7 @@ class FsChat(WebSocketClient):
             'name': self.channel_name
         }
         try:
-            request = requests.post("http://funstream.tv/api/user", data=payload, timeout=5)
+            request = requests.post(API_URL.format("/user"), data=payload, timeout=5)
             if request.status_code == 200:
                 channel_id = json.loads(re.findall('{.*}', request.text)[0])['id']
                 return channel_id
@@ -140,10 +189,10 @@ class FsChat(WebSocketClient):
                 error_message = request.json()
                 if 'message' in error_message:
                     log.error("Unable to get channel ID. {0}".format(error_message['message']))
-                    self.closed(0, 'INV_CH_ID')
+                    self.closed(1000, 'INV_CH_ID')
                 else:
                     log.error("Unable to get channel ID. No message available")
-                    self.closed(0, 'INV_CH_ID')
+                    self.closed(1000, 'INV_CH_ID')
         except requests.ConnectionError:
             log.info("Unable to get information from api")
         return None
@@ -161,7 +210,7 @@ class FsChat(WebSocketClient):
             self.fs_send(payload)
 
             msg_joining = translate_key(MODULE_KEY.join(['sc2tv', 'joining']))
-            self.fs_system_message(msg_joining.format(self.channel_name), category='connection')
+            self.fs_system_message(msg_joining.format(self.glob), category='connection')
             log.info(msg_joining.format(self.channel_id))
 
     def fs_send(self, payload):
@@ -211,45 +260,28 @@ class FsChat(WebSocketClient):
         try:
             self.duplicates.index(message['id'])
         except ValueError:
-            comp = {'source': self.source,
-                    'source_icon': SOURCE_ICON,
-                    'user': message['from']['name'],
-                    'text': message['text'],
-                    'emotes': [],
-                    'type': 'message'}
-            if message['to'] is not None:
-                comp['to'] = message['to']['name']
-                if comp['to'] == self.channel_name:
-                    if self.chat_module.conf_params()['config']['config'].get('show_pm'):
-                        comp['pm'] = True
-            else:
-                comp['to'] = None
-
-            smiles_array = re.findall(SMILE_REGEXP, comp['text'])
-            for smile in smiles_array:
-                for smile_find in self.smiles:
-                    if smile_find['code'] == smile.lower():
-                        if self.allow_smile(smile_find, message['store']['subscriptions']):
-                            comp['text'] = comp['text'].replace(SMILE_FORMAT.format(smile),
-                                                                EMOTE_FORMAT.format(smile))
-                            comp['emotes'].append({'emote_id': smile, 'emote_url': smile_find['url']})
+            msg = FsChatMessage(message['from']['name'], message['text'], message['store']['subscriptions'])
+            msg.process_smiles(self.smiles)
+            if message['to']:
+                msg.process_pm(message['to'].get('name'), self.channel_name,
+                               self.chat_module.conf_params()['config']['config'].get('show_pm'))
 
             self.duplicates.append(message['id'])
             if len(self.duplicates) > self.bufferForDup:
                 self.duplicates.pop(0)
-            self._send_message(comp)
+            self._send_message(msg)
 
     def _process_joined(self):
-        self.chat_module.set_online(self.channel_name)
+        self.chat_module.set_online(self.glob)
         self.fs_system_message(
-            translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.channel_name), category='connection')
+            translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.glob), category='connection')
 
     def _process_channel_list(self, message):
-        self.chat_module.set_viewers(self.channel_name, message['result']['amount'])
+        self.chat_module.set_viewers(self.glob, message['result']['amount'])
 
     def _post_process_multiple_channels(self, message):
         if self.chat_module.conf_params()['config']['config']['show_channel_names']:
-            message['channel_name'] = self.channel_name
+            message.channel_name = self.glob
 
     def _send_message(self, comp):
         self._post_process_multiple_channels(comp)
@@ -279,7 +311,8 @@ class FsThread(threading.Thread):
         self.daemon = "True"
         self.queue = queue
         self.socket = socket
-        self.channel_name = channel_name
+        self.channel_name = get_channel_name(channel_name)
+        self.glob = channel_name
         self.chat_module = kwargs.get('chat_module')
         self.smiles = []
         self.ws = None
@@ -294,16 +327,9 @@ class FsThread(threading.Thread):
         while True:
             try_count += 1
             log.info("Connecting, try {0}".format(try_count))
-            if not self.smiles:
-                try:
-                    smiles = requests.post('http://funstream.tv/api/smile', timeout=5)
-                    if smiles.status_code == 200:
-                        smiles_answer = smiles.json()
-                        for smile in smiles_answer:
-                            self.smiles.append(smile)
-                except requests.ConnectionError:
-                    log.error("Unable to get smiles")
-            self.ws = FsChat(self.socket, self.queue, self.channel_name, protocols=['websocket'], smiles=self.smiles,
+            self._get_info()
+            self.ws = FsChat(self.socket, self.queue, self.channel_name, glob=self.glob,
+                             protocols=['websocket'], smiles=self.smiles,
                              main_thread=self, **self.kwargs)
             if self.ws.crit_error:
                 log.critical("Got critical error, halting")
@@ -317,6 +343,17 @@ class FsThread(threading.Thread):
     def stop(self):
         self.ws.send("11")
         self.ws.close(4000, reason="CLOSE_OK")
+
+    def _get_info(self):
+        if not self.smiles:
+            try:
+                smiles = requests.post(API_URL.format('/smile'), timeout=5)
+                if smiles.status_code == 200:
+                    smiles_answer = smiles.json()
+                    for smile in smiles_answer:
+                        self.smiles.append(smile)
+            except requests.ConnectionError:
+                log.error("Unable to get smiles")
 
 
 class Sc2tvMessage(object):
@@ -383,14 +420,14 @@ class sc2tv(ChatModule):
         request = ['/chat/channel/list', {'channel': 'stream/{0}'.format(str(ws.channel_id))}]
 
         try:
-            user_request = requests.post('http://funstream.tv/api/user', timeout=5, data=user_data)
+            user_request = requests.post(API_URL.format('/user'), timeout=5, data=user_data)
             if user_request.status_code == 200:
                 status_data['slug'] = user_request.json()['slug']
         except requests.ConnectionError:
             log.error("Unable to get smiles")
 
         try:
-            status_request = requests.post('http://funstream.tv/api/stream', timeout=5, data=status_data)
+            status_request = requests.post(API_URL.format('/stream'), timeout=5, data=status_data)
             if status_request.status_code == 200:
                 if status_request.json()['online']:
                     self.set_online(ws.channel_name)
