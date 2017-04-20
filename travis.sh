@@ -13,7 +13,8 @@ case "$TEST_SUITE" in
         ;;
     'eslint')
         docker pull markocelan/eslint
-        docker run -v "${TRAVIS_BUILD_DIR}/src":/src markocelan/eslint --color.
+        docker run -v "${TRAVIS_BUILD_DIR}/src/themes/default/config/.eslintrc.yml":/root/.eslintrc.yml \
+          -v "${TRAVIS_BUILD_DIR}/src/themes/default/":/src markocelan/eslint --color ./app/app.js
         exit $?
         ;;
     'scsslint')
