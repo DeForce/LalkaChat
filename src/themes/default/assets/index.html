@@ -34,7 +34,9 @@
                 </template>
 
                 <div class="username" :style="{color: message.nick_colour}">{{message.display_name || message.user}}</div>
-                <div>:</div>
+                <template v-if="message.me == false">
+                    <div>:</div>
+                </template>
                 <div class="text" v-html="sanitize(message)" :class="{ 'system': message.source === 'sy', 'private': message.pm, 'mention': message.mention }"></div>
             </div>
         </div>

@@ -5,7 +5,7 @@ from modules.helper.system import SOURCE, SOURCE_ICON, SOURCE_USER
 
 log = logging.getLogger('helper.message')
 
-AVAILABLE_COMMANDS = ['remove_by_user', 'remove_by_id', 'replace_by_user', 'replace_by_id']
+AVAILABLE_COMMANDS = ['remove_by_user', 'remove_by_id', 'replace_by_user', 'replace_by_id', 'reload']
 
 
 def _validate_command(command):
@@ -115,9 +115,13 @@ class RemoveMessageByID(CommandMessage):
 class TextMessage(Message):
     def __init__(self, source, source_icon, user, text,
                  emotes=None, badges=None, pm=False,
-                 nick_colour=None, mid=None):
+                 nick_colour=None, mid=None, me=False):
         """
             Text message used by main chat logic
+        :param badges: Badges to display
+        :param nick_colour: Nick colour
+        :param mid: Message ID
+        :param me: /me notation
         :param source: Chat source (gg/twitch/beampro etc.)
         :param source_icon: Chat icon (as url)
         :param user: nickname
@@ -134,13 +138,14 @@ class TextMessage(Message):
         self._emotes = [] if emotes is None else emotes
         self._badges = [] if badges is None else badges
         self._pm = pm
+        self._me = me
         self._nick_colour = nick_colour
         self._channel_name = None
         self._id = str(mid) if mid else str(uuid.uuid1())
 
         self._jsonable += ['user', 'text', 'emotes', 'badges',
                            'id', 'source', 'source_icon', 'pm',
-                           'nick_colour', 'channel_name']
+                           'nick_colour', 'channel_name', 'me']
 
     @property
     def source(self):
@@ -208,6 +213,14 @@ class TextMessage(Message):
     @property
     def id(self):
         return self._id
+
+    @property
+    def me(self):
+        return self._me
+
+    @me.setter
+    def me(self, value):
+        self._me = value
 
 
 class SystemMessage(TextMessage):

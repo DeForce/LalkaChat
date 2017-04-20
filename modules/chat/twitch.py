@@ -64,10 +64,10 @@ class TwitchNormalDisconnect(Exception):
 
 
 class TwitchTextMessage(TextMessage):
-    def __init__(self, user, text):
+    def __init__(self, user, text, me):
         self.bttv_emotes = {}
         TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
-                             user=user, text=text)
+                             user=user, text=text, me=me)
 
 
 class TwitchSystemMessage(SystemMessage):
@@ -109,8 +109,10 @@ class TwitchMessageHandler(threading.Thread):
         # Also, there is slight problem with some users, they don't have
         #  the display-name tag, so we have to check their "real" username
         #  and capitalize it because twitch does so, so we do the same.
-        if msg.type in ['pubmsg', 'action']:
+        if msg.type in ['pubmsg']:
             self._handle_message(msg)
+        elif msg.type in ['action']:
+            self._handle_message(msg, me=True)
         elif msg.type in ['clearchat']:
             self._handle_clearchat(msg)
         elif msg.type in ['usernotice']:
@@ -183,8 +185,8 @@ class TwitchMessageHandler(threading.Thread):
         if msg.arguments:
             self._handle_message(msg, sub_message=True)
 
-    def _handle_message(self, msg, sub_message=False):
-        message = TwitchTextMessage(msg.source.split('!')[0], msg.arguments.pop())
+    def _handle_message(self, msg, sub_message=False, me=False):
+        message = TwitchTextMessage(msg.source.split('!')[0], msg.arguments.pop(), me)
         if message.user == 'twitchnotify':
             self.irc_class.queue.put(TwitchSystemMessage(message.text, category='chat'))
 
