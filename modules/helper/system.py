@@ -163,3 +163,7 @@ def get_update(sem_version):
 def get_language():
     local_name, local_encoding = locale.getdefaultlocale()
     return LANGUAGE_DICT.get(local_name, 'en')
+
+
+def get_key(*args):
+    return MODULE_KEY.join(args)

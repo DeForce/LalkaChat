@@ -14,9 +14,14 @@ from modules.helper.module import BaseModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
     LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException
+from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSpin, LCSlider, LCChooseMultiple
 
 VERSION = '0.3.6'
 SEM_VERSION = semantic_version.Version(VERSION)
+
+
+def button_test():
+    log.info('HelloWorld')
 
 
 def init():
@@ -34,7 +39,7 @@ def init():
     window = None
 
     # Creating dict with folder settings
-    main_config = {'root_folder': PYTHON_FOLDER,
+    base_config = {'root_folder': PYTHON_FOLDER,
                    'conf_folder': CONF_FOLDER,
                    'main_conf_file': MAIN_CONF_FILE,
                    'main_conf_file_loc': MAIN_CONF_FILE,
@@ -57,28 +62,28 @@ def init():
             exit()
 
     log.info("Loading basic configuration")
-    main_config_dict = OrderedDict()
-    main_config_dict['gui_information'] = OrderedDict()
-    main_config_dict['gui_information']['category'] = 'main'
-    main_config_dict['gui_information']['width'] = '450'
-    main_config_dict['gui_information']['height'] = '500'
-    main_config_dict['gui_information']['pos_x'] = '10'
-    main_config_dict['gui_information']['pos_y'] = '10'
-    main_config_dict['system'] = OrderedDict()
-    main_config_dict['system']['log_level'] = 'INFO'
-    main_config_dict['system']['testing_mode'] = False
-    main_config_dict['gui'] = OrderedDict()
-    main_config_dict['gui']['cli'] = False
-    main_config_dict['gui']['show_icons'] = False
-    main_config_dict['gui']['show_hidden'] = False
-    main_config_dict['gui']['gui'] = True
-    main_config_dict['gui']['on_top'] = True
-    main_config_dict['gui']['show_browser'] = True
-    main_config_dict['gui']['show_counters'] = True
-    main_config_dict['gui']['transparency'] = 50
-    main_config_dict['gui']['borderless'] = False
-    main_config_dict['gui']['reload'] = None
-    main_config_dict['language'] = get_language()
+    main_config_dict = LCPanel()
+    main_config_dict['gui_information'] = LCStaticBox()
+    main_config_dict['gui_information']['category'] = LCText('main')
+    main_config_dict['gui_information']['width'] = LCText('450')
+    main_config_dict['gui_information']['height'] = LCText('500')
+    main_config_dict['gui_information']['pos_x'] = LCText('10')
+    main_config_dict['gui_information']['pos_y'] = LCText('10')
+    main_config_dict['system'] = LCStaticBox()
+    main_config_dict['system']['log_level'] = LCText('INFO')
+    main_config_dict['system']['testing_mode'] = LCBool(False)
+    main_config_dict['gui'] = LCStaticBox()
+    main_config_dict['gui']['cli'] = LCBool(False)
+    main_config_dict['gui']['show_icons'] = LCBool(False)
+    main_config_dict['gui']['show_hidden'] = LCBool(False)
+    main_config_dict['gui']['gui'] = LCBool(True)
+    main_config_dict['gui']['on_top'] = LCBool(True)
+    main_config_dict['gui']['show_browser'] = LCBool(True)
+    main_config_dict['gui']['show_counters'] = LCBool(True)
+    main_config_dict['gui']['transparency'] = LCSlider(100, min_v=0, max_v=100)
+    main_config_dict['gui']['borderless'] = LCBool(False)
+    main_config_dict['gui']['reload'] = LCButton(button_test)
+    main_config_dict['language'] = LCText(get_language())
 
     main_config_gui = {
         'language': {
@@ -103,27 +108,28 @@ def init():
     # Adding config for main module
     main_class = BaseModule(
         conf_params={
-            'root_folder': main_config['root_folder'],
+            'root_folder': base_config['root_folder'],
             'logs_folder': LOG_FOLDER,
-            'config': load_from_config_file(MAIN_CONF_FILE, main_config_dict),
-            'gui': main_config_gui
         },
+        config=main_config_dict,
+        gui=main_config_gui,
         conf_file_name='config.cfg'
     )
     loaded_modules['main'] = main_class.conf_params()
-    root_logger.setLevel(level=logging.getLevelName(main_config_dict['system'].get('log_level', 'INFO')))
+    main_config = main_class.conf_params()['config']
+    root_logger.setLevel(level=logging.getLevelName(main_config['system'].get('log_level', 'INFO')))
 
-    gui_settings['gui'] = main_config_dict[GUI_TAG].get('gui')
-    gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
-    gui_settings['transparency'] = main_config_dict[GUI_TAG].get('transparency')
-    gui_settings['borderless'] = main_config_dict[GUI_TAG].get('borderless')
-    gui_settings['language'] = main_config_dict.get('language')
-    gui_settings['show_hidden'] = main_config_dict[GUI_TAG].get('show_hidden')
-    gui_settings['size'] = (int(main_config_dict['gui_information'].get('width')),
-                            int(main_config_dict['gui_information'].get('height')))
-    gui_settings['position'] = (int(main_config_dict['gui_information'].get('pos_x')),
-                                int(main_config_dict['gui_information'].get('pos_y')))
-    gui_settings['show_browser'] = main_config_dict['gui'].get('show_browser')
+    gui_settings['gui'] = main_config[GUI_TAG].get('gui')
+    gui_settings['on_top'] = main_config[GUI_TAG].get('on_top')
+    gui_settings['transparency'] = main_config[GUI_TAG].get('transparency')
+    gui_settings['borderless'] = main_config[GUI_TAG].get('borderless')
+    gui_settings['language'] = main_config.get('language')
+    gui_settings['show_hidden'] = main_config[GUI_TAG].get('show_hidden')
+    gui_settings['size'] = (int(main_config['gui_information'].get('width')),
+                            int(main_config['gui_information'].get('height')))
+    gui_settings['position'] = (int(main_config['gui_information'].get('pos_x')),
+                                int(main_config['gui_information'].get('pos_y')))
+    gui_settings['show_browser'] = main_config['gui'].get('show_browser')
 
     # Checking updates
     log.info("Checking for updates")
@@ -145,35 +151,36 @@ def init():
     queue = Queue.Queue()
     # Loading module for message processing...
     msg = messaging.Message(queue)
-    loaded_modules.update(msg.load_modules(main_config, loaded_modules['main']))
+    loaded_modules.update(msg.load_modules(base_config, loaded_modules['main']))
     msg.start()
 
     log.info("Loading Chats")
     # Trying to dynamically load chats that are in config file.
-    chat_modules = os.path.join(CONF_FOLDER, "chat_modules.cfg")
+    chat_modules_file = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
     chat_conf_dict['gui_information'] = {'category': 'chat'}
-    chat_conf_dict['chats'] = []
+    chat_conf_dict['chats'] = LCChooseMultiple(
+        [],
+        check_type='files',
+        folder=os.path.sep.join(['modules', 'chat']),
+        keep_extension=False
+    )
 
     chat_conf_gui = {
-        'chats': {
-            'view': 'choose_multiple',
-            'check_type': 'files',
-            'check': os.path.sep.join(['modules', 'chat']),
-            'file_extension': False},
-        'non_dynamic': ['chats.list_box']}
+        'non_dynamic': ['chats.list_box']
+    }
 
     chat_module = BaseModule(
         conf_params={
-            'config': load_from_config_file(chat_modules, chat_conf_dict),
+            'config': load_from_config_file(chat_modules_file, chat_conf_dict),
             'gui': chat_conf_gui
         },
         conf_file_name='chat_modules.cfg'
     )
     loaded_modules['chat'] = chat_module.conf_params()
 
-    for chat_module in chat_conf_dict['chats']:
+    for chat_module in chat_conf_dict['chats'].simple():
         log.info("Loading chat module: {0}".format(chat_module))
         module_location = os.path.join(chat_location, chat_module + ".py")
         if os.path.isfile(module_location):
@@ -197,7 +204,7 @@ def init():
     for f_module, f_config in loaded_modules.iteritems():
         if 'class' in f_config:
             try:
-                f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules,
+                f_config['class'].load_module(main_settings=base_config, loaded_modules=loaded_modules,
                                               queue=queue)
                 log.debug('loaded module {}'.format(f_module))
             except ModuleLoadException:

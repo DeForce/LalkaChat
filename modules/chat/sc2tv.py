@@ -16,6 +16,7 @@ from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Emote
 from modules.helper.module import ChatModule
 from modules.helper.system import translate_key, EMOTE_FORMAT
+from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
@@ -29,13 +30,12 @@ API_URL = 'http://funstream.tv/api{}'
 
 PING_DELAY = 10
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['gui_information'] = {'category': 'chat'}
-CONF_DICT['config'] = OrderedDict()
-CONF_DICT['config']['show_pm'] = True
-CONF_DICT['config']['socket'] = 'ws://funstream.tv/socket.io/'
-CONF_DICT['config']['show_channel_names'] = True
-CONF_DICT['config']['channels_list'] = []
+CONF_DICT['config'] = LCStaticBox()
+CONF_DICT['config']['show_pm'] = LCBool(True)
+CONF_DICT['config']['socket'] = LCText('ws://funstream.tv/socket.io/')
+CONF_DICT['config']['show_channel_names'] = LCBool(True)
 
 CONF_GUI = {
     'config': {
@@ -46,7 +46,7 @@ CONF_GUI = {
         },
     },
     'non_dynamic': ['config.socket'],
-    'icon': FILE_ICON}
+}
 
 
 class Peka2TVAPIError(Exception):

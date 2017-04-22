@@ -7,7 +7,6 @@ import logging
 import os
 import socket
 import threading
-from collections import OrderedDict
 
 import cherrypy
 from cherrypy.lib.static import serve_file
@@ -20,13 +19,15 @@ from ws4py.websocket import WebSocket
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByID
 from modules.helper.module import MessagingModule
-from modules.helper.parser import save_settings
+from modules.helper.parser import save_settings, convert_to_dict
 from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER
+from modules.interface.types import *
 
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 DEFAULT_STYLE = 'default'
+DEFAULT_GUI_STYLE = 'default_gui'
 DEFAULT_PRIORITY = 9001
-HISTORY_SIZE = 40
+HISTORY_SIZE = 50
 HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
 log = logging.getLogger('webchat')
@@ -34,19 +35,32 @@ REMOVED_TRIGGER = '%%REMOVED%%'
 
 WS_THREADS = THREADS + 3
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel()
 CONF_DICT['gui_information'] = {
     'category': 'main',
     'id': DEFAULT_PRIORITY
 }
-CONF_DICT['server'] = OrderedDict()
-CONF_DICT['server']['host'] = '127.0.0.1'
-CONF_DICT['server']['port'] = '8080'
-CONF_DICT['style_gui'] = DEFAULT_STYLE
-CONF_DICT['style_gui_settings'] = OrderedDict()
-CONF_DICT['style'] = DEFAULT_STYLE
-CONF_DICT['style_settings'] = OrderedDict()
-CONF_DICT['style_settings']['show_system_msg'] = True
+CONF_DICT['server'] = LCStaticBox()
+CONF_DICT['server']['host'] = LCText('127.0.0.1')
+CONF_DICT['server']['port'] = LCText('8080')
+
+CONF_DICT['gui_chat'] = LCPanel()
+CONF_DICT['gui_chat']['style'] = LCChooseSingle(
+    DEFAULT_GUI_STYLE,
+    check_type='dir',
+    folder='http',
+    empty_label=True)
+CONF_DICT['gui_chat']['style_settings'] = LCStaticBox()
+CONF_DICT['gui_chat']['style_settings']['show_system_msg'] = LCBool(True)
+
+CONF_DICT['server_chat'] = LCPanel()
+CONF_DICT['server_chat']['style'] = LCChooseSingle(
+    DEFAULT_STYLE,
+    check_type='dir',
+    folder='http',
+    empty_label=True)
+CONF_DICT['server_chat']['style_settings'] = LCStaticBox()
+CONF_DICT['server_chat']['style_settings']['show_system_msg'] = LCBool(True)
 
 TYPE_DICT = {
     TextMessage: 'message',
@@ -372,15 +386,15 @@ class CssRoot(object):
     def style_scss(self, *path):
         css_namespace = Namespace()
         for key, value in self.settings['keys'].items():
-            if isinstance(value, basestring):
-                if value.startswith('#'):
-                    css_value = Color.from_hex(value)
-                else:
-                    css_value = String(value)
-            elif isinstance(value, bool):
-                css_value = Boolean(value)
-            elif isinstance(value, int) or isinstance(value, float):
-                css_value = Number(value)
+            log.info('%s, %s', key, type(value))
+            if isinstance(value, LCText):
+                css_value = String(value)
+            elif isinstance(value, LCColour):
+                css_value = Color.from_hex(value)
+            elif isinstance(value, LCBool):
+                css_value = Boolean(bool(value))
+            elif isinstance(value, LCSpin) or isinstance(value, float):
+                css_value = Number(int(value))
             else:
                 raise ValueError("Unable to find comparable values")
             css_namespace.set_variable('${}'.format(key), css_value)
@@ -524,7 +538,8 @@ class webchat(MessagingModule):
                     'location': None,
                     'keys': {}
                 }
-            }})
+            }
+        })
         self.prepare_style_settings()
         self.style_settings = self._conf_params['style_settings']
 
@@ -560,7 +575,8 @@ class webchat(MessagingModule):
 
     @staticmethod
     def get_style_path(style):
-        path = os.path.abspath(os.path.join(HTTP_FOLDER, style))
+        path_file = style.value if isinstance(style, LCObject) else style
+        path = os.path.abspath(os.path.join(HTTP_FOLDER, path_file))
         if os.path.exists(path):
             return path
         elif os.path.exists(os.path.join(HTTP_FOLDER, DEFAULT_STYLE)):
@@ -581,8 +597,8 @@ class webchat(MessagingModule):
 
         style_changed = False
 
-        chat_style = self._conf_params['config']['style']
-        gui_style = self._conf_params['config']['style_gui']
+        chat_style = self._conf_params['config']['server_chat']['style']
+        gui_style = self._conf_params['config']['gui_chat']['style']
         style_config = self._conf_params['style_settings']
 
         self.update_style_settings(chat_style, gui_style)
@@ -621,7 +637,8 @@ class webchat(MessagingModule):
         return message
 
     def rest_get_style_settings(self, *args):
-        return json.dumps(self._conf_params['style_settings'][args[0][0]]['keys'])
+        return json.dumps(
+            convert_to_dict(self._conf_params['style_settings'][args[0][0]]['keys']))
 
     def rest_get_history(self, *args, **kwargs):
         return json.dumps(
@@ -648,7 +665,8 @@ class webchat(MessagingModule):
     def write_style_to_file(self, style_name, style_type):
         file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
         with open(file_path, 'w') as style_file:
-            json.dump(self._conf_params['style_settings'][style_type]['keys'], style_file, indent=2)
+            data = self._conf_params['style_settings'][style_type]['keys']
+            json.dump(convert_to_dict(data, ordered=True), style_file, indent=2)
 
     def get_style_gui_from_file(self, style_name):
         file_path = os.path.join(self.get_style_path(style_name), 'settings_gui.json')
@@ -658,68 +676,70 @@ class webchat(MessagingModule):
         return {}
 
     def load_style_settings(self, style_name, style_type=None, keys=None):
+        # Shortcut
+        params = self._conf_params
+
         if keys:
             style_type = keys['all_settings']['type']
-        settings_path = 'style_settings' if style_type == 'chat' else 'style_gui_settings'
+        web_type = 'gui' if style_type == 'gui_chat' else 'chat'
 
-        self._conf_params['config'][settings_path] = self.get_style_from_file(style_name)
-        self._conf_params['style_settings'][style_type]['keys'] = self._conf_params['config']['style_settings']
-        self._conf_params['gui'][settings_path] = self.get_style_gui_from_file(style_name)
-        return self._conf_params['config'][settings_path]
+        lc_settings = alter_data_to_lc_style(self.get_style_from_file(style_name),
+                                             self.get_style_gui_from_file(style_name))
+
+        params['config'][style_type].update({'style_settings': lc_settings})
+        params['style_settings'][web_type]['keys'] = params['config'][style_type]['style_settings']
+        params['gui'][style_type].update(
+            {'style_settings': self.get_style_gui_from_file(style_name)})
+        return params['config'][style_type]['style_settings']
 
     def update_style_settings(self, chat_style, gui_style):
-        self._conf_params['style_settings']['chat']['keys'] = self._conf_params['config']['style_settings']
-        self._conf_params['style_settings']['gui']['keys'] = self._conf_params['config']['style_gui_settings']
+        params = self._conf_params['style_settings']
+        params['chat']['keys'] = self._conf_params['config']['server_chat']['style_settings']
+        params['gui']['keys'] = self._conf_params['config']['gui_chat']['style_settings']
         self.write_style_to_file(chat_style, 'chat')
         self.write_style_to_file(gui_style, 'gui')
 
     def prepare_style_settings(self):
-        style_settings = self._conf_params['style_settings']['chat']
+        server_style_settings = self._conf_params['style_settings']['chat']
         gui_style_settings = self._conf_params['style_settings']['gui']
 
-        config_style = self._conf_params['config']['style']
-        gui_config_style = self._conf_params['config']['style_gui']
+        server_style = self._conf_params['config']['server_chat']['style']
+        gui_style = self._conf_params['config']['gui_chat']['style']
 
-        style_settings['style_name'] = config_style
-        style_settings['location'] = self.get_style_path(config_style)
-        style_settings['keys'] = self.load_style_settings(config_style, 'chat')
+        server_style_settings['style_name'] = server_style
+        server_style_settings['location'] = self.get_style_path(server_style)
+        server_style_settings['keys'] = self.load_style_settings(server_style, 'server_chat')
 
-        gui_style_settings['style_name'] = gui_config_style
-        gui_style_settings['location'] = self.get_style_path(gui_config_style)
-        gui_style_settings['keys'] = self.load_style_settings(gui_config_style, 'gui')
+        gui_style_settings['style_name'] = gui_style
+        gui_style_settings['location'] = self.get_style_path(gui_style)
+        gui_style_settings['keys'] = self.load_style_settings(gui_style, 'gui_chat')
 
     def _conf_settings(self, *args, **kwargs):
         return CONF_DICT
 
     def _gui_settings(self):
         return {
-            'style_gui': {
-                'check': 'http',
-                'check_type': 'dir',
-                'view': 'choose_single'
+            'server_chat': {
+                'redraw': {
+                    'style_settings': {
+                        'redraw_trigger': ['style'],
+                        'type': 'server_chat',
+                        'get_config': self.load_style_settings,
+                        'get_gui': self.get_style_gui_from_file
+                    },
+                }
             },
-            'style_gui_settings': {},
-            'style': {
-                'check': 'http',
-                'check_type': 'dir',
-                'view': 'choose_single'
+            'gui_chat': {
+                'redraw': {
+                    'style_settings': {
+                        'redraw_trigger': ['style'],
+                        'type': 'gui_chat',
+                        'get_config': self.load_style_settings,
+                        'get_gui': self.get_style_gui_from_file
+                    },
+                }
             },
-            'style_settings': {},
             'non_dynamic': ['server.*'],
-            'ignored_sections': ['style_settings', 'style_gui_settings'],
-            'redraw': {
-                'style_settings': {
-                    'redraw_trigger': ['style'],
-                    'type': 'chat',
-                    'get_config': self.load_style_settings,
-                    'get_gui': self.get_style_gui_from_file
-                },
-                'style_gui_settings': {
-                    'redraw_trigger': ['style_gui'],
-                    'type': 'gui',
-                    'get_config': self.load_style_settings,
-                    'get_gui': self.get_style_gui_from_file
-                },
-            }
-        }
 
+            'ignored_sections': ['gui_chat.style_settings', 'server_chat.style_settings'],
+        }

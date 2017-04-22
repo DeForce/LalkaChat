@@ -15,6 +15,7 @@ from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUser
 from modules.helper.module import ChatModule
 from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
+from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -33,16 +34,15 @@ BITS_REGEXP = r'(^|\s)(\w+){}(\s|$)'
 
 PING_DELAY = 10
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['gui_information'] = {'category': 'chat'}
-CONF_DICT['config'] = OrderedDict()
-CONF_DICT['config']['host'] = 'irc.twitch.tv'
-CONF_DICT['config']['port'] = 6667
-CONF_DICT['config']['show_pm'] = True
-CONF_DICT['config']['bttv'] = True
-CONF_DICT['config']['show_channel_names'] = True
-CONF_DICT['config']['show_nickname_colors'] = False
-CONF_DICT['config']['channels_list'] = []
+CONF_DICT['config'] = LCStaticBox()
+CONF_DICT['config']['host'] = LCText('irc.twitch.tv')
+CONF_DICT['config']['port'] = LCText(6667)
+CONF_DICT['config']['show_pm'] = LCBool(True)
+CONF_DICT['config']['bttv'] = LCBool(True)
+CONF_DICT['config']['show_channel_names'] = LCBool(True)
+CONF_DICT['config']['show_nickname_colors'] = LCBool(False)
 CONF_GUI = {
     'config': {
         'hidden': ['host', 'port'],
@@ -51,8 +51,8 @@ CONF_GUI = {
             'addable': 'true'
         }
     },
-    'non_dynamic': ['config.host', 'config.port', 'config.bttv'],
-    'icon': FILE_ICON}
+    'non_dynamic': ['config.host', 'config.port', 'config.bttv']
+}
 
 
 class TwitchUserError(Exception):

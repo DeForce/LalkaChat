@@ -15,6 +15,7 @@ from ws4py.client.threadedclient import WebSocketClient
 from modules.helper.message import TextMessage, Emote, SystemMessage, RemoveMessageByUser
 from modules.helper.module import ChatModule
 from modules.helper.system import translate_key, EMOTE_FORMAT
+from modules.interface.types import LCStaticBox, LCBool, LCPanel
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('hitbox')
@@ -31,10 +32,10 @@ CDN_URL = 'http://edge.sf.hitbox.tv{}'
 
 PING_DELAY = 10
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['gui_information'] = {'category': 'chat'}
-CONF_DICT['config'] = OrderedDict()
-CONF_DICT['config']['show_nickname_colors'] = False
+CONF_DICT['config'] = LCStaticBox()
+CONF_DICT['config']['show_nickname_colors'] = LCBool(False)
 
 CONF_GUI = {
     'config': {
@@ -42,8 +43,8 @@ CONF_GUI = {
             'view': 'list',
             'addable': 'true'
         },
-    },
-    'icon': FILE_ICON}
+    }
+}
 
 
 class HitboxAPIError(Exception):

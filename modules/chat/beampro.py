@@ -8,7 +8,6 @@ import os
 import requests
 import Queue
 import logging
-from collections import OrderedDict
 
 import time
 
@@ -17,6 +16,7 @@ from modules.helper.module import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 
 from modules.helper.system import NA_MESSAGE, translate_key
+from modules.interface.types import LCStaticBox, LCBool, LCPanel
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('beampro')
@@ -28,10 +28,10 @@ ID_PREFIX = 'bp_{0}'
 
 API_URL = 'https://beam.pro/api/v1{}'
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['gui_information'] = {'category': 'chat'}
-CONF_DICT['config'] = OrderedDict()
-CONF_DICT['config']['show_pm'] = True
+CONF_DICT['config'] = LCStaticBox()
+CONF_DICT['config']['show_pm'] = LCBool(True)
 
 CONF_GUI = {
     'config': {
@@ -39,8 +39,7 @@ CONF_GUI = {
             'view': 'list',
             'addable': 'true'
         }
-    },
-    'icon': FILE_ICON
+    }
 }
 
 

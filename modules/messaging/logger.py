@@ -3,24 +3,24 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
 import datetime
-from collections import OrderedDict
 
 from modules.helper.message import process_text_messages
 from modules.helper.module import MessagingModule
 from modules.helper.system import CONF_FOLDER
+from modules.interface.types import *
 
 DEFAULT_PRIORITY = 20
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel()
 CONF_DICT['gui_information'] = {
     'category': 'messaging',
     'id': DEFAULT_PRIORITY
 }
-CONF_DICT['config'] = OrderedDict()
-CONF_DICT['config']['logging'] = True
-CONF_DICT['config']['file_format'] = '%Y-%m-%d'
-CONF_DICT['config']['message_date_format'] = '%Y-%m-%d %H:%M:%S'
-CONF_DICT['config']['rotation'] = 'daily'
+CONF_DICT['config'] = LCStaticBox()
+CONF_DICT['config']['logging'] = LCBool(True)
+CONF_DICT['config']['file_format'] = LCText('%Y-%m-%d')
+CONF_DICT['config']['message_date_format'] = LCText('%Y-%m-%d %H:%M:%S')
+CONF_DICT['config']['rotation'] = LCText('daily')
 
 CONF_GUI = {'non_dynamic': ['config.*']}
 

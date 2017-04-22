@@ -10,7 +10,6 @@ import re
 import string
 import threading
 import time
-from collections import OrderedDict
 
 import requests
 from ws4py.client.threadedclient import WebSocketClient
@@ -19,6 +18,7 @@ from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Emote, RemoveMessageByID
 from modules.helper.module import ChatModule
 from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
+from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText, LCGridSingle
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('goodgame')
@@ -27,15 +27,15 @@ SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
 FILE_ICON = os.path.join('img', 'gg.png')
 SYSTEM_USER = 'GoodGame'
 ID_PREFIX = 'gg_{0}'
-CONF_DICT = OrderedDict()
+
+CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['gui_information'] = {'category': 'chat'}
-CONF_DICT['config'] = OrderedDict()
-CONF_DICT['config']['show_pm'] = True
-CONF_DICT['config']['socket'] = 'ws://chat.goodgame.ru:8081/chat/websocket'
-CONF_DICT['config']['show_channel_names'] = True
-CONF_DICT['config']['use_channel_id'] = False
-CONF_DICT['config']['check_viewers'] = True
-CONF_DICT['config']['channels_list'] = []
+CONF_DICT['config'] = LCStaticBox()
+CONF_DICT['config']['show_pm'] = LCBool(True)
+CONF_DICT['config']['socket'] = LCText('ws://chat.goodgame.ru:8081/chat/websocket')
+CONF_DICT['config']['show_channel_names'] = LCBool(True)
+CONF_DICT['config']['use_channel_id'] = LCBool(False)
+CONF_DICT['config']['check_viewers'] = LCBool(True)
 SMILE_REGEXP = r':(\w+|\d+):'
 SMILE_FORMAT = ':{}:'
 
@@ -47,8 +47,8 @@ CONF_GUI = {
             'addable': 'true'
         }
     },
-    'non_dynamic': ['config.socket'],
-    'icon': FILE_ICON}
+    'non_dynamic': ['config.socket']
+}
 
 
 class GoodgameTextMessage(TextMessage):
@@ -289,8 +289,10 @@ class GGThread(threading.Thread):
         self.queue = queue
         self.address = address
         self.nick = nick
-        if use_chid:
-            self.ch_id = nick if int(nick) else None
+        try:
+            self.ch_id = int(nick)
+        except:
+            self.ch_id = None
         self.kwargs = kwargs
         self.ws = None
 

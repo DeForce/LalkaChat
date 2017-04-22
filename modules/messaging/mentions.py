@@ -6,11 +6,12 @@ from collections import OrderedDict
 
 from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
+from modules.interface.types import LCGridSingle, LCPanel
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel()
 CONF_DICT['gui_information'] = {'category': 'messaging'}
-CONF_DICT['mentions'] = []
-CONF_DICT['address'] = []
+CONF_DICT['mentions'] = LCGridSingle()
+CONF_DICT['address'] = LCGridSingle()
 
 CONF_GUI = {
     'mentions': {
