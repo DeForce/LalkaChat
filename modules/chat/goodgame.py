@@ -33,6 +33,8 @@ CONF_DICT['config'] = OrderedDict()
 CONF_DICT['config']['show_pm'] = True
 CONF_DICT['config']['socket'] = 'ws://chat.goodgame.ru:8081/chat/websocket'
 CONF_DICT['config']['show_channel_names'] = True
+CONF_DICT['config']['use_channel_id'] = False
+CONF_DICT['config']['check_viewers'] = True
 CONF_DICT['config']['channels_list'] = []
 SMILE_REGEXP = r':(\w+|\d+):'
 SMILE_FORMAT = ':{}:'
@@ -278,7 +280,7 @@ class GGChat(WebSocketClient):
 
 
 class GGThread(threading.Thread):
-    def __init__(self, queue, address, nick, **kwargs):
+    def __init__(self, queue, address, nick, use_chid, **kwargs):
         threading.Thread.__init__(self)
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -287,7 +289,8 @@ class GGThread(threading.Thread):
         self.queue = queue
         self.address = address
         self.nick = nick
-        self.ch_id = None
+        if use_chid:
+            self.ch_id = nick if int(nick) else None
         self.kwargs = kwargs
         self.ws = None
 
@@ -415,8 +418,9 @@ class goodgame(ChatModule):
     def _test_class(self):
         return TestGG(self)
 
-    @staticmethod
-    def get_viewers(channel):
+    def get_viewers(self, channel):
+        if not self._conf_params['config']['config']['check_viewers']:
+            return NA_MESSAGE
         streams_url = 'http://api2.goodgame.ru/streams/{0}'.format(channel)
         try:
             request = requests.get(streams_url)
@@ -434,6 +438,7 @@ class goodgame(ChatModule):
     def _set_chat_online(self, chat):
         ChatModule.set_chat_online(self, chat)
         gg = GGThread(self.queue, self.host, chat,
+                      self._conf_params['config']['config']['use_channel_id'],
                       settings=self._conf_params['settings'], chat_module=self)
         self.channels[chat] = gg
         gg.start()
