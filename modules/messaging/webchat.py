@@ -26,7 +26,7 @@ from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 DEFAULT_STYLE = 'default'
 DEFAULT_PRIORITY = 9001
-HISTORY_SIZE = 5
+HISTORY_SIZE = 40
 HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
 log = logging.getLogger('webchat')
