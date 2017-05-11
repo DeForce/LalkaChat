@@ -80,7 +80,7 @@ Docker build is available for testing LalkaChat, uses XPRA to display GUI from b
   - `docker run -rm --name chat-test -p 8080:8080 -v <PATH_TO_CONFIG>:/usr/lib/python2.7/site-packages/LalkaChat/conf deforce/lalkachat:testing`
 
 ## Special Thanks:
-ftpud - for fixing IE compatibility (Old problem with IE Browser)
-JAre - for being awesome with his docker stuff
-ichursin - for deep knowledge in JavaScript and helping me with code
-l0stparadis3 - for helping and testing in Linux environment
+ftpud - for fixing IE compatibility (Old problem with IE Browser)  
+JAre - for being awesome with his docker stuff  
+[ichursin](https://github.com/ichursin) - for deep knowledge in JavaScript and helping me with code  
+l0stparadis3 - for helping and testing in Linux environment  
