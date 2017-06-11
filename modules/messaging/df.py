@@ -7,13 +7,14 @@ from collections import OrderedDict
 
 from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
+from modules.interface.types import LCStaticBox, LCText, LCGridDual, LCPanel
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel()
 CONF_DICT['gui_information'] = {'category': 'messaging'}
-CONF_DICT['grep'] = OrderedDict()
-CONF_DICT['grep']['symbol'] = '#'
-CONF_DICT['grep']['file'] = 'logs/df.txt'
-CONF_DICT['prof'] = OrderedDict()
+CONF_DICT['grep'] = LCStaticBox()
+CONF_DICT['grep']['symbol'] = LCText('#')
+CONF_DICT['grep']['file'] = LCText('logs/df.txt')
+CONF_DICT['prof'] = LCGridDual()
 
 CONF_GUI = {
     'prof': {

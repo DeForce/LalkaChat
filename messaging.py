@@ -11,7 +11,7 @@ from collections import OrderedDict
 from modules.helper.module import BaseModule, MessagingModule
 from modules.helper.system import ModuleLoadException, THREADS, CONF_FOLDER
 from modules.helper.parser import load_from_config_file
-
+from modules.interface.types import LCPanel, LCChooseMultiple
 
 log = logging.getLogger('messaging')
 MODULE_PRI_DEFAULT = '100'
@@ -43,17 +43,19 @@ class Message(threading.Thread):
         modules_list = OrderedDict()
 
         conf_file = os.path.join(main_config['conf_folder'], "messaging_modules.cfg")
-        conf_dict = OrderedDict()
+        conf_dict = LCPanel()
         conf_dict['gui_information'] = {'category': 'messaging'}
-        conf_dict['messaging'] = {'webchat': None}
+        conf_dict['messaging'] = LCChooseMultiple(
+            ['webchat'],
+            check_type='files',
+            folder='modules/messaging',
+            keep_extension=False,
+            description=True
+        )
 
         conf_gui = {
-            'messaging': {'check': 'modules/messaging',
-                          'check_type': 'files',
-                          'file_extension': False,
-                          'view': 'choose_multiple',
-                          'description': True},
-            'non_dynamic': ['messaging.*']}
+            'non_dynamic': ['messaging.*']
+        }
         config = load_from_config_file(conf_file, conf_dict)
         messaging_module = BaseModule(
             conf_params={
@@ -69,8 +71,8 @@ class Message(threading.Thread):
 
         modules = {}
         # Loading modules from cfg.
-        if len(conf_dict['messaging']) > 0:
-            for m_module in conf_dict['messaging']:
+        if len(conf_dict['messaging'].value) > 0:
+            for m_module in conf_dict['messaging'].value:
                 log.info("Loading %s" % m_module)
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the

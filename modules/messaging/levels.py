@@ -1,31 +1,30 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import logging
 import math
 import os
 import random
 import sqlite3
 import xml.etree.ElementTree as ElementTree
-from collections import OrderedDict
 import datetime
 
 from modules.helper.message import process_text_messages, SystemMessage, ignore_system_messages
 from modules.helper.parser import save_settings
 from modules.helper.system import ModuleLoadException
 from modules.helper.module import MessagingModule
+from modules.interface.types import *
 
 log = logging.getLogger('levels')
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel()
 CONF_DICT['gui_information'] = {'category': 'messaging'}
-CONF_DICT['config'] = OrderedDict()
-CONF_DICT['config']['message'] = u'{0} has leveled up, now he is {1}'
-CONF_DICT['config']['db'] = os.path.join('conf', u'levels.db')
-CONF_DICT['config']['experience'] = u'geometrical'
-CONF_DICT['config']['exp_for_level'] = 200
-CONF_DICT['config']['exp_for_message'] = 1
-CONF_DICT['config']['decrease_window'] = 60
+CONF_DICT['config'] = LCStaticBox()
+CONF_DICT['config']['message'] = LCText(u'{0} has leveled up, now he is {1}')
+CONF_DICT['config']['db'] = LCText(os.path.join('conf', u'levels.db'))
+CONF_DICT['config']['experience'] = LCDropdown('geometrical', ['geometrical', 'static', 'random'])
+CONF_DICT['config']['exp_for_level'] = LCText(200)
+CONF_DICT['config']['exp_for_message'] = LCText(1)
+CONF_DICT['config']['decrease_window'] = LCText(1)
 
 
 CONF_GUI = {

@@ -2,24 +2,25 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import re
-from collections import OrderedDict
 
 import logging
 
 from modules.helper.message import ignore_system_messages, process_text_messages
 from modules.helper.module import MessagingModule
+from modules.interface.types import LCStaticBox, LCText, LCGridSingle, LCPanel
 
 DEFAULT_PRIORITY = 30
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel()
 CONF_DICT['gui_information'] = {
     'category': 'messaging',
     'id': DEFAULT_PRIORITY}
-CONF_DICT['main'] = {'message': 'ignored message'}
-CONF_DICT['users_hide'] = []
-CONF_DICT['users_block'] = []
-CONF_DICT['words_hide'] = []
-CONF_DICT['words_block'] = []
+CONF_DICT['main'] = LCStaticBox()
+CONF_DICT['main']['message'] = LCText('ignored message')
+CONF_DICT['users_hide'] = LCGridSingle()
+CONF_DICT['users_block'] = LCGridSingle()
+CONF_DICT['words_hide'] = LCGridSingle()
+CONF_DICT['words_block'] = LCGridSingle()
 log = logging.getLogger('blacklist')
 
 

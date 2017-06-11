@@ -5,14 +5,10 @@ import wx.grid
 from modules.helper.system import MODULE_KEY, translate_key, log, PYTHON_FOLDER
 from modules.interface.controls import GuiCreationError, CustomColourPickerCtrl, KeyListBox, KeyCheckListBox, KeyChoice, \
     id_renew
+from modules.interface.types import LCPanel
 
 
-def create_textctrl(**kwargs):
-    panel = kwargs.get('panel')
-    value = kwargs.get('value')
-    key = kwargs.get('key')
-    bind = kwargs.get('bind')
-
+def create_textctrl(panel=None, value=None, key=None, bind=None, **kwargs):
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
     item_name = MODULE_KEY.join(key)
     item_box = wx.TextCtrl(panel, id=id_renew(item_name, update=True),
@@ -39,7 +35,8 @@ def create_button(source_class=None, panel=None, key=None, value=None,
         source_class.buttons[item_name] = [c_button]
 
     if value:
-        c_button.Bind(wx.EVT_BUTTON, value, id=button_id)
+        # TODO: Implement button function pressing
+        c_button.Bind(wx.EVT_BUTTON, bind, id=button_id)
     else:
         c_button.Bind(wx.EVT_BUTTON, bind, id=button_id)
 
@@ -49,6 +46,8 @@ def create_button(source_class=None, panel=None, key=None, value=None,
 
 def create_static_box(source_class, panel=None, value=None,
                       gui=None, key=None, show_hidden=None, **kwargs):
+    if isinstance(value, LCPanel):
+        return wx.BoxSizer(wx.VERTICAL)
     item_value = value
 
     static_box = wx.StaticBox(panel, label=translate_key(MODULE_KEY.join(key)))
@@ -65,16 +64,18 @@ def create_static_box(source_class, panel=None, value=None,
     for item, value in item_value.items():
         if item in hidden_items and not show_hidden:
             continue
-        view = gui.get(item, {}).get('view', type(value))
+
+        view = type(value)
         if view in source_class.controls.keys():
             bind_fn = source_class.controls[view]
         elif callable(value):
             bind_fn = source_class.controls['button']
         else:
+            # bind_fn = {'function': create_empty}
             raise GuiCreationError('Unable to create item, bad value map')
         item_dict = bind_fn['function'](source_class=source_class, panel=static_box, item=item,
                                         value=value, key=key + [item],
-                                        bind=bind_fn['bind'], gui=gui.get(item, {}),
+                                        bind=bind_fn.get('bind'), gui=gui.get(item, {}),
                                         from_sb=True)
         if 'text_size' in item_dict:
             if max_text_size < item_dict.get('text_size'):
@@ -97,17 +98,13 @@ def create_static_box(source_class, panel=None, value=None,
     return static_sizer
 
 
-def create_spin(**kwargs):
-    panel = kwargs.get('panel')
-    value = kwargs.get('value')
-    key = kwargs.get('key')
-    bind = kwargs.get('bind')
-    gui = kwargs.get('gui')
-
+def create_spin(panel=None, value=None, key=None, bind=None, **kwargs):
+    item_class = value
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
     item_name = MODULE_KEY.join(key)
     style = wx.ALIGN_LEFT
-    item_box = wx.SpinCtrl(panel, id=id_renew(item_name, update=True), min=gui['min'], max=gui['max'],
+    item_box = wx.SpinCtrl(panel, id=id_renew(item_name, update=True),
+                           min=item_class.min, max=item_class.max,
                            initial=int(value), style=style)
     item_text = wx.StaticText(panel, label=translate_key(item_name))
     item_box.Bind(wx.EVT_SPINCTRL, bind)
@@ -117,14 +114,7 @@ def create_spin(**kwargs):
     return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
 
-def create_list(**kwargs):
-    panel = kwargs.get('panel')
-    value = kwargs.get('value')
-    key = kwargs.get('key')
-    bind = kwargs.get('bind')
-    gui = kwargs.get('gui')
-    from_sb = kwargs.get('from_sb')
-
+def create_list(panel=None, value=None, key=None, bind=None, gui=None, from_sb=None, **kwargs):
     view = gui.get('view')
     is_dual = True if 'dual' in view else False
     style = wx.ALIGN_CENTER_VERTICAL
@@ -196,12 +186,7 @@ def create_list(**kwargs):
         return border_sizer
 
 
-def create_colour_picker(**kwargs):
-    panel = kwargs.get('panel')
-    value = kwargs.get('value')
-    key = kwargs.get('key')
-    bind = kwargs.get('bind')
-
+def create_colour_picker(panel=None, value=None, key=None, bind=None, **kwargs):
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
     item_name = MODULE_KEY.join(key)
@@ -214,16 +199,11 @@ def create_colour_picker(**kwargs):
     return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
 
-def create_choose(**kwargs):
-    panel = kwargs.get('panel')
-    item_list = kwargs.get('value')
-    key = kwargs.get('key')
-    bind = kwargs.get('bind')
-    gui = kwargs.get('gui')
+def create_choose(panel=None, value=None, key=None, bind=None, **kwargs):
+    item_list = value.value
+    item_class = value
 
-    view = gui.get('view')
-    is_single = True if 'single' in view else False
-    description = gui.get('description', False)
+    is_single = False if value.multiple else True
     style = wx.LB_SINGLE if is_single else wx.LB_EXTENDED
     border_sizer = wx.BoxSizer(wx.VERTICAL)
     item_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -231,18 +211,18 @@ def create_choose(**kwargs):
     translated_items = []
 
     static_label = MODULE_KEY.join(key)
-    static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
-    item_sizer.Add(static_text)
+    if not item_class.empty_label:
+        static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
+        item_sizer.Add(static_text)
 
-    if gui['check_type'] in ['dir', 'folder', 'files']:
-        check_type = gui['check_type']
-        keep_extension = gui['file_extension'] if 'file_extension' in gui else False
-        for item_in_list in os.listdir(os.path.join(PYTHON_FOLDER, gui['check'])):
-            item_path = os.path.join(PYTHON_FOLDER, gui['check'], item_in_list)
+    if item_class.check_type in ['dir', 'folder', 'files']:
+        check_type = item_class.check_type
+        for item_in_list in os.listdir(os.path.join(PYTHON_FOLDER, item_class.folder)):
+            item_path = os.path.join(PYTHON_FOLDER, item_class.folder, item_in_list)
             if check_type in ['dir', 'folder'] and os.path.isdir(item_path):
                 list_items.append(item_in_list)
             elif check_type == 'files' and os.path.isfile(item_path):
-                if not keep_extension:
+                if not item_class.keep_extension:
                     item_in_list = ''.join(os.path.basename(item_path).split('.')[:-1])
                 if '__init__' not in item_in_list:
                     if item_in_list not in list_items:
@@ -274,7 +254,7 @@ def create_choose(**kwargs):
         check_items = [list_items.index(item) for item in section_for]
         item_list_box.SetChecked(check_items)
 
-    if description:
+    if item_class.description:
         adv_sizer = wx.BoxSizer(wx.HORIZONTAL)
         adv_sizer.Add(item_list_box, 0, wx.EXPAND)
 
@@ -294,33 +274,21 @@ def create_choose(**kwargs):
     return border_sizer
 
 
-def create_dropdown(**kwargs):
-    panel = kwargs.get('panel')
-    value = kwargs.get('value')
-    key = kwargs.get('key')
-    bind = kwargs.get('bind')
-    gui = kwargs.get('gui')
-
+def create_dropdown(panel=None, value=None, key=None, bind=None, gui=None, **kwargs):
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
-    choices = gui.get('choices', [])
+    choices = value.list
     item_name = MODULE_KEY.join(key)
     item_text = wx.StaticText(panel, label=translate_key(item_name))
     item_box = KeyChoice(panel, id=id_renew(item_name, update=True),
                          keys=choices, choices=choices)
     item_box.Bind(wx.EVT_CHOICE, bind)
-    item_box.SetSelection(choices.index(value))
+    item_box.SetSelection(choices.index(str(value)))
     item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
     item_sizer.Add(item_box)
     return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
 
-def create_slider(**kwargs):
-    panel = kwargs.get('panel')
-    value = kwargs.get('value')
-    key = kwargs.get('key')
-    bind = kwargs.get('bind')
-    gui = kwargs.get('gui')
-
+def create_slider(panel=None, value=None, key=None, bind=None, gui=None, **kwargs):
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
     item_name = MODULE_KEY.join(key)
     style = wx.SL_VALUE_LABEL | wx.SL_AUTOTICKS
@@ -337,18 +305,21 @@ def create_slider(**kwargs):
     return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
 
 
-def create_checkbox(**kwargs):
-    panel = kwargs.get('panel')
-    value = kwargs.get('value')
-    key = kwargs.get('key')
-    bind = kwargs.get('bind')
-
+def create_checkbox(panel=None, value=None, key=None, bind=None, **kwargs):
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
     style = wx.ALIGN_CENTER_VERTICAL
     item_key = MODULE_KEY.join(key)
     item_box = wx.CheckBox(panel, id=id_renew(item_key, update=True),
                            label=translate_key(item_key), style=style)
-    item_box.SetValue(value)
+    item_box.SetValue(bool(value))
     item_box.Bind(wx.EVT_CHECKBOX, bind)
     item_sizer.Add(item_box, 0, wx.ALIGN_LEFT)
     return {'item': item_sizer}
+
+
+def create_panel(*args, **kwargs):
+    return create_static_box(*args, **kwargs)
+
+
+def create_empty(*args, **kwargs):
+    return {'item': wx.BoxSizer(wx.HORIZONTAL)}

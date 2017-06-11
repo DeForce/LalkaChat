@@ -1,7 +1,11 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
+import collections
+
+from modules.helper.functions import find_by_type, parse_keys_to_string, deep_get
 from modules.interface.controls import KeyListBox, MainMenuToolBar
 
 import modules.interface.functions
+from modules.interface.types import *
 
 try:
     from cefpython3.wx import chromectrl as browser
@@ -16,7 +20,7 @@ import os
 import logging
 import webbrowser
 import wx
-from modules.helper.system import MODULE_KEY, translate_key
+from modules.helper.system import MODULE_KEY, translate_key, get_key
 from modules.helper.parser import return_type
 from modules.helper.module import BaseModule
 # ToDO: Support customization of borders/spacings
@@ -90,15 +94,15 @@ class SettingsWindow(wx.Frame):
         self.changes = {}
         self.buttons = {}
         self.groups = {
-            dict: {
+            LCPanel: {
+                'function': modules.interface.functions.create_panel,
+                'bind': None
+            },
+            LCStaticBox: {
                 'function': modules.interface.functions.create_static_box,
                 'bind': None
             },
-            OrderedDict: {
-                'function': modules.interface.functions.create_static_box,
-                'bind': None
-            },
-            'list_dual': {
+            LCGridDual: {
                 'function': modules.interface.functions.create_list,
                 'bind': {
                     'add': self.button_clicked,
@@ -106,7 +110,7 @@ class SettingsWindow(wx.Frame):
                     'select': self.select_cell
                 }
             },
-            'list': {
+            LCGridSingle: {
                 'function': modules.interface.functions.create_list,
                 'bind': {
                     'add': self.button_clicked,
@@ -114,59 +118,51 @@ class SettingsWindow(wx.Frame):
                     'select': self.select_cell
                 }
             },
-            'choose_multiple': {
+            LCChooseMultiple: {
                 'function': modules.interface.functions.create_choose,
                 'bind': {
                     'change': self.on_listbox_change,
                     'check_change': self.on_checklist_box_change
                 }
             },
-            'choose_single': {
+            LCChooseSingle: {
                 'function': modules.interface.functions.create_choose,
                 'bind': {
                     'change': self.on_listbox_change,
                     'check_change': self.on_checklist_box_change
                 }
-            }
+            },
         }
         self.controls = {
-            type(None): {
+            LCButton: {
                 'function': modules.interface.functions.create_button,
                 'bind': self.button_clicked
             },
-            bool: {
+            LCBool: {
                 'function': modules.interface.functions.create_checkbox,
                 'bind': self.on_check_change
             },
-            str: {
+            LCText: {
                 'function': modules.interface.functions.create_textctrl,
                 'bind': self.on_textctrl
             },
-            unicode: {
-                'function': modules.interface.functions.create_textctrl,
-                'bind': self.on_textctrl
-            },
-            int: {
-                'function': modules.interface.functions.create_textctrl,
-                'bind': self.on_textctrl
-            },
-            'spin': {
+            LCSpin: {
                 'function': modules.interface.functions.create_spin,
                 'bind': self.on_spinctrl
             },
-            'dropdown': {
+            LCDropdown: {
                 'function': modules.interface.functions.create_dropdown,
                 'bind': self.on_dropdown
             },
-            'slider': {
+            LCSlider: {
                 'function': modules.interface.functions.create_slider,
                 'bind': self.on_sliderctrl
             },
-            'colour_picker': {
+            LCColour: {
                 'function': modules.interface.functions.create_colour_picker,
                 'bind': self.on_color_picker
             },
-            'list': {
+            LCList: {
                 'function': modules.interface.functions.create_list,
                 'bind': {
                     'add': self.button_clicked,
@@ -174,10 +170,6 @@ class SettingsWindow(wx.Frame):
                     'select': self.select_cell
                 }
             },
-            'button': {
-                'function': modules.interface.functions.create_button,
-                'bind': self.button_clicked
-            }
         }
         self.list_map = {}
         self.redraw_map = {}
@@ -258,46 +250,40 @@ class SettingsWindow(wx.Frame):
 
         split_keys = key.split(MODULE_KEY)
         module_name = split_keys[0]
-        config_section_name = split_keys[1]
-        if module_name in self.redraw_map:
-            for section, section_config in self.redraw_map[module_name].items():
+        panel_key_list = split_keys[1:-2]
+        config_section_name = split_keys[-2]
+        if get_key(module_name, *panel_key_list) in self.redraw_map:
+            for section_name, section_config in self.redraw_map[get_key(module_name, *panel_key_list)].items():
                 if config_section_name in section_config['redraw_trigger']:
                     redraw_key = MODULE_KEY.join(section_config['key'])
                     self.redraw_item(section_config, value)
                     clear_changes(redraw_key)
                     enable_button()
-
-        config = self.main_class.loaded_modules[module_name]['config']
-        change_item = config_section_name
+        if panel_key_list:
+            config = deep_get(self.main_class.loaded_modules[module_name]['config'], *panel_key_list)
+        else:
+            config = self.main_class.loaded_modules[module_name]['config']
+        ch_item = config_section_name
         if section:
+            check = config[ch_item].value if isinstance(config[ch_item], LCObject) else config[ch_item]
             if isinstance(value, list):
-                if set(config[change_item]) != set(value):
-                    apply_changes()
-                else:
-                    clear_changes()
+                apply_changes() if set(check) != set(value) else clear_changes()
             else:
-                if config[change_item] != return_type(value):
+                if check != return_type(value):
                     apply_changes()
                 else:
                     clear_changes()
         elif item_type == 'gridbox':
-            main_tuple = config[change_item]
-
-            if compare_2d_lists(value, main_tuple):
+            if compare_2d_lists(value, config[split_keys[-1]].simple()):
                 clear_changes()
             else:
                 apply_changes()
         else:
-            if isinstance(value, bool):
-                if config[change_item][split_keys[2]] != value:
-                    apply_changes()
-                else:
-                    clear_changes()
+            test_value = value if isinstance(value, bool) else return_type(value)
+            if config[ch_item][split_keys[-1]].simple() != test_value:
+                apply_changes()
             else:
-                if config[change_item][split_keys[2]] != return_type(value):
-                    apply_changes()
-                else:
-                    clear_changes()
+                clear_changes()
 
     def on_tree_ctrl_changed(self, event):
         self.settings_saved = False
@@ -400,6 +386,14 @@ class SettingsWindow(wx.Frame):
     def on_color_picker(self, event):
         self.on_change(MODULE_KEY.join(event['key']), event['hex'])
 
+    def get_tree_item(self, key, node, image=-1, name_key=None):
+        item_data = wx.TreeItemData()
+        item_data.SetData(key)
+        return self.tree_ctrl.AppendItem(
+            node, translate_key(name_key if name_key else key),
+            data=item_data,
+            image=image)
+
     def create_layout(self):
         self.main_grid = wx.BoxSizer(wx.HORIZONTAL)
         style = wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_TWIST_BUTTONS | wx.TR_NO_LINES
@@ -408,38 +402,44 @@ class SettingsWindow(wx.Frame):
         image_list = wx.ImageList(16, 16)
 
         tree_ctrl_id = modules.interface.functions.id_renew('settings.tree', update=True)
-        tree_ctrl = wx.TreeCtrl(self, id=tree_ctrl_id, style=style)
-        root_key = MODULE_KEY.join(['settings', 'tree', 'root'])
-        root_node = tree_ctrl.AddRoot(translate_key(root_key))
-        for cat_name, category in self.categories.iteritems():
-            item_key = MODULE_KEY.join(['settings', cat_name])
-            item_data = wx.TreeItemData()
-            item_data.SetData(item_key)
+        self.tree_ctrl = wx.TreeCtrl(self, id=tree_ctrl_id, style=style)
+        root_key = get_key('settings', 'tree', 'root')
+        root_node = self.tree_ctrl.AddRoot(translate_key(root_key))
+        for cat_name, category in self.categories.items():
+            item_node = self.get_tree_item(get_key('settings', cat_name), root_node)
+            for module_name, module_settings in category.items():
+                if module_name == cat_name:
+                    continue
+                if '.' in module_name:
+                    continue
 
-            item_node = tree_ctrl.AppendItem(root_node, translate_key(item_key), data=item_data)
-            for module_name, module_settings in category.iteritems():
-                if not module_name == cat_name:
-                    if module_settings.get('gui', {}).get('icon'):
-                        icon = wx.Bitmap(module_settings['gui']['icon'])
-                        self.tree_ctrl_image_dict[module_name] = image_list.GetImageCount()
-                        image_list.Add(icon)
-                    else:
-                        self.tree_ctrl_image_dict[module_name] = -1
+                config = module_settings.get('config')
+                if config.icon:
+                    icon = wx.Bitmap(config.icon)
+                    self.tree_ctrl_image_dict[module_name] = image_list.GetImageCount()
+                    image_list.Add(icon)
+                else:
+                    self.tree_ctrl_image_dict[module_name] = -1
 
-                    f_item_key = MODULE_KEY.join([item_key, module_name])
-                    f_item_data = wx.TreeItemData()
-                    f_item_data.SetData(f_item_key)
-                    tree_ctrl.AppendItem(item_node, translate_key(module_name),
-                                         image=self.tree_ctrl_image_dict[module_name],
-                                         data=f_item_data)
+                module_node = self.get_tree_item(
+                    get_key('settings', cat_name, module_name),
+                    item_node, name_key=module_name,
+                    image=self.tree_ctrl_image_dict[module_name]
+                )
+
+                tree_nodes = self._get_panels(config)
+                if not tree_nodes:
+                    continue
+                self.create_nested_tree_item(tree_nodes, node=module_node,
+                                             key=get_key('settings', cat_name, module_name))
+
         if self.show_icons:
-            tree_ctrl.AssignImageList(image_list)
-        tree_ctrl.ExpandAll()
+            self.tree_ctrl.AssignImageList(image_list)
+        self.tree_ctrl.ExpandAll()
 
-        self.tree_ctrl = tree_ctrl
         self.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_tree_ctrl_changed, id=tree_ctrl_id)
 
-        self.main_grid.Add(tree_ctrl, 7, wx.EXPAND | wx.ALL, 7)
+        self.main_grid.Add(self.tree_ctrl, 7, wx.EXPAND | wx.ALL, 7)
 
         content_page_id = modules.interface.functions.id_renew(MODULE_KEY.join(['settings', 'content']))
         self.content_page = wx.Panel(self, id=content_page_id)
@@ -447,7 +447,7 @@ class SettingsWindow(wx.Frame):
 
         self.main_grid.Layout()
         self.SetSizer(self.main_grid)
-        tree_ctrl.SelectItem(tree_ctrl.GetFirstChild(root_node)[0])
+        self.tree_ctrl.SelectItem(self.tree_ctrl.GetFirstChild(root_node)[0])
 
     def fill_page_with_content(self, panel, keys):
 
@@ -464,7 +464,7 @@ class SettingsWindow(wx.Frame):
             raise ModuleKeyError("Key not found in modules")
 
         module_data = self.categories[category][module_id]
-        custom_renderer = module_data['custom_renderer']
+        custom_renderer = module_data.get('custom_renderer', False)
         module_config = module_data.get('config', {})
         module_gui_config = module_data.get('gui', {})
 
@@ -513,7 +513,7 @@ class SettingsWindow(wx.Frame):
         page_sc_window.SetScrollbars(5, 5, 10, 10)
         sizer = wx.BoxSizer(wx.VERTICAL)
         joined_keys = MODULE_KEY.join(key)
-        if 'redraw' in gui:
+        if gui and 'redraw' in gui:
             for redraw_target, redraw_settings in gui['redraw'].items():
                 if joined_keys not in self.redraw_map:
                     self.redraw_map[joined_keys] = {}
@@ -532,16 +532,19 @@ class SettingsWindow(wx.Frame):
         for section_key, section_items in config.items():
             if section_key in SKIP_TAGS:
                 continue
-
-            view = gui.get(section_key, {}).get('view', type(section_items))
+            if isinstance(section_items, LCObject):
+                view = type(section_items)
+            else:
+                view = gui.get(section_key, {}).get('view', type(section_items))
             if view in self.groups.keys():
                 data = self.groups[view]
-                gui_settings = gui.get(section_key, {}).copy()
+                gui_settings = gui.get(section_key, {}).copy() if gui else {}
                 item_keys = key + [section_key]
                 sizer_item = data['function'](
                     source_class=self, panel=page_sc_window, item=section_key,
                     value=section_items, bind=data['bind'],
-                    gui=gui_settings, key=item_keys, from_sb=False)
+                    gui=gui_settings, key=item_keys, from_sb=False,
+                    show_hidden=self.show_hidden)
                 if joined_keys in self.redraw_map.keys():
                     if section_key in self.redraw_map[joined_keys]:
                         self.redraw_map[joined_keys][section_key].update({
@@ -598,11 +601,11 @@ class SettingsWindow(wx.Frame):
         if static_box:
             static_box.Destroy()
         sizer.Destroy()
-        new_sizer = fnc(panel=panel, item=redraw_keys['redraw_target'],
+        new_sizer = fnc(source_class=self, panel=panel, item=redraw_keys['redraw_target'],
                         value=config, bind=bind, gui=config_gui, key=key)
         sizer_parent.Insert(item_index, new_sizer, 0, wx.EXPAND)
 
-        self.redraw_map[key[0]][key[1]]['item'] = new_sizer
+        self.redraw_map[get_key(*key[:-1])][key[-1]]['item'] = new_sizer
 
         self.main_grid.Layout()
 
@@ -665,7 +668,11 @@ class SettingsWindow(wx.Frame):
 
             for item, change in changed_items.iteritems():
                 item_split = item.split(MODULE_KEY)
-                section, item_name = item_split[1:] if len(item_split) > 2 else (item_split[1], None)
+                panel_keys = item_split[1:-2]
+                section = item_split[-2]
+                item_name = item_split[-1]
+
+                deep_config = deep_get(module_config, *panel_keys)
                 for d_item in non_dynamic:
                     if section in d_item:
                         if MODULE_KEY.join([section, '*']) in d_item:
@@ -676,13 +683,16 @@ class SettingsWindow(wx.Frame):
                             break
                 if item_split[-1] in ['list_box']:
                     del item_split[-1]
+                    item_name = item_split[-1]
                 if len(item_split) == 2:
-                    module_config[section] = change['value']
+                    item_type = type(deep_config[item_name])
+                    deep_config[item_name] = item_type(change['value'])
                 else:
                     value = change['value']
-                    if item == MODULE_KEY.join(['main', 'gui', 'show_hidden']):
+                    if item == get_key('main', 'gui', 'show_hidden'):
                         self.show_hidden = value
-                    module_config[section][item_name] = value
+                    item_type = type(deep_config[section][item_name])
+                    deep_config[section][item_name] = item_type(value)
             if 'class' in module_settings:
                 module_settings['class'].apply_settings()
         return non_dynamic_check
@@ -690,6 +700,31 @@ class SettingsWindow(wx.Frame):
     def select_cell(self, event):
         self.selected_cell = (event.GetRow(), event.GetCol())
         event.Skip()
+
+    @staticmethod
+    def _get_panels(module_settings):
+        return find_by_type(module_settings, LCPanel)
+
+    def create_nested_tree_item(self, tree_item, node=None, key=None):
+        for name, data in tree_item.items():
+            category, module_name = key.split(MODULE_KEY)[1:3]
+            key_left = key.split(MODULE_KEY)[3:]
+            full_key_list = key_left + [name]
+            key_string = get_key(module_name, *full_key_list)
+
+            node_l = self.get_tree_item(get_key(key, name), node,
+                                        name_key=get_key(key, name))
+            if isinstance(data, collections.Mapping):
+                self.create_nested_tree_item(data, node_l, get_key(key, name))
+
+            if key_string in self.categories[category]:
+                continue
+
+            panel_data = deep_get(self.categories[category][module_name]['config'], *full_key_list)
+            gui_data = deep_get(self.categories[category][module_name]['gui'], *full_key_list)
+            self.categories[category][key_string] = {}
+            self.categories[category][key_string]['config'] = panel_data
+            self.categories[category][key_string]['gui'] = gui_data
 
 
 class StatusFrame(wx.Panel):
@@ -770,9 +805,9 @@ class StatusFrame(wx.Panel):
         if module_name not in self.chats:
             self.chats[module_name] = {}
         if channel.lower() not in self.chats[module_name]:
-            config = self.chat_modules.get(module_name)['class'].conf_params()
-            icon = config['gui']['icon']
-            multiple = config['config']['config']['show_channel_names']
+            config = self.chat_modules.get(module_name)['class'].conf_params()['config']
+            icon = config.icon
+            multiple = config['config']['show_channel_names']
             self.chats[module_name][channel.lower()] = self._create_item(channel, icon, multiple)
         self.Layout()
         self.Refresh()

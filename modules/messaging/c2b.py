@@ -4,19 +4,19 @@
 import logging
 import random
 import re
-from collections import OrderedDict
 
 from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
+from modules.interface.types import LCGridDual, LCPanel
 
 DEFAULT_PRIORITY = 10
 log = logging.getLogger('c2b')
 
-CONF_DICT = OrderedDict()
+CONF_DICT = LCPanel()
 CONF_DICT['gui_information'] = {
     'category': 'messaging',
     'id': DEFAULT_PRIORITY}
-CONF_DICT['config'] = {}
+CONF_DICT['config'] = LCGridDual()
 
 CONF_GUI = {
     'config': {

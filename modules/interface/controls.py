@@ -63,7 +63,7 @@ class CustomColourPickerCtrl(object):
         label_sizer.Add(label_text, 1, wx.ALIGN_CENTER)
         label_sizer2.Add(label_sizer, 1, wx.ALIGN_CENTER)
         label_panel.SetSizer(label_sizer2)
-        label_panel.SetBackgroundColour(value)
+        label_panel.SetBackgroundColour(str(value))
         self.panel = label_panel
 
         button = wx.Button(panel, label=translate_key(MODULE_KEY.join(key + ['button'])))

@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 from modules.helper import parser
 from modules.helper.message import TextMessage, Message
+from modules.interface.types import LCPanel, LCStaticBox, LCBool, LCList
 from parser import save_settings, load_from_config_file
 from system import RestApiException, CONF_FOLDER
 
@@ -13,10 +14,10 @@ BASE_DICT = {
     'custom_renderer': False
 }
 
-CHAT_DICT = OrderedDict()
-CHAT_DICT['config'] = OrderedDict()
-CHAT_DICT['config']['show_channel_names'] = False
-CHAT_DICT['config']['channels_list'] = []
+CHAT_DICT = LCPanel()
+CHAT_DICT['config'] = LCStaticBox()
+CHAT_DICT['config']['show_channel_names'] = LCBool(False)
+CHAT_DICT['config']['channels_list'] = LCList()
 
 CHAT_GUI = {
     'config': {
@@ -35,6 +36,9 @@ class BaseModule:
         self._conf_params = BASE_DICT.copy()
         self._conf_params['dependencies'] = set()
 
+        self.__conf_settings = kwargs.get('config', {})
+        self.__gui_settings = kwargs.get('gui', {})
+
         self._loaded_modules = {}
         self._rest_api = {}
         self._module_name = self.__class__.__name__
@@ -52,7 +56,6 @@ class BaseModule:
              'config': load_from_config_file(conf_file, self._conf_settings()),
              'gui': self._gui_settings(),
              'settings': {}})
-
         self._conf_params.update(kwargs.get('conf_params', {}))
 
     def add_to_queue(self, q_type, data):
@@ -79,14 +82,14 @@ class BaseModule:
             Override this method
         :rtype: object
         """
-        return {}
+        return self.__conf_settings
 
     def _gui_settings(self, *args, **kwargs):
         """
             Override this method
         :return: Settings for GUI (dict)
         """
-        return {}
+        return self.__gui_settings
 
     def load_module(self, *args, **kwargs):
         self._loaded_modules = kwargs.get('loaded_modules')
