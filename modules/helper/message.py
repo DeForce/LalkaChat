@@ -159,6 +159,10 @@ class TextMessage(Message):
     def user(self):
         return self._user
 
+    @user.setter
+    def user(self, value):
+        self._user = value
+
     @property
     def text(self):
         """
