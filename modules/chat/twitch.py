@@ -143,8 +143,7 @@ class TwitchMessageHandler(threading.Thread):
 
     @staticmethod
     def _handle_display_name(message, name):
-        message.display_name = name if name else message.user
-        message.jsonable += ['display_name']
+        message.user = name if name else message.user
 
     @staticmethod
     def _handle_emotes(message, tag_value):

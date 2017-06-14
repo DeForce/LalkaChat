@@ -274,7 +274,7 @@ class SettingsWindow(wx.Frame):
                 else:
                     clear_changes()
         elif item_type == 'gridbox':
-            if compare_2d_lists(value, config[split_keys[-1]].simple()):
+            if compare_2d_lists(value, config[ch_item][split_keys[-1]].simple()):
                 clear_changes()
             else:
                 apply_changes()
