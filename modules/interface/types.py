@@ -1,6 +1,7 @@
 from collections import OrderedDict
 
 import logging
+log = logging.getLogger('interface/types')
 
 
 class LCObject(object):
@@ -187,7 +188,6 @@ def alter_data_to_lc_style(data, gui):
     new_data = LCStaticBox()
     for item, value in data.items():
         item_type = gui.get(item, {}).get('view', type(value))
-        logging.info('item: %s, value: %s, type: %s', item, value, item_type)
         if item_type not in TYPE_TO_LC:
             new_data[item] = value
         else:

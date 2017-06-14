@@ -113,7 +113,7 @@ class RemoveMessageByID(CommandMessage):
 
 
 class TextMessage(Message):
-    def __init__(self, source, source_icon, user, text,
+    def __init__(self, platform_id, icon, user, text,
                  emotes=None, badges=None, pm=False,
                  nick_colour=None, mid=None, me=False):
         """
@@ -122,8 +122,8 @@ class TextMessage(Message):
         :param nick_colour: Nick colour
         :param mid: Message ID
         :param me: /me notation
-        :param source: Chat source (gg/twitch/beampro etc.)
-        :param source_icon: Chat icon (as url)
+        :param platform_id: Chat source (gg/twitch/beampro etc.)
+        :param icon: Chat icon (as url)
         :param user: nickname
         :param text: message text
         :param emotes: 
@@ -131,8 +131,7 @@ class TextMessage(Message):
         """
         Message.__init__(self)
 
-        self._source = source
-        self._source_icon = source_icon
+        self._platform = Platform(platform_id, icon)
         self._user = user
         self._text = text
         self._emotes = [] if emotes is None else emotes
@@ -144,16 +143,12 @@ class TextMessage(Message):
         self._id = str(mid) if mid else str(uuid.uuid1())
 
         self._jsonable += ['user', 'text', 'emotes', 'badges',
-                           'id', 'source', 'source_icon', 'pm',
-                           'nick_colour', 'channel_name', 'me']
+                           'id', 'platform', 'pm', 'nick_colour',
+                           'channel_name', 'me']
 
     @property
-    def source(self):
-        return self._source
-
-    @property
-    def source_icon(self):
-        return self._source_icon
+    def platform(self):
+        return self._platform
 
     @property
     def user(self):
@@ -228,19 +223,19 @@ class TextMessage(Message):
 
 
 class SystemMessage(TextMessage):
-    def __init__(self, text, source=SOURCE, source_icon=SOURCE_ICON, user=SOURCE_USER, emotes=None, category='system'):
+    def __init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON, user=SOURCE_USER, emotes=None, category='system'):
         """
             Text message used by main chat logic
               Serves system messages from modules
-        :param source: TextMessage.source
-        :param source_icon: TextMessage.source_icon
+        :param platform_id: TextMessage.source
+        :param icon: TextMessage.source_icon
         :param user: TextMessage.user
         :param text: TextMessage.text
         :param category: System message category, can be filtered
         """
         if emotes is None:
             emotes = []
-        TextMessage.__init__(self, source, source_icon, user, text, emotes)
+        TextMessage.__init__(self, platform_id, icon, user, text, emotes)
         self._category = category
 
     @property
@@ -269,3 +264,17 @@ class Emote(object):
 class Badge(Emote):
     def __init__(self, badge_id, badge_url):
         Emote.__init__(self, badge_id, badge_url)
+
+
+class Platform(object):
+    def __init__(self, platform_id, icon):
+        self._id = platform_id
+        self._icon = icon
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def icon(self):
+        return self._icon

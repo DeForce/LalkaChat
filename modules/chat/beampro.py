@@ -49,13 +49,13 @@ class BeamProAPIException(Exception):
 
 class BeamProTextMessage(TextMessage):
     def __init__(self, user, text, mid):
-        TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+        TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
                              user=user, text=text, mid=mid)
 
 
 class BeamProSystemMessage(SystemMessage):
     def __init__(self, text, category='system'):
-        SystemMessage.__init__(self, text, source=SOURCE, source_icon=SOURCE_ICON,
+        SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
                                user=SYSTEM_USER, category=category)
 
 

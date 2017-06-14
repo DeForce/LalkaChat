@@ -53,7 +53,7 @@ CONF_GUI = {
 
 class GoodgameTextMessage(TextMessage):
     def __init__(self, text, user, mid=None):
-        TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+        TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
                              user=user, text=text, mid=mid)
 
     def process_smiles(self, smiles, rights, premium, prems, payments):
@@ -97,7 +97,7 @@ class GoodgameTextMessage(TextMessage):
 
 class GoodgameSystemMessage(SystemMessage):
     def __init__(self, text, category='system'):
-        SystemMessage.__init__(self, text, source=SOURCE, source_icon=SOURCE_ICON,
+        SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
                                user=SYSTEM_USER, category=category)
 
 

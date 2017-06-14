@@ -66,13 +66,13 @@ class TwitchNormalDisconnect(Exception):
 class TwitchTextMessage(TextMessage):
     def __init__(self, user, text, me):
         self.bttv_emotes = {}
-        TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+        TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
                              user=user, text=text, me=me)
 
 
 class TwitchSystemMessage(SystemMessage):
     def __init__(self, text, category='system', emotes=None):
-        SystemMessage.__init__(self, text, source=SOURCE, source_icon=SOURCE_ICON,
+        SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
                                user=SYSTEM_USER, emotes=emotes, category=category)
 
 
