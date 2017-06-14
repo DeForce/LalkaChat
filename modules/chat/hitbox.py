@@ -53,13 +53,13 @@ class HitboxAPIError(Exception):
 
 class HitboxTextMessage(TextMessage):
     def __init__(self, user, text, mid, nick_colour):
-        TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+        TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
                              user=user, text=text, mid=mid, nick_colour=nick_colour)
 
 
 class HitboxSystemMessage(SystemMessage):
     def __init__(self, text, category='system'):
-        SystemMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+        SystemMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
                                user=SYSTEM_USER, text=text, category=category)
 
 

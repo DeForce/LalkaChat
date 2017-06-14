@@ -3,7 +3,6 @@ import Queue
 import copy
 import datetime
 import json
-import logging
 import os
 import socket
 import threading
@@ -76,6 +75,10 @@ def process_badges(badges):
     return [{'badge': badge.id, 'url': badge.url} for badge in badges]
 
 
+def process_platform(platform):
+    return {'id': platform.id, 'icon': platform.icon}
+
+
 def prepare_message(msg, style_settings, msg_class):
     message = copy.deepcopy(msg)
 
@@ -95,6 +98,9 @@ def prepare_message(msg, style_settings, msg_class):
 
     if 'badges' in message:
         message['badges'] = process_badges(message['badges'])
+
+    if 'platform' in message:
+        message['platform'] = process_platform(message['platform'])
 
     if 'command' in message:
         if message['command'].startswith('replace'):
@@ -386,7 +392,6 @@ class CssRoot(object):
     def style_scss(self, *path):
         css_namespace = Namespace()
         for key, value in self.settings['keys'].items():
-            log.info('%s, %s', key, type(value))
             if isinstance(value, LCText):
                 css_value = String(value)
             elif isinstance(value, LCColour):

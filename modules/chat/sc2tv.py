@@ -80,7 +80,7 @@ class FsChatMessage(TextMessage):
         self._text = text
         self._subscriptions = subscr
 
-        TextMessage.__init__(self, source=SOURCE, source_icon=SOURCE_ICON,
+        TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
                              user=self.user, text=self.text)
 
     def process_smiles(self, smiles):
@@ -104,7 +104,7 @@ class FsSystemMessage(SystemMessage):
     def __init__(self, text, emotes=None, category='system'):
         if emotes is None:
             emotes = []
-        SystemMessage.__init__(self, text, source=SOURCE, source_icon=SOURCE_ICON,
+        SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
                                user=SYSTEM_USER, emotes=emotes, category=category)
 
 
