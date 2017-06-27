@@ -6,7 +6,6 @@ import random
 import re
 import threading
 import time
-from collections import OrderedDict
 
 import irc.client
 import requests
@@ -14,8 +13,8 @@ import requests
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUser
 from modules.helper.module import ChatModule
-from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
-from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool
+from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE, register_iodc
+from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool, LCButton
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -31,6 +30,7 @@ SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 FILE_ICON = os.path.join('img', 'tw.png')
 SYSTEM_USER = 'Twitch.TV'
 BITS_REGEXP = r'(^|\s)(\w+){}(\s|$)'
+API_URL = 'https://api.twitch.tv/kraken/{}'
 
 PING_DELAY = 10
 
@@ -43,6 +43,8 @@ CONF_DICT['config']['show_pm'] = LCBool(True)
 CONF_DICT['config']['bttv'] = LCBool(True)
 CONF_DICT['config']['show_channel_names'] = LCBool(True)
 CONF_DICT['config']['show_nickname_colors'] = LCBool(False)
+CONF_DICT['config']['register_oidc'] = LCButton(register_iodc)
+
 CONF_GUI = {
     'config': {
         'hidden': ['host', 'port'],
@@ -51,7 +53,8 @@ CONF_GUI = {
             'addable': 'true'
         }
     },
-    'non_dynamic': ['config.host', 'config.port', 'config.bttv']
+    'non_dynamic': ['config.host', 'config.port', 'config.bttv'],
+    'ignored_sections': ['config.register_oidc'],
 }
 
 
@@ -61,6 +64,10 @@ class TwitchUserError(Exception):
 
 class TwitchNormalDisconnect(Exception):
     """Normal Disconnect exception"""
+
+
+class TwitchAPIError(Exception):
+    """Exception of API"""
 
 
 class TwitchTextMessage(TextMessage):
@@ -602,6 +609,12 @@ class twitch(ChatModule):
         self.host = CONF_DICT['config']['host']
         self.port = int(CONF_DICT['config']['port'])
         self.bttv = CONF_DICT['config']['bttv']
+        self.access_code = self._conf_params['config'].get('access_code')
+        if self.access_code:
+            headers['Authorization'] = 'OAuth {}'.format(self.access_code)
+
+        self.rest_add('GET', 'oidc', self.parse_oidc_request)
+        self.rest_add('POST', 'oidc', self.oidc_code)
 
     def _conf_settings(self, *args, **kwargs):
         return CONF_DICT
@@ -643,3 +656,49 @@ class twitch(ChatModule):
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
         ChatModule.apply_settings(self, **kwargs)
+
+    def parse_oidc_request(self, req):
+        return '<script>' \
+               'var http = new XMLHttpRequest();' \
+               'var params = "request=" + encodeURIComponent(window.location.hash);' \
+               'http.open("POST", "oidc", true);' \
+               'http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");' \
+               'http.send(params);' \
+               '</script>'
+
+    def oidc_code(self, req, **kwargs):
+        def remove_hash(item):
+            return item if '#' not in item else item[1:]
+        items_list = map(remove_hash, kwargs.get('request').split('&'))
+        item_dict = {}
+        for item in items_list:
+            item_dict[item.split('=')[0]] = item.split('=')[1]
+
+        if not self.access_code:
+            self.access_code = item_dict['access_token']
+            self._conf_params['config']['access_code'] = self.access_code
+
+            headers['Authorization'] = 'OAuth {}'.format(self.access_code)
+        if self.channels:
+            self.api_call('channels/{}/editors'.format(self.channels.items()[0][0]))
+        return 'Access Code saved'
+
+    def api_call(self, key):
+        req = requests.get(API_URL.format(key), headers=headers)
+        if req.ok:
+            return req.json()
+        raise TwitchAPIError('Unable to get {}'.format(key))
+
+    def register_iodc(self, parent_window):
+        port = self._loaded_modules['webchat']['port']
+
+        url = 'https://api.twitch.tv/kraken/oauth2/authorize?client_id={}' \
+              '&redirect_uri={}' \
+              '&response_type={}' \
+              '&scope={}'.format(headers['Client-ID'], 'http://localhost:{}/{}'.format(port, 'rest/twitch/oidc'),
+                                 'token', 'channel_editor channel_read')
+        request = requests.get(url)
+
+        if request.ok:
+            parent_window.create_browser(request.url)
+        pass

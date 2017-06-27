@@ -167,3 +167,19 @@ def get_language():
 
 def get_key(*args):
     return MODULE_KEY.join(args)
+
+
+def register_iodc(event):
+    parent = get_wx_parent(event.GetEventObject()).Parent
+    twitch = parent.loaded_modules.get('twitch')['class']
+    if not twitch:
+        raise ValueError('Unable to find loaded Twitch.TV Module')
+
+    twitch.register_iodc(parent)
+    pass
+
+
+def get_wx_parent(item):
+    if item.GrandParent:
+        return get_wx_parent(item.GrandParent)
+    return item

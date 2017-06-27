@@ -5,6 +5,7 @@ from modules.helper.functions import find_by_type, parse_keys_to_string, deep_ge
 from modules.interface.controls import KeyListBox, MainMenuToolBar
 
 import modules.interface.functions
+from modules.interface.frames import OAuthBrowser
 from modules.interface.types import *
 
 try:
@@ -990,6 +991,10 @@ class ChatGui(wx.Frame):
                 if 'class' in settings:
                     settings['class'].gui_button_press(self, event, list_keys)
         event.Skip()
+
+    def create_browser(self, url):
+        browser_window = OAuthBrowser(self, url)
+        pass
 
 
 class GuiThread(threading.Thread, BaseModule):
