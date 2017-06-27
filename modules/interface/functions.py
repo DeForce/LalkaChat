@@ -8,6 +8,7 @@ from modules.interface.controls import GuiCreationError, CustomColourPickerCtrl,
 from modules.interface.types import LCPanel
 
 
+
 def create_textctrl(panel=None, value=None, key=None, bind=None, **kwargs):
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
     item_name = MODULE_KEY.join(key)
@@ -36,6 +37,8 @@ def create_button(source_class=None, panel=None, key=None, value=None,
 
     if value:
         # TODO: Implement button function pressing
+        if callable(value.value):
+            c_button.Bind(wx.EVT_BUTTON, value.value, id=button_id)
         c_button.Bind(wx.EVT_BUTTON, bind, id=button_id)
     else:
         c_button.Bind(wx.EVT_BUTTON, bind, id=button_id)

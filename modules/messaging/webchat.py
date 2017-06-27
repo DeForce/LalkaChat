@@ -345,8 +345,11 @@ class RestRoot(object):
 
         body = cherrypy.request.body
         if cherrypy.request.method in cherrypy.request.methods_with_bodies:
-            data = json.load(body)
-            kwargs.update(data)
+            try:
+                data = json.load(body)
+                kwargs.update(data)
+            except:
+                pass
 
         if len(args) > 1:
             module_name = args[0]
