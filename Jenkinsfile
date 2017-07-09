@@ -1,6 +1,8 @@
 import groovy.json.JsonBuilder
 import groovy.json.JsonSlurperClassic
 
+def UploadPath = "jenkins@czt.lv:/usr/local/nginx/html/czt.lv/lalkachat/"
+
 node('docker-host') {
     stage('Checkout') {
         checkout scm
@@ -101,9 +103,10 @@ node('docker-host') {
                 }
                 archive "dist/windows/${ZipName}.zip"
                 sh "chmod 664 dist/windows/${ZipName}.zip"
-                def UploadPath = "jenkins@czt.lv:/usr/local/nginx/html/czt.lv/lalkachat/"
                 sh "scp dist/windows/${ZipName}.zip ${UploadPath}"
             }
+            sh "tar -zcvf themes-${BRANCH_NAME.replace('/', '-')}.tar.gz http/"
+            sh "scp themes-${BRANCH_NAME.replace('/', '-')}.tar.gz ${UploadPath}"
         }
     }
     finally {
