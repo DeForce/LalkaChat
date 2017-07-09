@@ -532,8 +532,8 @@ class webchat(MessagingModule):
         conf_params = self._conf_params['config']
 
         self._conf_params.update({
-            'host': conf_params['server']['host'],
-            'port': conf_params['server']['port'],
+            'host': str(conf_params['server']['host']),
+            'port': str(conf_params['server']['port']),
 
             'style_settings': {
                 'gui': {

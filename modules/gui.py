@@ -1,10 +1,13 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import collections
 
+import sys
+
 from modules.helper.functions import find_by_type, parse_keys_to_string, deep_get
 from modules.interface.controls import KeyListBox, MainMenuToolBar
 
 import modules.interface.functions
+from modules.interface.events import StatusChangeEvent, EVT_STATUS_CHANGE
 from modules.interface.frames import OAuthBrowser
 from modules.interface.types import *
 
@@ -34,6 +37,8 @@ SKIP_TXT_CONTROLS = ['list_input', 'list_input2']
 SKIP_BUTTONS = ['list_add', 'list_remove', 'apply_button', 'cancel_button', 'ok_button']
 ITEM_SPACING_VERT = 6
 ITEM_SPACING_HORZ = 30
+
+WINDOWS = True if sys.platform == 'win32' else False
 
 
 def check_duplicate(item, window):
@@ -177,7 +182,8 @@ class SettingsWindow(wx.Frame):
         self.show_icons = self.main_class.main_config['config']['gui']['show_icons']
 
         # Setting up the window
-        self.SetBackgroundColour('cream')
+        if WINDOWS:
+            self.SetBackgroundColour('cream')
         self.show_hidden = self.main_class.gui_settings.get('show_hidden')
 
         # Setting up events
@@ -204,7 +210,7 @@ class SettingsWindow(wx.Frame):
         description = translate_key(MODULE_KEY.join([selection, 'description']))
 
         item_key = modules.interface.controls.IDS[event.GetId()].split(MODULE_KEY)
-        show_description = self.main_class.loaded_modules[item_key[0]]['gui'][item_key[1]].get('description', False)
+        show_description = self.main_class.loaded_modules[item_key[0]]['config'][item_key[1]].description
 
         if isinstance(item_object, KeyListBox):
             self.on_change(modules.interface.controls.IDS[event.GetId()], selection, item_type='listbox', section=True)
@@ -732,7 +738,10 @@ class StatusFrame(wx.Panel):
     def __init__(self, parent, **kwargs):
         self.chat_modules = kwargs.get('chat_modules')
         wx.Panel.__init__(self, parent, size=wx.Size(-1, 24))
-        self.SetBackgroundColour('cream')
+        self.parent = parent
+
+        if WINDOWS:
+            self.SetBackgroundColour('cream')
 
         self.chats = {}
         self.border_sizer = self._create_sizer()
@@ -852,8 +861,10 @@ class StatusFrame(wx.Panel):
             viewers = '{0}k'.format(viewers[:-3])
         if module_name in self.chats:
             if channel.lower() in self.chats[module_name]:
-                self.chats[module_name][channel.lower()]['label'].SetLabel(str(viewers))
-        self.Layout()
+                wx.PostEvent(self.parent, StatusChangeEvent(data={
+                    'label': self.chats[module_name][channel.lower()]['label'],
+                    'value': str(viewers)
+                }))
 
 
 class ChatGui(wx.Frame):
@@ -915,6 +926,7 @@ class ChatGui(wx.Frame):
 
         # Set events
         self.Bind(wx.EVT_CLOSE, self.on_close)
+        self.Bind(EVT_STATUS_CHANGE, self.process_status_change)
 
         # Show window after creation
         self.SetSizer(vbox)
@@ -994,6 +1006,12 @@ class ChatGui(wx.Frame):
 
     def create_browser(self, url):
         browser_window = OAuthBrowser(self, url)
+        pass
+
+    def process_status_change(self, event):
+        data = event.data
+        data['label'].SetLabel(data['value'])
+        self.Layout()
         pass
 
 
