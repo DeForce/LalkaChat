@@ -16,7 +16,7 @@
                 </div>
 
                 <div class="message-source">
-                    <img class="platform" :src="message.source_icon || './img/sources/' + message.source + '.png'" />
+                    <img class="platform" :src="message.platform.icon || './img/sources/' + message.platform.id + '.png'" />
                 </div>
 
                 <template v-if="message.levels">
