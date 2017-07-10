@@ -77,8 +77,8 @@ class FsChatMessage(TextMessage):
                              user=self.user, text=self.text)
 
     def process_smiles(self, smiles):
-        finded = re.findall(SMILE_REGEXP, self._text)
-        for smile in finded:
+        found_smiles = re.findall(SMILE_REGEXP, self._text)
+        for smile in found_smiles:
             if smile.lower() in smiles and allow_smile(smiles[smile], self._subscriptions):
                 self._text = self._text.replace(SMILE_FORMAT.format(smile),
                                                 EMOTE_FORMAT.format(smile))
