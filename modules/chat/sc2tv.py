@@ -19,6 +19,7 @@ from modules.helper.system import translate_key, EMOTE_FORMAT
 from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText
 
 logging.getLogger('requests').setLevel(logging.ERROR)
+logging.getLogger('urllib3').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
 SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
@@ -150,7 +151,7 @@ class FsChat(WebSocketClient):
                 MODULE_KEY.join(['sc2tv', 'connection_closed'])).format(self.glob),
                                 category='connection')
         else:
-            log.info("Websocket Connection Closed Down")
+            log.info("Websocket Connection Closed Down with error %s, %s", code, reason)
             self.fs_system_message(
                 translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])).format(self.glob),
                 category='connection')
@@ -161,6 +162,7 @@ class FsChat(WebSocketClient):
         self.queue.put(FsSystemMessage(message, category=category))
 
     def received_message(self, mes):
+        log.debug('received message {}'.format(mes))
         if mes.data == '40':
             return
         if mes.data in ['2', '3']:
@@ -201,6 +203,7 @@ class FsChat(WebSocketClient):
     def fs_join(self):
         # Then we send the message acording to needed format and
         #  hope it joins us
+        logging.debug("Joining Channel {}".format(str(self.channel_id)))
         if self.channel_id:
             payload = [
                 '/chat/join',
@@ -212,7 +215,7 @@ class FsChat(WebSocketClient):
 
             msg_joining = translate_key(MODULE_KEY.join(['sc2tv', 'joining']))
             self.fs_system_message(msg_joining.format(self.glob), category='connection')
-            log.info(msg_joining.format(self.channel_id))
+            log.debug(msg_joining.format(self.channel_id))
 
     def fs_send(self, payload):
         iter_sio = "42"+str(self.iter)

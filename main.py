@@ -204,8 +204,7 @@ def init():
     for f_module, f_config in loaded_modules.iteritems():
         if 'class' in f_config:
             try:
-                f_config['class'].load_module(main_settings=base_config, loaded_modules=loaded_modules,
-                                              queue=queue)
+                f_config['class'].load_module(main_settings=base_config, loaded_modules=loaded_modules)
                 log.debug('loaded module {}'.format(f_module))
             except ModuleLoadException:
                 msg.modules.remove(loaded_modules[f_module]['class'])

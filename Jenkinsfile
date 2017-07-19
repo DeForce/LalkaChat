@@ -3,13 +3,86 @@ import groovy.json.JsonSlurperClassic
 
 def UploadPath = "jenkins@czt.lv:/usr/local/nginx/html/czt.lv/lalkachat/"
 
+def stage = { String stageName, Closure body ->
+    // It's stage that prints its name
+    stage(stageName) {
+        echo "Stage: ${stageName}"
+        body.call()
+    }
+}
+
+def buildThemes() {
+    // Creates themes.json
+    sh 'python src/jenkins/get_themes.py'
+    def ThemesJson = readFile('themes.json')
+    def ThemesList = new JsonSlurperClassic().parseText(ThemesJson)
+    echo "${ThemesList}"
+    for (def Theme : ThemesList) {
+        sh "/bin/sh src/jenkins/test_theme.sh ${Theme}"
+        sh "/bin/sh src/jenkins/build_theme.sh ${Theme}"
+    }
+}
+
+def runTests(folder, name, skip) {
+    sh "python src/jenkins/get_folder_tests.py ${folder} ${name}"
+    def TestsList
+    try {
+        def TestJson = readFile("${name}_tests.json")
+        TestsList = new JsonSlurperClassic().parseText(TestJson)
+    }
+    catch (exc) {
+        echo "No json file, exiting"
+        return
+    }
+    def TestResults = [:]
+    for (def Test : TestsList) {
+        echo "Running ${Test} test"
+        def result = false
+        try {
+            def Test_Name = Test.split('/').last().split("\\.").first()
+            if(Test.endsWith('.py')) {
+                sh "set -o pipefail && python ${Test} 2>&1 | tee results/${name}_${Test_Name}_results.txt"
+            } else {
+                sh "set -o pipefail && /bin/bash ${Test} 2>&1 | tee results/${name}_${Test_Name}_results.txt"
+            }
+            result = true
+        } catch(exc) {
+            if(!skip) {
+                echo "Exception: $exc"
+                error("Test didn't pass")
+            }
+        }
+        finally {
+            TestResults[Test] = result
+        }
+    }
+    writeFile(file: "results/${name}_test.txt", text: new JsonBuilder(TestResults).toPrettyString())
+}
+
+def buildDockerImage(archName, image, buildName) {
+    sh "docker build -t ${buildName} -f docker/dockerfiles/${archName}/${image}/Dockerfile ."
+}
+
+@NonCPS
+static def mapToList(depmap) {
+    def dlist = []
+    for (def entry2 in depmap) {
+        dlist.add(new java.util.AbstractMap.SimpleImmutableEntry(entry2.key, entry2.value))
+    }
+    dlist
+}
+
 node('docker-host') {
     stage('Checkout') {
         checkout scm
         sh 'mkdir -p results'
         sh 'rsync -avz src/jenkins/root/ ./'
+
+        // This comment is needed until I refactor Jenkinsfile to support proper error throwing
+        // def deps = 'asdas/asdasddas/asdasda/asdasd'.split('/').last().split("\\.").first()
     }
     def stable = true
+    env.PYTHONPATH = pwd()
     try {
         def containersToBuild = []
         stage('Prepare Docker containers') {
@@ -58,11 +131,13 @@ node('docker-host') {
                         try {
                             stage('Run Chat') {
                                 sh '/bin/sh src/jenkins/run_chat.sh'
-                                sh 'ps aux | grep -v grep | grep main.py'
                             }
                             stage('Run Tests') {
                                 stage('Chat Tests') {
                                     runTests('src/jenkins/chat_tests', 'chat', false)
+                                }
+                                stage('Module Tests') {
+                                    echo 'Module Tests'
                                 }
                             }
                             stage('Lint Tests') {
@@ -75,11 +150,19 @@ node('docker-host') {
                                     stable = false
                                 }
                             }
-                        } finally {
+                        } catch(exc) {
+                            echo "${exc}"
+                        }
+                        finally {
+                            echo "Chat logs"
                             sh 'cat chat.log'
-                            sh "python src/jenkins/tests_to_xml.py ${container}"
-                            junit 'results/chat_tests.xml'
-                            archive 'results/**'
+                            try {
+                                sh "python src/jenkins/tests_to_xml.py ${container}"
+                                junit 'results/chat_tests.xml'
+                                archive 'results/**'
+                            } catch (exc) {
+                                echo "Got Exception, skipping"
+                            }
                         }
                     }
                 }
@@ -104,9 +187,9 @@ node('docker-host') {
                 archive "dist/windows/${ZipName}.zip"
                 sh "chmod 664 dist/windows/${ZipName}.zip"
                 sh "scp dist/windows/${ZipName}.zip ${UploadPath}"
+                sh "tar -zcvf themes-${BRANCH_NAME.replace('/', '-')}.tar.gz http/"
+                sh "scp themes-${BRANCH_NAME.replace('/', '-')}.tar.gz ${UploadPath}"
             }
-            sh "tar -zcvf themes-${BRANCH_NAME.replace('/', '-')}.tar.gz http/"
-            sh "scp themes-${BRANCH_NAME.replace('/', '-')}.tar.gz ${UploadPath}"
         }
     }
     finally {
@@ -120,57 +203,4 @@ node('docker-host') {
             deleteDir()
         }
     }
-}
-
-def buildThemes() {
-    // Creates themes.json
-    sh 'python src/jenkins/get_themes.py'
-    def ThemesJson = readFile('themes.json')
-    def ThemesList = new JsonSlurperClassic().parseText(ThemesJson)
-    echo "${ThemesList}"
-    for (def Theme : ThemesList) {
-        sh "/bin/sh src/jenkins/test_theme.sh ${Theme}"
-        sh "/bin/sh src/jenkins/build_theme.sh ${Theme}"
-    }
-}
-
-def runTests(folder, name, skip) {
-    sh "python src/jenkins/get_folder_tests.py ${folder} ${name}"
-    def TestJson = readFile("${name}_tests.json")
-    def TestsList = new JsonSlurperClassic().parseText(TestJson)
-    def TestResults = [:]
-    for (def Test : TestsList) {
-        echo "Running ${Test} test"
-        def result = false
-        try {
-            def Test_Name = Test.split('/').last().split("\\.").first()
-            if(Test.endsWith('.py')) {
-                sh "set -o pipefail && python ${Test} 2>&1 | tee results/${name}_${Test_Name}_results.txt"
-            } else {
-                sh "set -o pipefail && /bin/bash ${Test} 2>&1 | tee results/${name}_${Test_Name}_results.txt"
-            }
-            result = true
-        } catch(exc) {
-            if(!skip) {
-                error('Test didn\'t pass')
-            }
-        }
-        finally {
-            TestResults[Test] = result
-        }
-    }
-    writeFile(file: "results/${name}_test.txt", text: new JsonBuilder(TestResults).toPrettyString())
-}
-
-def buildDockerImage(archName, image, buildName) {
-    sh "docker build -t ${buildName} -f docker/dockerfiles/${archName}/${image}/Dockerfile ."
-}
-
-@NonCPS
-def mapToList(depmap) {
-    def dlist = []
-    for (def entry2 in depmap) {
-        dlist.add(new java.util.AbstractMap.SimpleImmutableEntry(entry2.key, entry2.value))
-    }
-    dlist
 }
