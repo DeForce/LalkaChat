@@ -552,7 +552,7 @@ class webchat(MessagingModule):
         self.style_settings = self._conf_params['style_settings']
 
         self.s_thread = None
-        self.queue = None
+        self.queue = kwargs.get('queue')
         self.message_threads = []
 
         # Rest Api Settings
@@ -563,7 +563,6 @@ class webchat(MessagingModule):
 
     def load_module(self, *args, **kwargs):
         MessagingModule.load_module(self, *args, **kwargs)
-        self.queue = kwargs.get('queue')
         self.start_webserver()
 
     def start_webserver(self):

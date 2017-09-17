@@ -3,7 +3,7 @@ import collections
 
 import sys
 
-from modules.helper.functions import find_by_type, parse_keys_to_string, deep_get
+from modules.helper.functions import find_by_type, parse_keys_to_string, deep_get, get_config_item_path
 from modules.interface.controls import KeyListBox, MainMenuToolBar
 
 import modules.interface.functions
@@ -210,7 +210,9 @@ class SettingsWindow(wx.Frame):
         description = translate_key(MODULE_KEY.join([selection, 'description']))
 
         item_key = modules.interface.controls.IDS[event.GetId()].split(MODULE_KEY)
-        show_description = self.main_class.loaded_modules[item_key[0]]['config'][item_key[1]].description
+        config_item_path = get_config_item_path(item_key[:-1])
+        module_class = deep_get(self.main_class.loaded_modules, *config_item_path)
+        show_description = module_class.description
 
         if isinstance(item_object, KeyListBox):
             self.on_change(modules.interface.controls.IDS[event.GetId()], selection, item_type='listbox', section=True)
@@ -266,13 +268,12 @@ class SettingsWindow(wx.Frame):
                     self.redraw_item(section_config, value)
                     clear_changes(redraw_key)
                     enable_button()
-        if panel_key_list:
-            config = deep_get(self.main_class.loaded_modules[module_name]['config'], *panel_key_list)
-        else:
-            config = self.main_class.loaded_modules[module_name]['config']
-        ch_item = config_section_name
+        config_item = deep_get(self.main_class.loaded_modules, *get_config_item_path(split_keys))
+        if config_item is None:
+            config_item = deep_get(self.main_class.loaded_modules, *get_config_item_path(split_keys[:-1]))
+
         if section:
-            check = config[ch_item].value if isinstance(config[ch_item], LCObject) else config[ch_item]
+            check = config_item.value if isinstance(config_item, LCObject) else config_item
             if isinstance(value, list):
                 apply_changes() if set(check) != set(value) else clear_changes()
             else:
@@ -281,13 +282,13 @@ class SettingsWindow(wx.Frame):
                 else:
                     clear_changes()
         elif item_type == 'gridbox':
-            if compare_2d_lists(value, config[ch_item][split_keys[-1]].simple()):
+            if compare_2d_lists(value, config_item.simple()):
                 clear_changes()
             else:
                 apply_changes()
         else:
             test_value = value if isinstance(value, bool) else return_type(value)
-            if config[ch_item][split_keys[-1]].simple() != test_value:
+            if config_item.simple() != test_value:
                 apply_changes()
             else:
                 clear_changes()
@@ -306,7 +307,8 @@ class SettingsWindow(wx.Frame):
 
     def on_textctrl(self, event):
         text_ctrl = event.EventObject
-        self.on_change(modules.interface.controls.IDS[event.GetId()], text_ctrl.GetValue().encode('utf-8'), item_type='textctrl')
+        self.on_change(modules.interface.controls.IDS[event.GetId()],
+                       text_ctrl.GetValue().encode('utf-8'), item_type='textctrl')
         event.Skip()
 
     def on_spinctrl(self, event):
@@ -321,7 +323,8 @@ class SettingsWindow(wx.Frame):
 
     def on_dropdown(self, event):
         drop_ctrl = event.EventObject
-        self.on_change(modules.interface.controls.IDS[event.GetId()], drop_ctrl.GetString(drop_ctrl.GetCurrentSelection()),
+        self.on_change(modules.interface.controls.IDS[event.GetId()],
+                       drop_ctrl.GetString(drop_ctrl.GetCurrentSelection()),
                        item_type='dropctrl')
         event.Skip()
 

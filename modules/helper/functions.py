@@ -27,3 +27,9 @@ def parse_keys_to_string(data):
 
 def deep_get(dictionary, *keys):
     return reduce(lambda d, key: d.get(key, None) if isinstance(d, collections.Mapping) else None, keys, dictionary)
+
+
+def get_config_item_path(*keys):
+    new_list = list(*keys)
+    new_list.insert(1, 'config')
+    return new_list

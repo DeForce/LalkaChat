@@ -86,7 +86,8 @@ class Message(threading.Thread):
                     class_module = class_init(main_config['conf_folder'],
                                               root_folder=main_config['root_folder'],
                                               main_settings=settings,
-                                              conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(m_module)))
+                                              conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(m_module)),
+                                              queue=self.queue)
 
                     params = class_module.conf_params()
                     priority = params['config'].get('gui_information', {}).get('id', MODULE_PRI_DEFAULT)
