@@ -89,10 +89,7 @@ class Message(threading.Thread):
                                               conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(m_module)))
 
                     params = class_module.conf_params()
-                    if 'id' in params:
-                        priority = params['id']
-                    else:
-                        priority = MODULE_PRI_DEFAULT
+                    priority = params['config'].get('gui_information', {}).get('id', MODULE_PRI_DEFAULT)
 
                     if int(priority) in modules:
                         modules[int(priority)].append(class_module)

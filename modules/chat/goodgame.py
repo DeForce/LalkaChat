@@ -21,6 +21,7 @@ from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
 from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText, LCGridSingle
 
 logging.getLogger('requests').setLevel(logging.ERROR)
+logging.getLogger('urllib3').setLevel(logging.ERROR)
 log = logging.getLogger('goodgame')
 SOURCE = 'gg'
 SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
