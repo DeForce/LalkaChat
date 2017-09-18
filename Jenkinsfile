@@ -1,6 +1,10 @@
 import groovy.json.JsonBuilder
 import groovy.json.JsonSlurperClassic
 
+env.UPLOAD_DIR = "/mnt/lc"
+env.WINDOWS_BINARIES_PATH = "http://repo.intra.czt.lv/lalkachat/"
+env.BUILDER_CONTAINER = "deforce/lc-ubuntu-builder"
+
 def UploadPath = "jenkins@czt.lv:/usr/local/nginx/html/czt.lv/lalkachat/"
 
 def stage = { String stageName, Closure body ->
@@ -168,28 +172,13 @@ node('docker-host') {
                 }
             }
         }
-        stage('Build') {
-            if (env.BRANCH_NAME == 'develop' || env.BRANCH_NAME == 'master') {
-                def ZipName = env.BUILD_TAG.replace('jenkins-', '')
-                echo ZipName
-                def container = 'deforce/lc-ubuntu-builder'
-                sh "cp requires_windows.txt requirements.txt"
-                def binariesLocation = "http://repo.intra.czt.lv/lalkachat/"
-                sh "wget -r --cut-dirs=1 -nH -np --reject index.html ${binariesLocation} "
-                sh "docker run -v \"\$(pwd):/src/\" ${container}"
-                sh "sh src/jenkins/build_default_themes.sh"
-                sh "cp -r http/ dist/windows/main/http/"
-                sh "chmod a+x -R dist/windows/main/"
-                sh "mv dist/windows/main dist/windows/LalkaChat"
-                dir('dist/windows/') {
-                    sh "zip -r ${ZipName}.zip LalkaChat"
-                }
-                archive "dist/windows/${ZipName}.zip"
-                sh "chmod 664 dist/windows/${ZipName}.zip"
-                sh "scp dist/windows/${ZipName}.zip ${UploadPath}"
-                sh "tar -zcvf themes-${BRANCH_NAME.replace('/', '-')}.tar.gz http/"
-                sh "scp themes-${BRANCH_NAME.replace('/', '-')}.tar.gz ${UploadPath}"
-            }
+        stage('Publish') {
+            env.ZIP_NAME = env.BUILD_TAG.replace('jenkins-', '')
+            sh "sh src/jenkins/publish_chat.sh"
+            sh """
+                tar -zcvf themes-${BRANCH_NAME.replace('/', '-')}.tar.gz http/
+                cp ./themes-${BRANCH_NAME.replace('/', '-')}.tar.gz ${env.UPLOAD_DIR}/
+               """.stripIndent()
         }
     }
     finally {
