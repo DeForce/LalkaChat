@@ -5,6 +5,7 @@ import Queue
 import imp
 import logging
 import logging.config
+import logging.handlers
 import os
 from collections import OrderedDict
 from time import sleep
@@ -18,6 +19,7 @@ from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPan
 
 VERSION = '0.3.6'
 SEM_VERSION = semantic_version.Version(VERSION)
+LOG_FILES_COUNT = 5
 
 
 def button_test():
@@ -248,7 +250,8 @@ def init():
 if __name__ == '__main__':
     root_logger = logging.getLogger()
     # Logging level
-    file_handler = logging.FileHandler(LOG_FILE)
+    file_handler = logging.handlers.RotatingFileHandler(
+        LOG_FILE, maxBytes=1000*1024, backupCount=LOG_FILES_COUNT)
     file_handler.setFormatter(LOG_FORMAT)
     root_logger.addHandler(file_handler)
 
