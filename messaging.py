@@ -3,11 +3,11 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import os
 import threading
-import imp
 import operator
 import logging
 from collections import OrderedDict
 
+from modules.helper.functions import get_class_from_iname
 from modules.helper.module import BaseModule, MessagingModule
 from modules.helper.system import ModuleLoadException, THREADS, CONF_FOLDER
 from modules.helper.parser import load_from_config_file
@@ -72,21 +72,20 @@ class Message(threading.Thread):
         modules = {}
         # Loading modules from cfg.
         if len(conf_dict['messaging'].value) > 0:
-            for m_module in conf_dict['messaging'].value:
-                log.info("Loading %s" % m_module)
+            for m_module_name in conf_dict['messaging'].value:
+                log.info("Loading %s" % m_module_name)
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
                 #  same name as module name
-                join_path = [main_config['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(m_module)]
+                join_path = [main_config['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(m_module_name)]
                 file_path = os.path.join(*join_path)
 
                 try:
-                    tmp = imp.load_source(m_module, file_path)
-                    class_init = getattr(tmp, m_module)
+                    class_init = get_class_from_iname(file_path, m_module_name)
                     class_module = class_init(main_config['conf_folder'],
                                               root_folder=main_config['root_folder'],
                                               main_settings=settings,
-                                              conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(m_module)),
+                                              conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(m_module_name)),
                                               queue=self.queue)
 
                     params = class_module.conf_params()
@@ -97,9 +96,9 @@ class Message(threading.Thread):
                     else:
                         modules[int(priority)] = [class_module]
 
-                    modules_list[m_module] = params
+                    modules_list[m_module_name] = params
                 except ModuleLoadException:
-                    log.error("Unable to load module {0}".format(m_module))
+                    log.error("Unable to load module {0}".format(m_module_name))
         sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
         for sorted_priority, sorted_list in sorted_module:
             for sorted_list_item in sorted_list:

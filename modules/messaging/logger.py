@@ -25,7 +25,7 @@ CONF_DICT['config']['rotation'] = LCText('daily')
 CONF_GUI = {'non_dynamic': ['config.*']}
 
 
-class logger(MessagingModule):
+class Logger(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
         # Creating filter and replace strings.

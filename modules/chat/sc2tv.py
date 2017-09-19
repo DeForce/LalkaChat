@@ -118,7 +118,7 @@ class FsChat(WebSocketClient):
         self.channel_name = channel_name
         self.glob = kwargs.get('glob')
         self.main_thread = kwargs.get('main_thread')  # type: FsThread
-        self.chat_module = kwargs.get('chat_module')  # type: sc2tv
+        self.chat_module = kwargs.get('chat_module')  # type: SC2TV
         self.crit_error = False
 
         self.channel_id = self.fs_get_id()
@@ -380,7 +380,7 @@ class Sc2tvMessage(object):
 class TestSc2tv(threading.Thread):
     def __init__(self, main_class):
         super(TestSc2tv, self).__init__()
-        self.main_class = main_class  # type: sc2tv
+        self.main_class = main_class  # type: SC2TV
         self.main_class.rest_add('POST', 'push_message', self.send_message)
         self.fs_thread = None
 
@@ -402,7 +402,7 @@ class TestSc2tv(threading.Thread):
         self.fs_thread.received_message(Sc2tvMessage(nickname, text))
 
 
-class sc2tv(ChatModule):
+class SC2TV(ChatModule):
     def __init__(self, *args, **kwargs):
         log.info("Initializing funstream chat")
         ChatModule.__init__(self, *args, **kwargs)

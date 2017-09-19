@@ -23,7 +23,7 @@ CONF_GUI = {
     'non_dynamic': ['grep.*']}
 
 
-class df(MessagingModule):
+class DF(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
         # Dwarf professions.

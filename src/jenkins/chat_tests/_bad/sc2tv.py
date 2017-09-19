@@ -4,7 +4,7 @@ import logging
 
 import time
 
-from modules.chat.sc2tv import sc2tv, FsSystemMessage
+from modules.chat.sc2tv import SC2TV, FsSystemMessage
 
 BASECONFIG = {
     'config': {
@@ -27,7 +27,7 @@ def validate_message(message):
 if __name__ == '__main__':
     queue = Queue.Queue()
 
-    sc2tv_class = sc2tv(conf_params=BASECONFIG, queue=queue)
+    sc2tv_class = SC2TV(conf_params=BASECONFIG, queue=queue)
     sc2tv_class.load_module(loaded_modules={})
 
     channel = sc2tv_class.channels[sc2tv_class.channels.keys()[0]]

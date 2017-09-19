@@ -377,7 +377,7 @@ def gg_message(nickname, text):
 class TestGG(threading.Thread):
     def __init__(self, main_class):
         super(TestGG, self).__init__()
-        self.main_class = main_class  # type: goodgame
+        self.main_class = main_class  # type: GoodGame
         self.main_class.rest_add('POST', 'push_message', self.send_message)
         self.gg_handler = None
 
@@ -399,7 +399,7 @@ class TestGG(threading.Thread):
         self.gg_handler.process_message(gg_message(nickname, text))
 
 
-class goodgame(ChatModule):
+class GoodGame(ChatModule):
     def __init__(self, *args, **kwargs):
         log.info("Initializing goodgame chat")
         ChatModule.__init__(self, *args, **kwargs)

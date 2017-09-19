@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import Queue
-import imp
 import logging
 import logging.config
 import logging.handlers
@@ -11,6 +10,7 @@ from collections import OrderedDict
 from time import sleep
 import semantic_version
 import messaging
+from modules.helper.functions import get_class_from_iname
 from modules.helper.module import BaseModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
@@ -173,32 +173,31 @@ def init():
         'non_dynamic': ['chats.list_box']
     }
 
-    chat_module = BaseModule(
+    chat_init_module = BaseModule(
         conf_params={
             'config': load_from_config_file(chat_modules_file, chat_conf_dict),
             'gui': chat_conf_gui
         },
         conf_file_name='chat_modules.cfg'
     )
-    loaded_modules['chat'] = chat_module.conf_params()
+    loaded_modules['chat'] = chat_init_module.conf_params()
 
-    for chat_module in chat_conf_dict['chats'].simple():
-        log.info("Loading chat module: {0}".format(chat_module))
-        module_location = os.path.join(chat_location, chat_module + ".py")
+    for chat_module_name in chat_conf_dict['chats'].simple():
+        log.info("Loading chat module: {0}".format(chat_module_name))
+        module_location = os.path.join(chat_location, chat_module_name + ".py")
         if os.path.isfile(module_location):
-            log.info("found {0}".format(chat_module))
+            log.info("found {0}".format(chat_module_name))
             # After module is find, we are initializing it.
-            # Class should be named as in config
+            # Class should be named same as module(Case insensitive)
             # Also passing core folder to module so it can load it's own
             #  configuration correctly
 
-            tmp = imp.load_source(chat_module, module_location)
-            chat_init = getattr(tmp, chat_module)
+            chat_init = get_class_from_iname(module_location, chat_module_name)
             class_module = chat_init(queue=queue,
                                      conf_folder=CONF_FOLDER,
-                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module)),
+                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module_name)),
                                      testing=main_config_dict['system']['testing_mode'])
-            loaded_modules[chat_module] = class_module.conf_params()
+            loaded_modules[chat_module_name] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")
 

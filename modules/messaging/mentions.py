@@ -23,7 +23,7 @@ CONF_GUI = {
 }
 
 
-class mentions(MessagingModule):
+class Mentions(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
         # Creating filter and replace strings.

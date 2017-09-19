@@ -24,7 +24,7 @@ CONF_DICT['words_block'] = LCGridSingle()
 log = logging.getLogger('blacklist')
 
 
-class blacklist(MessagingModule):
+class Blacklist(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
 
