@@ -8,7 +8,6 @@ from modules.interface.controls import GuiCreationError, CustomColourPickerCtrl,
 from modules.interface.types import LCPanel
 
 
-
 def create_textctrl(panel=None, value=None, key=None, bind=None, **kwargs):
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
     item_name = MODULE_KEY.join(key)
@@ -155,6 +154,7 @@ def create_list(panel=None, value=None, key=None, bind=None, gui=None, from_sb=N
     list_box.DisableDragColSize()
     list_box.DisableDragRowSize()
     list_box.Bind(wx.grid.EVT_GRID_SELECT_CELL, bind['select'])
+    list_box.Bind(wx.grid.EVT_GRID_CELL_CHANGED, bind['edit'])
 
     if is_dual:
         for index, (item, item_value) in enumerate(value.items()):

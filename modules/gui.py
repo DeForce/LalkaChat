@@ -113,7 +113,8 @@ class SettingsWindow(wx.Frame):
                 'bind': {
                     'add': self.button_clicked,
                     'remove': self.button_clicked,
-                    'select': self.select_cell
+                    'select': self.select_cell,
+                    'edit': self.edit_cell
                 }
             },
             LCGridSingle: {
@@ -121,7 +122,8 @@ class SettingsWindow(wx.Frame):
                 'bind': {
                     'add': self.button_clicked,
                     'remove': self.button_clicked,
-                    'select': self.select_cell
+                    'select': self.select_cell,
+                    'edit': self.edit_cell
                 }
             },
             LCChooseMultiple: {
@@ -173,7 +175,8 @@ class SettingsWindow(wx.Frame):
                 'bind': {
                     'add': self.button_clicked,
                     'remove': self.button_clicked,
-                    'select': self.select_cell
+                    'select': self.select_cell,
+                    'edit': self.edit_cell
                 }
             },
         }
@@ -709,6 +712,12 @@ class SettingsWindow(wx.Frame):
 
     def select_cell(self, event):
         self.selected_cell = (event.GetRow(), event.GetCol())
+        event.Skip()
+
+    def edit_cell(self, event):
+        button_id = event.GetId()
+        keys = modules.interface.controls.IDS[button_id].split(MODULE_KEY)
+        self.on_list_operation(MODULE_KEY.join(keys[:-1]), action='list_edit')
         event.Skip()
 
     @staticmethod
