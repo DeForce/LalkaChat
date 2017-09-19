@@ -46,7 +46,7 @@ def twitch_replace_indexes(filter_name, text, filter_size, replace_size, emotes_
     return emotes
 
 
-class c2b(MessagingModule):
+class C2B(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
 

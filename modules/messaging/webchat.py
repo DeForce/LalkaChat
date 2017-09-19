@@ -526,7 +526,7 @@ def socket_open(host, port):
     return sock.connect_ex((host, int(port)))
 
 
-class webchat(MessagingModule):
+class Webchat(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
         conf_params = self._conf_params['config']

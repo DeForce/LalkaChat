@@ -156,6 +156,7 @@ node('docker-host') {
                             }
                         } catch(exc) {
                             echo "${exc}"
+                            throw(exc)
                         }
                         finally {
                             echo "Chat logs"

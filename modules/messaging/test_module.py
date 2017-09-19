@@ -10,7 +10,7 @@ DEFAULT_PRIORITY = 30
 CONFIG_FILE = 'test_module.cfg'
 
 
-class test_module(MessagingModule):
+class Test_Module(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
 

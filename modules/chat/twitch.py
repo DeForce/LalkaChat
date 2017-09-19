@@ -577,7 +577,7 @@ class TwitchMessage(object):
 class TestTwitch(threading.Thread):
     def __init__(self, main_class):
         super(TestTwitch, self).__init__()
-        self.main_class = main_class  # type: twitch
+        self.main_class = main_class  # type: Twitch
         self.main_class.rest_add('POST', 'push_message', self.send_message)
         self.tw_queue = None
 
@@ -601,7 +601,7 @@ class TestTwitch(threading.Thread):
         self.tw_queue.put(TwitchMessage(nickname, text, emotes, bits))
 
 
-class twitch(ChatModule):
+class Twitch(ChatModule):
     def __init__(self, *args, **kwargs):
         log.info("Initializing twitch chat")
         ChatModule.__init__(self, *args, **kwargs)

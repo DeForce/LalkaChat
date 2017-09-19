@@ -1,5 +1,7 @@
 import collections
 
+import imp
+
 
 def find_by_type(data, type_to_find):
     found = collections.OrderedDict()
@@ -33,3 +35,12 @@ def get_config_item_path(*keys):
     new_list = list(*keys)
     new_list.insert(1, 'config')
     return new_list
+
+
+def get_class_from_iname(python_module_path, name):
+    python_module = imp.load_source(name, python_module_path)
+    python_module_items = [item.upper() for item in dir(python_module)]
+    if name.upper() in python_module_items:
+        class_name = dir(python_module)[python_module_items.index(name.upper())]
+        return getattr(python_module, class_name)
+    raise ValueError('Unable to find class from name')

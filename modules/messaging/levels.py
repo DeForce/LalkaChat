@@ -54,7 +54,7 @@ CONF_GUI = {
     }}
 
 
-class levels(MessagingModule):
+class Levels(MessagingModule):
     @staticmethod
     def create_db(db_location):
         if not os.path.exists(db_location):

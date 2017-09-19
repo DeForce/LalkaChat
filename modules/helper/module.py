@@ -47,7 +47,7 @@ class BaseModule:
         if 'conf_file_name' in kwargs:
             conf_file_name = kwargs.get('conf_file_name')
         else:
-            conf_file_name = os.path.join(CONF_FOLDER, "{}.cfg".format(self._module_name))
+            conf_file_name = os.path.join(CONF_FOLDER, "{}.cfg".format(self._module_name.lower()))
         conf_file = os.path.join(CONF_FOLDER, conf_file_name)
 
         self._conf_params.update(
