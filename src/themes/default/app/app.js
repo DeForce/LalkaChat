@@ -7,7 +7,7 @@ const DOMPurify = require('dompurify');
     new Vue({
         el: '#chat-container',
         data: function () {
-            var wsUrl = 'ws://' + window.location.host + window.location.pathname + '/ws';
+            var wsUrl = 'ws://' + window.location.host + window.location.pathname + 'ws';
             var messages = [];
             var socket = new WebSocket(wsUrl);
 
