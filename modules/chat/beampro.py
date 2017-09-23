@@ -79,7 +79,7 @@ class BeamProMessageHandler(threading.Thread):
     def _process_event(self, message):
         event = message['event']
         if event == 'WelcomeEvent':
-            self.main_class.set_online(self.channel_nick)
+            self.main_class.set_channel_online(self.channel_nick)
         elif event == 'ChatMessage':
             self._process_chat_message(message)
         elif event == 'DeleteMessage':
@@ -187,7 +187,7 @@ class BeamProClient(WebSocketClient):
             self.system_message(
                 translate_key('beampro.connection_died').format(self.channel_nick)
             )
-        self.main_class.set_offline(self.channel_nick)
+        self.main_class.set_channel_offline(self.channel_nick)
 
     def received_message(self, message):
         self.ws_queue.put(json.loads(message.data))
@@ -336,8 +336,8 @@ class beampro(ChatModule):
             return NA_MESSAGE
         return viewers_req.headers['x-total-count']
 
-    def _set_chat_online(self, chat):
-        ChatModule._set_chat_online(self, chat)
+    def _add_channel(self, chat):
+        ChatModule._add_channel(self, chat)
         self.channels[chat] = BeamProInitThread(
             queue=self.queue,
             channel=chat,

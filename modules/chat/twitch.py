@@ -354,7 +354,7 @@ class IRC(irc.client.SimpleIRCClient):
             log.info("Connection lost")
             log.debug("connection: {}".format(connection))
             log.debug("event: {}".format(event))
-            self.chat_module.set_offline(self.nick)
+            self.chat_module.set_channel_offline(self.nick)
             self.system_message(
                 translate_key(MODULE_KEY.join(['twitch', 'connection_died'])).format(self.nick),
                 category='connection')
@@ -379,7 +379,7 @@ class IRC(irc.client.SimpleIRCClient):
         self.tw_connection = connection
         self.system_message(translate_key(MODULE_KEY.join(['twitch', 'joining'])).format(self.channel),
                             category='connection')
-        self.chat_module.set_online(self.nick)
+        self.chat_module.set_channel_online(self.nick)
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilities (Twitch color, Display Name,
         #  Subscriber, etc)
@@ -646,8 +646,8 @@ class Twitch(ChatModule):
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
-    def _set_chat_online(self, chat):
-        ChatModule.set_chat_online(self, chat)
+    def _add_channel(self, chat):
+        ChatModule.add_channel(self, chat)
         self.channels[chat] = TWThread(self.queue, self.host, self.port, chat, self.bttv,
                                        settings=self._conf_params['settings'], chat_module=self)
         self.channels[chat].start()

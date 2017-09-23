@@ -105,7 +105,17 @@ def init():
             }
         },
         'ignored_sections': ['gui.reload'],
-        'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
+        'non_dynamic': [
+            'language.list_box',
+            'gui.borderless',
+            'gui.cli',
+            'gui.gui',
+            'gui.show_browser',
+            'gui.show_hidden',
+            'gui.show_icons',
+            'gui.transparency',
+            'system.*'
+        ]
     }
     # Adding config for main module
     main_class = BaseModule(
@@ -197,7 +207,7 @@ def init():
                                      conf_folder=CONF_FOLDER,
                                      conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module_name)),
                                      testing=main_config_dict['system']['testing_mode'])
-            loaded_modules[chat_module_name] = class_module.conf_params()
+            loaded_modules[chat_module_name.lower()] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")
 
