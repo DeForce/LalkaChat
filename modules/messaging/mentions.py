@@ -9,7 +9,6 @@ from modules.helper.module import MessagingModule
 from modules.interface.types import LCGridSingle, LCPanel
 
 CONF_DICT = LCPanel()
-CONF_DICT['gui_information'] = {'category': 'messaging'}
 CONF_DICT['mentions'] = LCGridSingle()
 CONF_DICT['address'] = LCGridSingle()
 

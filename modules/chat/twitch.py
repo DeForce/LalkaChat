@@ -35,7 +35,6 @@ API_URL = 'https://api.twitch.tv/kraken/{}'
 PING_DELAY = 10
 
 CONF_DICT = LCPanel(icon=FILE_ICON)
-CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['host'] = LCText('irc.twitch.tv')
 CONF_DICT['config']['port'] = LCText(6667)

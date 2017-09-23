@@ -77,10 +77,15 @@ class LCList(list, LCObject):
 
 class LCButton(LCObject):
     def __init__(self, fnc=None, *args, **kwargs):
+        if fnc is None:
+            fnc = self.pass_function
         super(LCButton, self).__init__(fnc, *args, **kwargs)
 
     def __repr__(self):
         return str(self.value)
+
+    def pass_function(self):
+        pass
 
 
 class LCSpin(LCObject):

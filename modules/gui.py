@@ -54,12 +54,13 @@ def create_categories(loaded_modules):
         if 'config' not in module_config:
             continue
 
-        config = module_config.get('config')
-        if INFORMATION_TAG in config:
-            tag = config[INFORMATION_TAG].get('category', 'undefined')
-            if tag not in cat_dict:
-                cat_dict[tag] = OrderedDict()
-            cat_dict[tag][module_name] = module_config
+        tag = module_config['class'].category
+        if tag == 'hidden':
+            continue
+
+        if tag not in cat_dict:
+            cat_dict[tag] = OrderedDict()
+        cat_dict[tag][module_name] = module_config
     return cat_dict
 
 
@@ -935,7 +936,7 @@ class ChatGui(wx.Frame):
         self.toolbar = MainMenuToolBar(self, main_class=self)
         vbox.Add(self.toolbar, 0, wx.EXPAND)
 
-        self.status_frame = StatusFrame(self, chat_modules=self.sorted_categories['chat'])
+        self.status_frame = StatusFrame(self, chat_modules=self.sorted_categories.get('chat', {}))
         vbox.Add(self.status_frame, 0, wx.EXPAND)
         if self.main_config['config']['gui']['show_counters']:
             self.status_frame.Show(True)
@@ -1076,6 +1077,7 @@ class GuiThread(threading.Thread, BaseModule):
     def __init__(self, **kwargs):
         threading.Thread.__init__(self)
         BaseModule.__init__(self, **kwargs)
+        self._category = 'hidden'
         self.daemon = True
         self.gui = None
         self.kwargs = kwargs

@@ -32,7 +32,6 @@ API_URL = 'http://funstream.tv/api{}'
 PING_DELAY = 10
 
 CONF_DICT = LCPanel(icon=FILE_ICON)
-CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['show_pm'] = LCBool(True)
 CONF_DICT['config']['socket'] = LCText('ws://funstream.tv/socket.io/')

@@ -22,7 +22,7 @@ SEM_VERSION = semantic_version.Version(VERSION)
 LOG_FILES_COUNT = 5
 
 
-def button_test():
+def button_test(event):
     log.info('HelloWorld')
 
 
@@ -66,7 +66,6 @@ def init():
     log.info("Loading basic configuration")
     main_config_dict = LCPanel()
     main_config_dict['gui_information'] = LCStaticBox()
-    main_config_dict['gui_information']['category'] = LCText('main')
     main_config_dict['gui_information']['width'] = LCText('450')
     main_config_dict['gui_information']['height'] = LCText('500')
     main_config_dict['gui_information']['pos_x'] = LCText('10')
@@ -125,7 +124,8 @@ def init():
         },
         config=main_config_dict,
         gui=main_config_gui,
-        conf_file_name='config.cfg'
+        conf_file_name='config.cfg',
+        category='main'
     )
     loaded_modules['main'] = main_class.conf_params()
     main_config = main_class.conf_params()['config']
@@ -171,7 +171,6 @@ def init():
     chat_modules_file = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
-    chat_conf_dict['gui_information'] = {'category': 'chat'}
     chat_conf_dict['chats'] = LCChooseMultiple(
         [],
         check_type='files',
@@ -188,7 +187,8 @@ def init():
             'config': load_from_config_file(chat_modules_file, chat_conf_dict),
             'gui': chat_conf_gui
         },
-        conf_file_name='chat_modules.cfg'
+        conf_file_name='chat_modules.cfg',
+        category='chat'
     )
     loaded_modules['chat'] = chat_init_module.conf_params()
 

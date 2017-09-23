@@ -25,7 +25,6 @@ from modules.interface.types import *
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 DEFAULT_STYLE = 'default'
 DEFAULT_GUI_STYLE = 'default_gui'
-DEFAULT_PRIORITY = 9001
 HISTORY_SIZE = 50
 HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 s_queue = Queue.Queue()
@@ -35,10 +34,6 @@ REMOVED_TRIGGER = '%%REMOVED%%'
 WS_THREADS = THREADS + 3
 
 CONF_DICT = LCPanel()
-CONF_DICT['gui_information'] = {
-    'category': 'main',
-    'id': DEFAULT_PRIORITY
-}
 CONF_DICT['server'] = LCStaticBox()
 CONF_DICT['server']['host'] = LCText('127.0.0.1')
 CONF_DICT['server']['port'] = LCText('8080')
@@ -529,6 +524,8 @@ def socket_open(host, port):
 class Webchat(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
+        self._load_priority = 9001
+        self._category = 'main'
         conf_params = self._conf_params['config']
 
         self._conf_params.update({

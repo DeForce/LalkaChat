@@ -64,7 +64,8 @@ class Message(threading.Thread):
                 'parser': config,
                 'config': conf_dict,
                 'gui': conf_gui},
-            conf_file_name='messaging_modules.cfg'
+            conf_file_name='messaging_modules.cfg',
+            category='messaging'
         )
 
         modules_list['messaging'] = messaging_module.conf_params()
@@ -89,7 +90,7 @@ class Message(threading.Thread):
                                               queue=self.queue)
 
                     params = class_module.conf_params()
-                    priority = params['config'].get('gui_information', {}).get('id', MODULE_PRI_DEFAULT)
+                    priority = class_module.load_priority
 
                     if int(priority) in modules:
                         modules[int(priority)].append(class_module)

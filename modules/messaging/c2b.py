@@ -9,13 +9,9 @@ from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
 from modules.interface.types import LCGridDual, LCPanel
 
-DEFAULT_PRIORITY = 10
 log = logging.getLogger('c2b')
 
 CONF_DICT = LCPanel()
-CONF_DICT['gui_information'] = {
-    'category': 'messaging',
-    'id': DEFAULT_PRIORITY}
 CONF_DICT['config'] = LCGridDual()
 
 CONF_GUI = {
@@ -49,6 +45,7 @@ def twitch_replace_indexes(filter_name, text, filter_size, replace_size, emotes_
 class C2B(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
+        self._load_priority = 10
 
     @process_text_messages
     @ignore_system_messages

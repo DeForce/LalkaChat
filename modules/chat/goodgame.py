@@ -30,7 +30,6 @@ SYSTEM_USER = 'GoodGame'
 ID_PREFIX = 'gg_{0}'
 
 CONF_DICT = LCPanel(icon=FILE_ICON)
-CONF_DICT['gui_information'] = {'category': 'chat'}
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['show_pm'] = LCBool(True)
 CONF_DICT['config']['socket'] = LCText('ws://chat.goodgame.ru:8081/chat/websocket')
@@ -259,7 +258,7 @@ class GGChat(WebSocketClient):
         :param reason: 
         """
         log.info("Connection Closed Down")
-        self.chat_module.set_offline(self.main_thread.nick)
+        self.chat_module.set_channel_offline(self.main_thread.nick)
         if code in [4000, 4001]:
             self.crit_error = True
             self.system_message(translate_key(
