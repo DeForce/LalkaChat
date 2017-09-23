@@ -41,7 +41,7 @@ class BaseModule:
 
         self._loaded_modules = {}
         self._rest_api = {}
-        self._module_name = self.__class__.__name__
+        self._module_name = self.__class__.__name__.lower()
         self._load_queue = {}
 
         if 'conf_file_name' in kwargs:
@@ -166,7 +166,7 @@ class ChatModule(BaseModule):
     def load_module(self, *args, **kwargs):
         BaseModule.load_module(self, *args, **kwargs)
         for channel in self.channels_list:
-            self._set_chat_online(channel)
+            self._add_channel(channel)
 
         if self.testing and self.channels:
             self.testing = self.testing.start()
@@ -205,47 +205,47 @@ class ChatModule(BaseModule):
                 if gui_class.gui.status_frame:
                     gui_class.gui.status_frame.set_viewers(self._module_name, channel, viewers)
 
-    def set_online(self, channel):
+    def set_channel_online(self, channel):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
             if gui_class.gui:
                 if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_online(self._module_name, channel)
+                    gui_class.gui.status_frame.set_channel_online(self._module_name, channel)
         else:
             self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_online'})
 
-    def set_offline(self, channel):
+    def set_channel_offline(self, channel):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
             if gui_class.gui:
                 if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_offline(self._module_name, channel)
+                    gui_class.gui.status_frame.set_channel_offline(self._module_name, channel)
         else:
             self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_offline'})
 
-    def set_chat_online(self, channel):
+    def add_channel(self, channel):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
             if gui_class.gui:
                 if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_chat_online(self._module_name, channel)
+                    gui_class.gui.status_frame.add_channel(self._module_name, channel)
         else:
             self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'add'})
 
-    def set_chat_offline(self, channel):
+    def remove_channel(self, channel):
         if 'gui' in self._loaded_modules:
             gui_class = self._loaded_modules['gui']['class']
             if gui_class.gui:
                 if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_chat_offline(self._module_name, channel)
+                    gui_class.gui.status_frame.remove_channel(self._module_name, channel)
         else:
             self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'remove'})
 
-    def _set_chat_offline(self, chat):
+    def _remove_channel(self, chat):
         """
         :param chat: 
         """
-        self.set_chat_offline(chat)
+        self.remove_channel(chat)
         try:
             self.channels[chat].stop()
         except Exception as exc:
@@ -253,22 +253,22 @@ class ChatModule(BaseModule):
             log.debug(exc)
         del self.channels[chat]
 
-    def _set_chat_online(self, chat):
+    def _add_channel(self, chat):
         """
             Overwite this method
         :param args: 
         :param kwargs: 
         """
-        self.set_chat_online(chat)
+        self.add_channel(chat)
 
     def _check_chats(self, online_chats):
         chats = self._conf_params['config']['config']['channels_list']
 
         chats_to_set_offline = [chat for chat in online_chats if chat not in chats]
-        [self._set_chat_offline(chat) for chat in chats_to_set_offline]
+        [self._remove_channel(chat) for chat in chats_to_set_offline]
 
         chats_to_set_online = [chat for chat in chats if chat not in online_chats]
-        [self._set_chat_online(chat) for chat in chats_to_set_online]
+        [self._add_channel(chat) for chat in chats_to_set_online]
 
     def get_remove_text(self):
         remove_dict = {}

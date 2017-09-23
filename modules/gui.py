@@ -702,8 +702,7 @@ class SettingsWindow(wx.Frame):
                     deep_config[item_name] = item_type(change['value'])
                 else:
                     value = change['value']
-                    if item == get_key('main', 'gui', 'show_hidden'):
-                        self.show_hidden = value
+                    self.apply_custom_gui_settings(item, value)
                     item_type = type(deep_config[section][item_name])
                     deep_config[section][item_name] = item_type(value)
             if 'class' in module_settings:
@@ -745,6 +744,19 @@ class SettingsWindow(wx.Frame):
             self.categories[category][key_string]['config'] = panel_data
             self.categories[category][key_string]['gui'] = gui_data
 
+    def apply_custom_gui_settings(self, item, value):
+        if item == get_key('main', 'gui', 'show_hidden'):
+            self.show_hidden = value
+        if item == get_key('main', 'gui', 'show_counters'):
+            self.main_class.status_frame.is_shown(value)
+        if item == get_key('main', 'gui', 'on_top'):
+            if value:
+                style = self.main_class.styles | wx.STAY_ON_TOP
+            else:
+                style = self.main_class.styles ^ wx.STAY_ON_TOP
+            self.main_class.styles = style
+            self.main_class.SetWindowStyle(style)
+
 
 class StatusFrame(wx.Panel):
     def __init__(self, parent, **kwargs):
@@ -764,15 +776,15 @@ class StatusFrame(wx.Panel):
             if chat_settings['class'].get_queue('status_frame'):
                 for item in chat_settings['class'].get_queue('status_frame'):
                     if item['action'] == 'add':
-                        self.set_chat_online(chat_name, item['channel'])
+                        self.add_channel(chat_name, item['channel'])
 
                 for item in chat_settings['class'].get_queue('status_frame'):
                     if item['action'] == 'set_online':
-                        self.set_online(chat_name, item['channel'])
+                        self.set_channel_online(chat_name, item['channel'])
 
         self.Fit()
         self.Layout()
-        self.Show(True)
+        self.Show(False)
 
     def _create_sizer(self):
         border_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -816,14 +828,7 @@ class StatusFrame(wx.Panel):
         return {'item': item_sizer, 'label': label,
                 'status': status_item, 'name': channel_text, 'channel': channel}
 
-    def set_online(self, module_name, channel):
-        if module_name in self.chats:
-            if channel.lower() in self.chats[module_name]:
-                self.chats[module_name][channel.lower()]['status'].SetBackgroundColour(wx.Colour(0, 128, 0))
-        self.Layout()
-        self.Refresh()
-
-    def set_chat_online(self, module_name, channel):
+    def add_channel(self, module_name, channel):
         if module_name not in self.chats:
             self.chats[module_name] = {}
         if channel.lower() not in self.chats[module_name]:
@@ -834,7 +839,7 @@ class StatusFrame(wx.Panel):
         self.Layout()
         self.Refresh()
 
-    def set_chat_offline(self, module_name, channel):
+    def remove_channel(self, module_name, channel):
         channel = channel.lower()
         if module_name not in self.chats:
             return
@@ -848,7 +853,14 @@ class StatusFrame(wx.Panel):
         self.Layout()
         self.Refresh()
 
-    def set_offline(self, module_name, channel):
+    def set_channel_online(self, module_name, channel):
+        if module_name in self.chats:
+            if channel.lower() in self.chats[module_name]:
+                self.chats[module_name][channel.lower()]['status'].SetBackgroundColour(wx.Colour(0, 128, 0))
+        self.Layout()
+        self.Refresh()
+
+    def set_channel_offline(self, module_name, channel):
         if module_name in self.chats:
             if channel in self.chats[module_name]:
                 self.chats[module_name][channel.lower()]['status'].SetBackgroundColour('red')
@@ -878,6 +890,10 @@ class StatusFrame(wx.Panel):
                     'value': str(viewers)
                 }))
 
+    def is_shown(self, value):
+        self.Show(value)
+        self.parent.Layout()
+
 
 class ChatGui(wx.Frame):
     def __init__(self, parent, title, url, **kwargs):
@@ -889,6 +905,7 @@ class ChatGui(wx.Frame):
         self.settings_window = None
         self.status_frame = None
         self.browser = None
+        self.first_readjust = False
 
         wx.Frame.__init__(self, parent, title=title,
                           size=self.gui_settings.get('size'),
@@ -905,6 +922,7 @@ class ChatGui(wx.Frame):
         if self.gui_settings.get('on_top', False):
             log.info("Application is on top")
             styles = styles | wx.STAY_ON_TOP
+        self.styles = styles
         self.SetFocus()
         self.SetWindowStyle(styles)
 
@@ -915,11 +933,14 @@ class ChatGui(wx.Frame):
         # Creating main gui window
         vbox = wx.BoxSizer(wx.VERTICAL)
         self.toolbar = MainMenuToolBar(self, main_class=self)
-
         vbox.Add(self.toolbar, 0, wx.EXPAND)
+
+        self.status_frame = StatusFrame(self, chat_modules=self.sorted_categories['chat'])
+        vbox.Add(self.status_frame, 0, wx.EXPAND)
         if self.main_config['config']['gui']['show_counters']:
-            self.status_frame = StatusFrame(self, chat_modules=self.sorted_categories['chat'])
-            vbox.Add(self.status_frame, 0, wx.EXPAND)
+            self.status_frame.Show(True)
+            self.status_frame.Fit()
+            self.status_frame.Layout()
         if self.gui_settings['show_browser']:
             if HAS_CHROME:
                 browser_settings = {
@@ -934,11 +955,17 @@ class ChatGui(wx.Frame):
 
             else:
                 self.browser = browser.WebView.New(parent=self, url=url, name='LalkaWebViewGui')
+                if self.main_config['config']['system']['testing_mode']:
+                    self.browser2 = browser.WebView.New(
+                        parent=self,
+                        url=str(url).replace('/gui', ''), name='LalkaWebViewGui2')
+                    vbox.Add(self.browser2, 1, wx.EXPAND)
             vbox.Add(self.browser, 1, wx.EXPAND)
 
         # Set events
         self.Bind(wx.EVT_CLOSE, self.on_close)
         self.Bind(EVT_STATUS_CHANGE, self.process_status_change)
+        self.Bind(wx.EVT_ACTIVATE, self.activate)
 
         # Show window after creation
         self.SetSizer(vbox)
@@ -946,9 +973,12 @@ class ChatGui(wx.Frame):
         if not self.gui_settings['show_browser']:
             self.Layout()
             self.Fit()
+            current_size = self.GetSize()
+            max_height = self.status_frame.GetSize()[1] + self.toolbar.GetBestSize()[1]
+            if current_size[1] != max_height:
+                self.SetSize(wx.Size(current_size[0], max_height))
 
         self.Show(True)
-
         # Show update dialog if new version found
         if self.main_config['update']:
             dialog = wx.MessageDialog(self, message="There is new version, do you want to update?",
@@ -959,6 +989,15 @@ class ChatGui(wx.Frame):
             if response == wx.ID_YES:
                 webbrowser.open(self.main_config['update_url'])
 
+    def activate(self, event):
+        if not self.first_readjust and not self.gui_settings['show_browser']:
+            self.first_readjust = True
+            if self.GetBestSize()[1] > self.GetSize()[1]:
+                self.SetSize(self.GetBestSize())
+            self.Layout()
+            self.Fit()
+        event.Skip()
+
     def on_close(self, event):
         log.info("Exiting...")
         log.debug(event)
@@ -966,9 +1005,10 @@ class ChatGui(wx.Frame):
         # Saving last window size
         config = self.loaded_modules['main']['config']['gui_information']
 
-        size = self.Size
-        config['width'] = size[0]
-        config['height'] = size[1]
+        if self.gui_settings['show_browser']:
+            size = self.Size
+            config['width'] = size[0]
+            config['height'] = size[1]
         config['pos_x'] = self.Position.x
         config['pos_y'] = self.Position.y
 
@@ -990,12 +1030,13 @@ class ChatGui(wx.Frame):
         if self.settings_window:
             self.settings_window.SetFocus()
         else:
-            self.settings_window = SettingsWindow(self,
-                                                  id=settings_menu_id,
-                                                  title=translate_key('settings'),
-                                                  size=(700, 400),
-                                                  main_class=self,
-                                                  categories=self.sorted_categories)
+            self.settings_window = SettingsWindow(
+                self,
+                id=settings_menu_id,
+                title=translate_key('settings'),
+                size=(700, 400),
+                main_class=self,
+                categories=self.sorted_categories)
 
     @staticmethod
     def button_clicked(event):

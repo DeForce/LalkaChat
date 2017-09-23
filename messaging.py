@@ -96,7 +96,7 @@ class Message(threading.Thread):
                     else:
                         modules[int(priority)] = [class_module]
 
-                    modules_list[m_module_name] = params
+                    modules_list[m_module_name.lower()] = params
                 except ModuleLoadException:
                     log.error("Unable to load module {0}".format(m_module_name))
         sorted_module = sorted(modules.items(), key=operator.itemgetter(0))

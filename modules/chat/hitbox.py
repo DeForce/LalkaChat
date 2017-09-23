@@ -84,7 +84,7 @@ class HitboxMessageHandler(threading.Thread):
     def _process_message(self, message):
         method = message['method']
         if method == 'loginMsg':
-            self.main_class.set_online(self.channel)
+            self.main_class.set_channel_online(self.channel)
         elif method == 'serverMsg':
             self._process_trash_msg(message['params'])
         elif method == 'pollMsg':
@@ -395,8 +395,8 @@ class hitbox(ChatModule):
     def _test_class(self):
         return TestHitbox(self)
 
-    def _set_chat_online(self, chat):
-        ChatModule._set_chat_online(self, chat)
+    def _add_channel(self, chat):
+        ChatModule._add_channel(self, chat)
         self.channels[chat] = HitboxInitThread(
             queue=self.queue,
             channel=chat,

@@ -61,7 +61,7 @@ def get_channel_name(channel_name):
     channel_req = requests.post(API_URL.format('/stream'), timeout=5, data=payload)
     if channel_req.ok:
         return channel_req.json()['owner']['name']
-    raise Peka2TVAPIError("Unable to get channel name")
+    return channel_name
 
 
 def allow_smile(smile, subscriptions, allow=False):
@@ -144,7 +144,7 @@ class FsChat(WebSocketClient):
         :param code: 
         :param reason: 
         """
-        self.chat_module.set_offline(self.glob)
+        self.chat_module.set_channel_offline(self.glob)
         if code in [4000, 4001]:
             self.crit_error = True
             self.fs_system_message(translate_key(
@@ -192,10 +192,10 @@ class FsChat(WebSocketClient):
                 error_message = request.json()
                 if 'message' in error_message:
                     log.error("Unable to get channel ID. {0}".format(error_message['message']))
-                    self.closed(1000, 'INV_CH_ID')
+                    self.closed(4000, 'INV_CH_ID')
                 else:
                     log.error("Unable to get channel ID. No message available")
-                    self.closed(1000, 'INV_CH_ID')
+                    self.closed(4000, 'INV_CH_ID')
         except requests.ConnectionError:
             log.info("Unable to get information from api")
         return None
@@ -276,7 +276,7 @@ class FsChat(WebSocketClient):
             self._send_message(msg)
 
     def _process_joined(self):
-        self.chat_module.set_online(self.glob)
+        self.chat_module.set_channel_online(self.glob)
         self.fs_system_message(
             translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.glob), category='connection')
 
@@ -343,6 +343,7 @@ class FsThread(threading.Thread):
                 self.ws.run_forever()
                 break
             time.sleep(5)
+        self.chat_module.remove_channel(self.glob)
 
     def stop(self):
         self.ws.send("11")
@@ -434,7 +435,7 @@ class SC2TV(ChatModule):
             status_request = requests.post(API_URL.format('/stream'), timeout=5, data=status_data)
             if status_request.status_code == 200:
                 if status_request.json()['online']:
-                    self.set_online(ws.channel_name)
+                    self.set_channel_online(ws.channel_name)
                     ws.fs_send(request)
                 else:
                     self.set_viewers(ws.channel_name, 'N/A')
@@ -442,8 +443,8 @@ class SC2TV(ChatModule):
         except requests.ConnectionError:
             log.error("Unable to get smiles")
 
-    def _set_chat_online(self, chat):
-        ChatModule.set_chat_online(self, chat)
+    def _add_channel(self, chat):
+        ChatModule.add_channel(self, chat)
         self.channels[chat] = FsThread(self.queue, self.socket, chat, chat_module=self)
         self.channels[chat].start()
 

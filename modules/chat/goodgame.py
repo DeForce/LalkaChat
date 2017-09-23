@@ -233,7 +233,7 @@ class GGChat(WebSocketClient):
     def opened(self):
         success_msg = "Connection Successful"
         log.info(success_msg)
-        self.chat_module.set_online(self.main_thread.nick)
+        self.chat_module.set_channel_online(self.main_thread.nick)
         try:
             self.chat_module.set_viewers(self.main_thread.nick,
                                          self.chat_module.get_viewers(self.main_thread.nick))
@@ -438,8 +438,8 @@ class GoodGame(ChatModule):
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
-    def _set_chat_online(self, chat):
-        ChatModule.set_chat_online(self, chat)
+    def _add_channel(self, chat):
+        ChatModule.add_channel(self, chat)
         gg = GGThread(self.queue, self.host, chat,
                       self._conf_params['config']['config']['use_channel_id'],
                       settings=self._conf_params['settings'], chat_module=self)
