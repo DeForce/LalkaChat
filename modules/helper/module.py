@@ -1,13 +1,13 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import logging
 import os
-from collections import OrderedDict
-
 from modules.helper import parser
 from modules.helper.message import TextMessage, Message
 from modules.interface.types import LCPanel, LCStaticBox, LCBool, LCList
 from parser import save_settings, load_from_config_file
 from system import RestApiException, CONF_FOLDER
+
+DEFAULT_PRIORITY = 30
 
 
 BASE_DICT = {
@@ -44,6 +44,8 @@ class BaseModule:
         self._module_name = self.__class__.__name__.lower()
         self._load_queue = {}
 
+        self._category = kwargs.get('category', 'main')
+
         if 'conf_file_name' in kwargs:
             conf_file_name = kwargs.get('conf_file_name')
         else:
@@ -76,6 +78,10 @@ class BaseModule:
         params = self._conf_params
         params['class'] = self
         return params
+
+    @property
+    def category(self):
+        return self._category
 
     def _conf_settings(self, *args, **kwargs):
         """
@@ -133,6 +139,12 @@ class BaseModule:
 class MessagingModule(BaseModule):
     def __init__(self, *args, **kwargs):
         BaseModule.__init__(self, *args, **kwargs)
+        self._category = 'messaging'
+        self._load_priority = DEFAULT_PRIORITY
+
+    @property
+    def load_priority(self):
+        return self._load_priority
 
     def process_message(self, message, queue=None):
         """
@@ -150,6 +162,7 @@ class MessagingModule(BaseModule):
 class ChatModule(BaseModule):
     def __init__(self, *args, **kwargs):
         BaseModule.__init__(self, *args, **kwargs)
+        self._category = 'chat'
         self.queue = kwargs.get('queue')
         self.channels = {}
 

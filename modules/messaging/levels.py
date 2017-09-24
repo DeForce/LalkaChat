@@ -17,7 +17,6 @@ from modules.interface.types import *
 log = logging.getLogger('levels')
 
 CONF_DICT = LCPanel()
-CONF_DICT['gui_information'] = {'category': 'messaging'}
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['message'] = LCText(u'{0} has leveled up, now he is {1}')
 CONF_DICT['config']['db'] = LCText(os.path.join('conf', u'levels.db'))
