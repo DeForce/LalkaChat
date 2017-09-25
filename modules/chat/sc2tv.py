@@ -63,16 +63,8 @@ def get_channel_name(channel_name):
     return channel_name
 
 
-def allow_smile(smile, subscriptions, allow=False):
-    if smile['user']:
-        channel_id = smile['user']['id']
-        for sub in subscriptions:
-            if sub == channel_id:
-                allow = True
-    else:
-        allow = True
-    return allow
-
+def allow_smile(smile, subscriptions):
+    return not smile["user"] or smile['user']['id'] in subscriptions
 
 class FsChatMessage(TextMessage):
     def __init__(self, user, text, subscr):
@@ -84,14 +76,12 @@ class FsChatMessage(TextMessage):
                              user=self.user, text=self.text)
 
     def process_smiles(self, smiles):
-        smiles_array = re.findall(SMILE_REGEXP, self._text)
-        for smile in smiles_array:
-            for smile_find in smiles:
-                if smile_find['code'] == smile.lower():
-                    if allow_smile(smile_find, self._subscriptions):
-                        self._text = self._text.replace(SMILE_FORMAT.format(smile),
-                                                        EMOTE_FORMAT.format(smile))
-                        self._emotes.append(Emote(smile, smile_find['url']))
+        found_smiles = re.findall(SMILE_REGEXP, self._text)
+        for smile in found_smiles:
+            if smile.lower() in smiles and allow_smile(smiles[smile], self._subscriptions):
+                self._text = self._text.replace(SMILE_FORMAT.format(smile),
+                                                EMOTE_FORMAT.format(smile))
+                self._emotes.append(Emote(smile, smiles[smile]['url']))
 
     def process_pm(self, to_name, channel_name, show_pm):
         self.text = u'@{},{}'.format(to_name, self.text)
@@ -317,7 +307,7 @@ class FsThread(threading.Thread):
         self.channel_name = get_channel_name(channel_name)
         self.glob = channel_name
         self.chat_module = kwargs.get('chat_module')
-        self.smiles = []
+        self.smiles = {}
         self.ws = None
         self.kwargs = kwargs
 
@@ -355,7 +345,7 @@ class FsThread(threading.Thread):
                 if smiles.status_code == 200:
                     smiles_answer = smiles.json()
                     for smile in smiles_answer:
-                        self.smiles.append(smile)
+                        [smile["code"]] = smile
             except requests.ConnectionError:
                 log.error("Unable to get smiles")
 
