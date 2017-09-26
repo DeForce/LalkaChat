@@ -3,6 +3,8 @@ import Queue
 import copy
 import datetime
 import json
+
+import jinja2
 import os
 import socket
 import threading
@@ -16,10 +18,11 @@ from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
 from modules.gui import MODULE_KEY
+from modules.helper.html_template import HTML_TEMPLATE
 from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByID
 from modules.helper.module import MessagingModule
 from modules.helper.parser import save_settings, convert_to_dict
-from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER
+from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER, EMOTE_FORMAT
 from modules.interface.types import *
 
 logging.getLogger('ws4py').setLevel(logging.ERROR)
@@ -63,7 +66,7 @@ TYPE_DICT = {
 
 
 def process_emotes(emotes):
-    return [{'emote_id': emote.id, 'emote_url': emote.url} for emote in emotes]
+    return [{'id': EMOTE_FORMAT.format(emote.id), 'url': emote.url} for emote in emotes]
 
 
 def process_badges(badges):
@@ -88,7 +91,7 @@ def prepare_message(msg, style_settings, msg_class):
             if issubclass(msg_class, m_class):
                 message['type'] = m_type
 
-    if 'emotes' in message:
+    if 'emotes' in message and message['emotes']:
         message['emotes'] = process_emotes(message['emotes'])
 
     if 'badges' in message:
@@ -596,6 +599,9 @@ class Webchat(MessagingModule):
 
     def apply_settings(self, **kwargs):
         save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections', ()))
+        html_template = jinja2.Template(HTML_TEMPLATE)
+        with open('{}/index.html'.format(HTTP_FOLDER), 'w') as template_file:
+            template_file.write(html_template.render(port=self._conf_params['port']))
         if 'system_exit' in kwargs:
             return
 
