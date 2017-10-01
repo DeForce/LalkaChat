@@ -18,6 +18,7 @@ CONF_FOLDER = os.path.join(PYTHON_FOLDER, "conf")
 MODULE_FOLDER = os.path.join(PYTHON_FOLDER, "modules")
 MAIN_CONF_FILE = os.path.join(CONF_FOLDER, "config.cfg")
 GUI_TAG = 'gui'
+WINDOWS = True if sys.platform == 'win32' else False
 
 LOG_FOLDER = os.path.join(PYTHON_FOLDER, "logs")
 if not os.path.exists(LOG_FOLDER):
