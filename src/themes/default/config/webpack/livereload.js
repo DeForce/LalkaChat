@@ -1,13 +1,13 @@
 const LiveReloadPlugin = require('webpack-livereload-plugin');
 const merge = require('webpack-merge');
-const development = require('./webpack.development');
+const development = require('./development');
 
 const livereload = {
-    plugins: [
-        new LiveReloadPlugin({
-            port: 5000
-        })
-    ]
+  plugins: [
+    new LiveReloadPlugin({
+      port: 5000
+    })
+  ]
 };
 
 module.exports = merge(development, livereload);

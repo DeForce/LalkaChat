@@ -1,0 +1,20 @@
+<div *ngIf="showRemoveButton" class="message-remove">
+  <img class="delete" (click)="remove()" [src]="deleteUrl" />
+</div>
+
+<div class="message-source">
+  <img class="platform" [src]="platformUrl" />
+</div>
+
+<div class="message-level" *ngIf="message.levels">
+  <img class="level" [src]="message.levels?.url" />
+</div>
+
+<div class="message-badges" *ngFor="let badge of message.badges">
+  <img class="badge" [src]="badge.url" [ngClass]="badge.badge" />
+</div>
+
+<div class="channel_name">[{{message.channel_name}}]</div>
+<div class="username" [style.color]="message.nick_colour">{{message.user}}</div>
+<div *ngIf="!message.me">:</div>
+<div class="text" [innerHTML]="messageText" [ngClass]="{ private: message.pm, mention: message.mention }"></div>
