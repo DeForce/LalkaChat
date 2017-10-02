@@ -169,7 +169,6 @@ class StatusFrame(wx.Panel):
                     'value': str(viewers)
                 }))
 
-
     def is_shown(self, value):
         self.Show(value)
         self.parent.Layout()

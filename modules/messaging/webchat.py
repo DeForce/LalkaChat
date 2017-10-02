@@ -1,6 +1,7 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import Queue
 import copy
+import time
 import datetime
 import json
 
@@ -105,6 +106,7 @@ def prepare_message(msg, style_settings, msg_class):
             message['text'] = style_settings['keys']['remove_text']
         return message
 
+    message['timestamp'] = int(time.mktime(message['timestamp'].timetuple()))
     message['id'] = str(message['id'])
     return message
 
