@@ -46,8 +46,8 @@ class Message(object):
         """
             Basic Message class
         """
-        self._jsonable = []
-        self._timestamp = datetime.datetime.now().isoformat()
+        self._jsonable = ['timestamp']
+        self._timestamp = datetime.datetime.now()
 
     def json(self):
         return {attr: getattr(self, attr) for attr in self._jsonable}
