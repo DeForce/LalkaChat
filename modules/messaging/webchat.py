@@ -1,7 +1,5 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import Queue
-import copy
-import time
 import datetime
 import json
 
@@ -78,9 +76,7 @@ def process_platform(platform):
     return {'id': platform.id, 'icon': platform.icon}
 
 
-def prepare_message(msg, style_settings, msg_class):
-    message = copy.deepcopy(msg)
-
+def prepare_message(message, style_settings, msg_class):
     if 'levels' in message:
         message['levels']['url'] = '{}?{}'.format(message['levels']['url'], style_settings['style_name'])
 
@@ -106,8 +102,6 @@ def prepare_message(msg, style_settings, msg_class):
             message['text'] = style_settings['keys']['remove_text']
         return message
 
-    message['timestamp'] = int(time.mktime(message['timestamp'].timetuple()))
-    message['id'] = str(message['id'])
     return message
 
 
@@ -174,8 +168,7 @@ class FireFirstMessages(threading.Thread):
             for item in self.history:
                 if isinstance(item, SystemMessage) and not show_system_msg:
                     continue
-                timestamp = datetime.datetime.strptime(item.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
-                timedelta = datetime.datetime.now() - timestamp
+                timedelta = datetime.datetime.now() - item.timestamp
                 timer = int(self.settings['keys'].get('timer', 0))
                 if timer > 0:
                     if timedelta > datetime.timedelta(seconds=timer):

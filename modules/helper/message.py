@@ -1,6 +1,7 @@
 import uuid
 import logging
 import datetime
+import time
 from modules.helper.system import SOURCE, SOURCE_ICON, SOURCE_USER
 
 log = logging.getLogger('helper.message')
@@ -46,7 +47,7 @@ class Message(object):
         """
             Basic Message class
         """
-        self._jsonable = ['timestamp']
+        self._jsonable = ['unixtime', 'iso_timestamp']
         self._timestamp = datetime.datetime.now()
 
     def json(self):
@@ -55,6 +56,14 @@ class Message(object):
     @property
     def timestamp(self):
         return self._timestamp
+
+    @property
+    def iso_timestamp(self):
+        return self._timestamp.isoformat()
+
+    @property
+    def unixtime(self):
+        return time.mktime(self._timestamp.timetuple())
 
     @property
     def jsonable(self):
