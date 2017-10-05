@@ -9,6 +9,7 @@ import socket
 import threading
 
 import cherrypy
+from html_sanitizer import Sanitizer
 from cherrypy.lib.static import serve_file
 from scss import Compiler
 from scss.namespace import Namespace
@@ -63,6 +64,8 @@ TYPE_DICT = {
     CommandMessage: 'command'
 }
 
+SANITIZER = Sanitizer()
+
 
 def process_emotes(emotes):
     return [{'id': EMOTE_FORMAT.format(emote.id), 'url': emote.url} for emote in emotes]
@@ -102,6 +105,7 @@ def prepare_message(message, style_settings, msg_class):
             message['text'] = style_settings['keys']['remove_text']
         return message
 
+    message['text'] = SANITIZER.sanitize(message['text'])
     return message
 
 
