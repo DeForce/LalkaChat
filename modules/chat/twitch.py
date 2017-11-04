@@ -378,7 +378,6 @@ class IRC(irc.client.SimpleIRCClient):
         self.tw_connection = connection
         self.system_message(translate_key(MODULE_KEY.join(['twitch', 'joining'])).format(self.channel),
                             category='connection')
-        self.chat_module.set_channel_online(self.nick)
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilities (Twitch color, Display Name,
         #  Subscriber, etc)
@@ -392,6 +391,7 @@ class IRC(irc.client.SimpleIRCClient):
         log.debug("connection: {}".format(connection))
         log.debug("event: {}".format(event))
         msg = translate_key(MODULE_KEY.join(['twitch', 'join_success'])).format(self.channel)
+        self.chat_module.set_channel_online(self.nick)
         log.info(msg)
         self.system_message(msg, category='connection')
 
@@ -460,6 +460,7 @@ class TWThread(threading.Thread):
                 if self.load_config():
                     self.irc = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
                     self.irc.connect(self.host, self.port, self.nickname)
+                    self.chat_module.set_channel_online(self.nickname)
                     self.irc.start()
                     log.info("Connection closed")
                     break

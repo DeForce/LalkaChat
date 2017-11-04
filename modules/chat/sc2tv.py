@@ -302,6 +302,7 @@ class FsPingThread(threading.Thread):
         while not self.ws.terminated:
             self.ws.send("2")
             self.ws.chat_module.get_viewers(self.ws)
+            self.ws.chat_module.set_channel_online(self.ws.glob)
             time.sleep(PING_DELAY)
 
 
