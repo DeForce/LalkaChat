@@ -28,17 +28,18 @@ class OAuthBrowser(wx.Frame):
 
 
 class StatusFrame(wx.Panel):
-    def __init__(self, parent, **kwargs):
-        self.chat_modules = kwargs.get('chat_modules')
+    def __init__(self, parent):
         wx.Panel.__init__(self, parent, size=wx.Size(-1, 24))
         self.parent = parent
+        self.chats = {}
+        self.border_sizer = self._create_sizer()
+        self.chat_modules = None
 
         if WINDOWS:
             self.SetBackgroundColour('cream')
 
-        self.chats = {}
-        self.border_sizer = self._create_sizer()
-
+    def load(self):
+        self.chat_modules = self.parent.sorted_categories['chat']
         for chat_name, chat_settings in self.chat_modules.items():
             if chat_name == 'chat':
                 continue
@@ -46,10 +47,16 @@ class StatusFrame(wx.Panel):
                 for item in chat_settings['class'].get_queue('status_frame'):
                     if item['action'] == 'add':
                         self.add_channel(chat_name, item['channel'])
+                        del item
 
                 for item in chat_settings['class'].get_queue('status_frame'):
                     if item['action'] == 'set_online':
                         self.set_channel_online(chat_name, item['channel'])
+                    elif item['action'] == 'set_pending':
+                        self.set_channel_pending(chat_name, item['channel'])
+                    elif item['action'] == 'set_offline':
+                        self.set_channel_offline(chat_name, item['channel'])
+                    del item
 
         self.Fit()
         self.Layout()
@@ -135,14 +142,33 @@ class StatusFrame(wx.Panel):
     def set_channel_online(self, module_name, channel):
         if module_name in self.chats:
             if channel.lower() in self.chats[module_name]:
-                self.chats[module_name][channel.lower()]['status'].SetBackgroundColour(wx.Colour(0, 128, 0))
+                wx.PostEvent(self.parent, StatusChangeEvent(data={
+                    'type': 'channel_state',
+                    'status': self.chats[module_name][channel.lower()]['status'],
+                    'value': wx.Colour(0, 128, 0)
+                }))
+        self.Layout()
+        self.Refresh()
+
+    def set_channel_pending(self, module_name, channel):
+        if module_name in self.chats:
+            if channel.lower() in self.chats[module_name]:
+                wx.PostEvent(self.parent, StatusChangeEvent(data={
+                    'type': 'channel_state',
+                    'status': self.chats[module_name][channel.lower()]['status'],
+                    'value': wx.Colour(200, 200, 0)
+                }))
         self.Layout()
         self.Refresh()
 
     def set_channel_offline(self, module_name, channel):
         if module_name in self.chats:
             if channel in self.chats[module_name]:
-                self.chats[module_name][channel.lower()]['status'].SetBackgroundColour('red')
+                wx.PostEvent(self.parent, StatusChangeEvent(data={
+                    'type': 'channel_state',
+                    'status': self.chats[module_name][channel.lower()]['status'],
+                    'value': 'red'
+                }))
         self.Refresh()
 
     def refresh_labels(self, module_name):
@@ -165,6 +191,7 @@ class StatusFrame(wx.Panel):
         if module_name in self.chats:
             if channel.lower() in self.chats[module_name]:
                 wx.PostEvent(self.parent, StatusChangeEvent(data={
+                    'type': 'viewers',
                     'label': self.chats[module_name][channel.lower()]['label'],
                     'value': str(viewers)
                 }))

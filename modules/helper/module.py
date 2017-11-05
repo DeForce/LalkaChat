@@ -197,11 +197,11 @@ class ChatModule(BaseModule):
         self.refresh_channel_names()
 
     def refresh_channel_names(self):
-        if 'gui' in self._loaded_modules:
+        try:
             gui_class = self._loaded_modules['gui']['class']
-            if gui_class.gui:
-                if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.refresh_labels(self._module_name)
+            gui_class.gui.status_frame.refresh_labels(self._module_name)
+        except Exception as exc:
+            log.info('Unable to update channel names')
 
     def get_viewers(self, *args, **kwargs):
         """
@@ -212,46 +212,45 @@ class ChatModule(BaseModule):
         pass
 
     def set_viewers(self, channel, viewers):
-        if 'gui' in self._loaded_modules:
+        try:
             gui_class = self._loaded_modules['gui']['class']
-            if gui_class.gui:
-                if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_viewers(self._module_name, channel, viewers)
+            gui_class.gui.status_frame.set_viewers(self._module_name, channel, viewers)
+        except Exception:
+            log.info('Unable to set viewers')
 
     def set_channel_online(self, channel):
-        if 'gui' in self._loaded_modules:
+        try:
             gui_class = self._loaded_modules['gui']['class']
-            if gui_class.gui:
-                if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_channel_online(self._module_name, channel)
-        else:
+            gui_class.gui.status_frame.set_channel_online(self._module_name, channel)
+        except Exception as exc:
             self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_online'})
 
-    def set_channel_offline(self, channel):
-        if 'gui' in self._loaded_modules:
+    def set_channel_pending(self, channel):
+        try:
             gui_class = self._loaded_modules['gui']['class']
-            if gui_class.gui:
-                if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.set_channel_offline(self._module_name, channel)
-        else:
+            gui_class.gui.status_frame.set_channel_pending(self._module_name, channel)
+        except Exception:
+            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_pending'})
+
+    def set_channel_offline(self, channel):
+        try:
+            gui_class = self._loaded_modules['gui']['class']
+            gui_class.gui.status_frame.set_channel_offline(self._module_name, channel)
+        except Exception:
             self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_offline'})
 
     def add_channel(self, channel):
-        if 'gui' in self._loaded_modules:
+        try:
             gui_class = self._loaded_modules['gui']['class']
-            if gui_class.gui:
-                if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.add_channel(self._module_name, channel)
-        else:
+            gui_class.gui.status_frame.add_channel(self._module_name, channel)
+        except Exception:
             self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'add'})
 
     def remove_channel(self, channel):
-        if 'gui' in self._loaded_modules:
+        try:
             gui_class = self._loaded_modules['gui']['class']
-            if gui_class.gui:
-                if gui_class.gui.status_frame:
-                    gui_class.gui.status_frame.remove_channel(self._module_name, channel)
-        else:
+            gui_class.gui.status_frame.remove_channel(self._module_name, channel)
+        except Exception:
             self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'remove'})
 
     def _remove_channel(self, chat):

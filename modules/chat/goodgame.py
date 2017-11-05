@@ -289,6 +289,8 @@ class GGThread(threading.Thread):
         self.queue = queue
         self.address = address
         self.nick = nick
+
+        self.chat_module = kwargs.get('chat_module')
         try:
             self.ch_id = int(nick)
         except:
@@ -340,6 +342,7 @@ class GGThread(threading.Thread):
         while True:
             try_count += 1
             log.info("Connecting, try {0}".format(try_count))
+            self.chat_module.set_channel_pending(self.nick)
             if self.load_config():
                 # Connecting to goodgame websocket
                 self.ws = GGChat(self.address, protocols=['websocket'], queue=self.queue,

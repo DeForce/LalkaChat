@@ -800,7 +800,8 @@ class ChatGui(wx.Frame):
         self.toolbar = MainMenuToolBar(self, main_class=self)
         vbox.Add(self.toolbar, 0, wx.EXPAND)
 
-        self.status_frame = StatusFrame(self, chat_modules=self.sorted_categories.get('chat', {}))
+        self.status_frame = StatusFrame(self)
+        self.status_frame.load()
         vbox.Add(self.status_frame, 0, wx.EXPAND)
         if self.main_config['config']['gui']['show_counters']:
             if self.status_frame.chats:
@@ -929,7 +930,10 @@ class ChatGui(wx.Frame):
 
     def process_status_change(self, event):
         data = event.data
-        data['label'].SetLabel(data['value'])
+        if data['type'] == 'viewers':
+            data['label'].SetLabel(data['value'])
+        elif data['type'] == 'channel_state':
+            data['status'].SetBackgroundColour(data['value'])
         self.Layout()
         pass
 
