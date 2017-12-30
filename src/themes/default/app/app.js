@@ -1,5 +1,6 @@
 const Vue = require('vue');
 const DOMPurify = require('dompurify');
+const twemoji = require('twemoji');
 
 (function (WebSocket, Vue, Sanitizer) {
     'use strict';
@@ -74,11 +75,12 @@ const DOMPurify = require('dompurify');
                 return clean;
             },
             replaceEmotions: function (message, emotes) {
+                var tw_message = twemoji.parse(message)
                 return emotes.reduce(function (m, emote) {
                     var regex = new RegExp(emote.id, 'g')
                     return m.replace(regex, '<img class="smile" src="' + emote.url + '" />')
                     },
-                    message);
+                    tw_message);
             },
             removeByIds: function (ids) {
                 this.messages = this.messages.filter(function (message) {
