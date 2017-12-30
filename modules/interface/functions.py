@@ -107,7 +107,7 @@ def create_spin(panel=None, value=None, key=None, bind=None, **kwargs):
     style = wx.ALIGN_LEFT
     item_box = wx.SpinCtrl(panel, id=id_renew(item_name, update=True),
                            min=item_class.min, max=item_class.max,
-                           initial=int(value), style=style)
+                           initial=value.simple(), style=style)
     item_text = wx.StaticText(panel, label=translate_key(item_name))
     item_box.Bind(wx.EVT_SPINCTRL, bind)
     item_box.Bind(wx.EVT_TEXT, bind)

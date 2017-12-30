@@ -6,7 +6,7 @@ from modules.helper.system import SOURCE, SOURCE_ICON, SOURCE_USER
 
 log = logging.getLogger('helper.message')
 
-AVAILABLE_COMMANDS = ['remove_by_user', 'remove_by_id', 'replace_by_user', 'replace_by_id', 'reload']
+AVAILABLE_COMMANDS = ['remove_by_users', 'remove_by_ids', 'replace_by_users', 'replace_by_ids', 'reload']
 
 
 def _validate_command(command):
@@ -47,19 +47,22 @@ class Message(object):
         """
             Basic Message class
         """
-        self._jsonable = ['unixtime', 'iso_timestamp']
+        self._jsonable = []
         self._timestamp = datetime.datetime.now()
+        self._type = 'message'
 
     def json(self):
-        return {attr: getattr(self, attr) for attr in self._jsonable}
+        return {'type': self._type,
+                'unixtime': self.unixtime,
+                'payload': {attr: getattr(self, attr) for attr in self._jsonable}}
+
+    @property
+    def type(self):
+        return self._type
 
     @property
     def timestamp(self):
         return self._timestamp
-
-    @property
-    def iso_timestamp(self):
-        return self._timestamp.isoformat()
 
     @property
     def unixtime(self):
@@ -76,55 +79,61 @@ class Message(object):
 
 
 class CommandMessage(Message):
-    def __init__(self, command=''):
+    def __init__(self, command='', platform=None):
         """
             Command Message class
               Used to control chat behaviour
         :param command: Which command to use
         """
         Message.__init__(self)
+        self._type = 'command'
         self._command = _validate_command(command)
-        self._jsonable += ['command']
+        self._platform = platform
+        self._jsonable += ['command', 'platform']
 
     @property
     def command(self):
         return self._command
 
+    @property
+    def platform(self):
+        return self._platform
 
-class RemoveMessageByUser(CommandMessage):
-    def __init__(self, user, text=None):
+
+class RemoveMessageByUsers(CommandMessage):
+    def __init__(self, users, text=None, **kwargs):
         if text:
-            CommandMessage.__init__(self, command='remove_by_user')
+            CommandMessage.__init__(self, command='replace_by_users', **kwargs)
             self.text = text
         else:
-            CommandMessage.__init__(self, command='replace_by_user')
-        self._user = user if isinstance(user, list) else [user]
-        self._jsonable += ['user']
+            CommandMessage.__init__(self, command='remove_by_users', **kwargs)
+        self._users = users if isinstance(users, list) else [users]
+        self._jsonable += ['users']
 
     @property
-    def user(self):
-        return self._user
+    def users(self):
+        return self._users
 
 
-class RemoveMessageByID(CommandMessage):
-    def __init__(self, message_id, text=None):
+class RemoveMessageByIDs(CommandMessage):
+    def __init__(self, message_id, text=None, **kwargs):
         if text:
-            CommandMessage.__init__(self, command='remove_by_user')
+            CommandMessage.__init__(self, command='replace_by_ids', **kwargs)
             self.text = text
         else:
-            CommandMessage.__init__(self, command='replace_by_user')
-        self._message_ids = message_id if isinstance(message_id, list) else [message_id]
-        self._jsonable += ['message_ids']
+            CommandMessage.__init__(self, command='remove_by_ids', **kwargs)
+        self._messages = message_id if isinstance(message_id, list) else [message_id]
+        self._jsonable += ['messages']
 
     @property
-    def message_ids(self):
-        return self._message_ids
+    def messages(self):
+        return self._messages
 
 
 class TextMessage(Message):
     def __init__(self, platform_id, icon, user, text,
                  emotes=None, badges=None, pm=False,
-                 nick_colour=None, mid=None, me=False):
+                 nick_colour=None, mid=None, me=False, channel_name=None):
         """
             Text message used by main chat logic
         :param badges: Badges to display
@@ -148,7 +157,7 @@ class TextMessage(Message):
         self._pm = pm
         self._me = me
         self._nick_colour = nick_colour
-        self._channel_name = None
+        self._channel_name = channel_name
         self._id = str(mid) if mid else str(uuid.uuid1())
 
         self._jsonable += ['user', 'text', 'emotes', 'badges',
@@ -232,7 +241,8 @@ class TextMessage(Message):
 
 
 class SystemMessage(TextMessage):
-    def __init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON, user=SOURCE_USER, emotes=None, category='system'):
+    def __init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON, user=SOURCE_USER,
+                 emotes=None, category='system', channel_name=None):
         """
             Text message used by main chat logic
               Serves system messages from modules
@@ -244,7 +254,8 @@ class SystemMessage(TextMessage):
         """
         if emotes is None:
             emotes = []
-        TextMessage.__init__(self, platform_id, icon, user, text, emotes)
+        TextMessage.__init__(self, platform_id, icon, user, text,
+                             emotes=emotes, channel_name=channel_name)
         self._category = category
 
     @property

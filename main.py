@@ -230,30 +230,30 @@ def init():
                                loaded_modules=loaded_modules,
                                queue=queue)
         loaded_modules['gui'] = window.conf_params()
-        window.start()
-
-    if main_config_dict['gui']['cli']:
-        try:
-            while True:
-                console = raw_input("> ")
-                log.info(console)
-                if console == "exit":
-                    log.info("Exiting now!")
-                    close()
-                else:
-                    log.info("Incorrect Command")
-        except (KeyboardInterrupt, SystemExit):
-            log.info("Exiting now")
-            close()
-        except Exception as exc:
-            log.info(exc)
+        window.run()
     else:
-        try:
-            while True:
-                sleep(1)
-        except (KeyboardInterrupt, SystemExit):
-            log.info("Exiting now")
-            close()
+        if main_config_dict['gui']['cli']:
+            try:
+                while True:
+                    console = raw_input("> ")
+                    log.info(console)
+                    if console == "exit":
+                        log.info("Exiting now!")
+                        close()
+                    else:
+                        log.info("Incorrect Command")
+            except (KeyboardInterrupt, SystemExit):
+                log.info("Exiting now")
+                close()
+            except Exception as exc:
+                log.info(exc)
+        else:
+            try:
+                while True:
+                    sleep(1)
+            except (KeyboardInterrupt, SystemExit):
+                log.info("Exiting now")
+                close()
 
 
 if __name__ == '__main__':

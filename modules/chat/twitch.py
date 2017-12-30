@@ -10,8 +10,9 @@ import time
 import irc.client
 import requests
 
+from helper.parser import update
 from modules.gui import MODULE_KEY
-from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUser
+from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUsers
 from modules.helper.module import ChatModule
 from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE, register_iodc
 from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool, LCButton
@@ -29,7 +30,7 @@ SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 FILE_ICON = os.path.join('img', 'tw.png')
 SYSTEM_USER = 'Twitch.TV'
-BITS_REGEXP = r'(^|\s)(\w+){}(\s|$)'
+BITS_REGEXP = r'(^|\s)(\w+{})(?=(\s|$))'
 API_URL = 'https://api.twitch.tv/kraken/{}'
 
 PING_DELAY = 10
@@ -77,9 +78,9 @@ class TwitchTextMessage(TextMessage):
 
 
 class TwitchSystemMessage(SystemMessage):
-    def __init__(self, text, category='system', emotes=None):
+    def __init__(self, text, category='system', **kwargs):
         SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
-                               user=SYSTEM_USER, emotes=emotes, category=category)
+                               user=SYSTEM_USER, category=category, **kwargs)
 
 
 class TwitchEmote(Emote):
@@ -175,10 +176,13 @@ class TwitchMessageHandler(threading.Thread):
             if self.chat_module.conf_params()['config']['config'].get('show_pm'):
                 message.pm = True
 
-    def _handle_clearchat(self, msg):
+    def _handle_clearchat(self, msg, text=None):
+        if self.chat_module.conf_params()['config']['config']['show_channel_names']:
+            text = self.kwargs['settings'].get('remove_text')
         self.message_queue.put(
-            RemoveMessageByUser(msg.arguments,
-                                text=self.kwargs['settings'].get('remove_text')))
+            RemoveMessageByUsers(msg.arguments,
+                                 text=text,
+                                 platform=SOURCE))
 
     def _handle_usernotice(self, msg):
         for tag in msg.tags:
@@ -264,7 +268,7 @@ class TwitchMessageHandler(threading.Thread):
         if not hasattr(message, 'bits'):
             return
         bits = message.bits
-        message['emotes'].append(Emote(
+        message.emotes.append(Emote(
             bits['bits'],
             BITS_URL.format(
                 theme=bits['theme'],
@@ -340,7 +344,7 @@ class IRC(irc.client.SimpleIRCClient):
         self.msg_handler.start()
 
     def system_message(self, message, category='system'):
-        self.queue.put(TwitchSystemMessage(message, category=category))
+        self.queue.put(TwitchSystemMessage(message, category=category, channel_name=self.nick))
 
     def on_disconnect(self, connection, event):
         if 'CLOSE_OK' in event.arguments:
@@ -545,7 +549,7 @@ class TWThread(threading.Thread):
             badges_url = "https://badges.twitch.tv/v1/badges/channels/{0}/display"
             request = requests.get(badges_url.format(self.channel_id))
             if request.status_code == 200:
-                self.kwargs['custom_badges'].update(request.json()['badge_sets'])
+                update(self.kwargs['custom_badges'], request.json()['badge_sets'])
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:

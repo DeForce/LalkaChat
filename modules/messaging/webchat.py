@@ -19,9 +19,9 @@ from ws4py.websocket import WebSocket
 
 from modules.gui import MODULE_KEY
 from modules.helper.html_template import HTML_TEMPLATE
-from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByID
+from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByIDs
 from modules.helper.module import MessagingModule
-from modules.helper.parser import save_settings, convert_to_dict
+from modules.helper.parser import save_settings, convert_to_dict, update
 from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER, EMOTE_FORMAT
 from modules.interface.types import *
 
@@ -49,6 +49,7 @@ CONF_DICT['gui_chat']['style'] = LCChooseSingle(
     empty_label=True)
 CONF_DICT['gui_chat']['style_settings'] = LCStaticBox()
 CONF_DICT['gui_chat']['style_settings']['show_system_msg'] = LCBool(True)
+CONF_DICT['gui_chat']['style_settings']['show_history'] = LCBool(True)
 
 CONF_DICT['server_chat'] = LCPanel()
 CONF_DICT['server_chat']['style'] = LCChooseSingle(
@@ -58,6 +59,7 @@ CONF_DICT['server_chat']['style'] = LCChooseSingle(
     empty_label=True)
 CONF_DICT['server_chat']['style_settings'] = LCStaticBox()
 CONF_DICT['server_chat']['style_settings']['show_system_msg'] = LCBool(True)
+CONF_DICT['server_chat']['style_settings']['show_history'] = LCBool(True)
 
 TYPE_DICT = {
     TextMessage: 'message',
@@ -80,32 +82,35 @@ def process_platform(platform):
 
 
 def prepare_message(message, style_settings, msg_class):
-    if 'levels' in message:
-        message['levels']['url'] = '{}?{}'.format(message['levels']['url'], style_settings['style_name'])
+    payload = message['payload']
 
-    if 'text' in message and message['text'] == REMOVED_TRIGGER:
-        message['text'] = style_settings.get('remove_text')
+    if 'text' in payload and payload['text'] == REMOVED_TRIGGER:
+        payload['text'] = style_settings.get('remove_text')
 
     if 'type' not in message:
         for m_class, m_type in TYPE_DICT.items():
             if issubclass(msg_class, m_class):
-                message['type'] = m_type
+                payload['type'] = m_type
 
-    if 'emotes' in message and message['emotes']:
-        message['emotes'] = process_emotes(message['emotes'])
-
-    if 'badges' in message:
-        message['badges'] = process_badges(message['badges'])
-
-    if 'platform' in message:
-        message['platform'] = process_platform(message['platform'])
-
-    if 'command' in message:
-        if message['command'].startswith('replace'):
-            message['text'] = style_settings['keys']['remove_text']
+    if message['type'] == 'command':
+        if payload['command'].startswith('replace'):
+            payload['text'] = style_settings['keys']['remove_text']
         return message
 
-    message['text'] = SANITIZER.sanitize(message['text'])
+    if 'levels' in payload:
+        if '?' not in payload['levels']['url']:
+            payload['levels']['url'] = '{}?{}'.format(payload['levels']['url'], style_settings['style_name'])
+
+    if 'emotes' in payload and payload['emotes']:
+        payload['emotes'] = process_emotes(payload['emotes'])
+
+    if 'badges' in payload:
+        payload['badges'] = process_badges(payload['badges'])
+
+    if 'platform' in payload:
+        payload['platform'] = process_platform(payload['platform'])
+
+    payload['text'] = SANITIZER.sanitize(payload['text'])
     return message
 
 
@@ -139,7 +144,6 @@ class MessagingThread(threading.Thread):
             if isinstance(message, SystemMessage) and not self.settings['chat']['keys'].get('show_system_msg', True):
                 continue
 
-            log.debug("%s", message.json())
             self.send_message(message, 'chat')
             self.send_message(message, 'gui')
         log.info("Messaging thread stopping")
@@ -173,7 +177,7 @@ class FireFirstMessages(threading.Thread):
                 if isinstance(item, SystemMessage) and not show_system_msg:
                     continue
                 timedelta = datetime.datetime.now() - item.timestamp
-                timer = int(self.settings['keys'].get('timer', 0))
+                timer = self.settings['keys'].get('timer').simple()
                 if timer > 0:
                     if timedelta > datetime.timedelta(seconds=timer):
                         continue
@@ -192,8 +196,9 @@ class WebChatSocketServer(WebSocket):
 
     def opened(self):
         cherrypy.engine.publish('add-client', self.peer_address, self)
-        timer = threading.Timer(0.3, self.fire_history)
-        timer.start()
+        if self.settings['keys'].get('show_history'):
+            timer = threading.Timer(0.3, self.fire_history)
+            timer.start()
 
     def closed(self, code, reason=None):
         cherrypy.engine.publish('del-client', self.peer_address, self)
@@ -281,11 +286,11 @@ class WebChatPlugin(WebSocketPlugin):
 
     def process_command(self, command, values):
         if command == 'remove_by_id':
-            self._remove_by_id(values.message_ids)
+            self._remove_by_id(values.messages)
         elif command == 'remove_by_user':
             self._remove_by_user(values.user)
         elif command == 'replace_by_id':
-            self._replace_by_id(values.message_ids)
+            self._replace_by_id(values.messages)
         elif command == 'replace_by_user':
             self._replace_by_user(values.user)
 
@@ -304,7 +309,7 @@ class WebChatPlugin(WebSocketPlugin):
     def _replace_by_id(self, ids):
         for item in ids:
             for index, message in enumerate(self.history):
-                if message.get('id') == item:
+                if message.id == item:
                     self.history[index]['text'] = REMOVED_TRIGGER
                     if 'emotes' in self.history[index]:
                         del self.history[index]['emotes']
@@ -314,7 +319,7 @@ class WebChatPlugin(WebSocketPlugin):
     def _replace_by_user(self, users):
         for item in users:
             for index, message in enumerate(self.history):
-                if message.get('user') == item:
+                if message.user == item:
                     self.history[index]['text'] = REMOVED_TRIGGER
                     if 'emotes' in self.history[index]:
                         del self.history[index]['emotes']
@@ -397,9 +402,9 @@ class CssRoot(object):
             elif isinstance(value, LCColour):
                 css_value = Color.from_hex(value)
             elif isinstance(value, LCBool):
-                css_value = Boolean(bool(value))
-            elif isinstance(value, LCSpin) or isinstance(value, float):
-                css_value = Number(int(value))
+                css_value = Boolean(value.simple())
+            elif isinstance(value, LCSpin):
+                css_value = Number(value.simple())
             else:
                 raise ValueError("Unable to find comparable values")
             css_namespace.set_variable('${}'.format(key), css_value)
@@ -662,7 +667,7 @@ class Webchat(MessagingModule):
     def rest_delete_history(path, **kwargs):
         cherrypy.engine.publish('del-history', path)
         cherrypy.engine.publish('websocket-broadcast',
-                                RemoveMessageByID(list(path)).json())
+                                RemoveMessageByIDs(list(path)).json())
 
     def get_style_from_file(self, style_name):
         file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
@@ -695,7 +700,8 @@ class Webchat(MessagingModule):
         lc_settings = alter_data_to_lc_style(self.get_style_from_file(style_name),
                                              self.get_style_gui_from_file(style_name))
 
-        params['config'][style_type].update({'style_settings': lc_settings})
+        # params['config'][style_type].update({'style_settings': lc_settings})
+        update(params['config'][style_type], {'style_settings': lc_settings})
         params['style_settings'][web_type]['keys'] = params['config'][style_type]['style_settings']
         params['gui'][style_type].update(
             {'style_settings': self.get_style_gui_from_file(style_name)})

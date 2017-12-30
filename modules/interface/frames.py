@@ -1,6 +1,7 @@
+import logging
+
 import wx
 
-from modules.interface.events import StatusChangeEvent
 from modules.helper.system import WINDOWS
 
 try:
@@ -8,6 +9,8 @@ try:
     HAS_CHROME = True
 except ImportError:
     from wx import html2 as browser
+
+log = logging.getLogger('chat_gui')
 
 
 class OAuthBrowser(wx.Frame):
@@ -139,36 +142,43 @@ class StatusFrame(wx.Panel):
         self.Layout()
         self.Refresh()
 
+    def _set_channel_color(self, element, color):
+        if element.GetBackgroundColour() != color:
+            log.debug('Changing element background color')
+            element.SetBackgroundColour(color)
+
+    def _update_label(self, element, label):
+        if element.GetLabel() != label:
+            log.debug('Changing element label')
+            element.SetLabel(label)
+
     def set_channel_online(self, module_name, channel):
         if module_name in self.chats:
             if channel.lower() in self.chats[module_name]:
-                wx.PostEvent(self.parent, StatusChangeEvent(data={
-                    'type': 'channel_state',
-                    'status': self.chats[module_name][channel.lower()]['status'],
-                    'value': wx.Colour(0, 128, 0)
-                }))
+                f_color = wx.Colour(0, 128, 0)
+                wx.CallAfter(self._set_channel_color,
+                             self.chats[module_name][channel.lower()]['status'],
+                             f_color)
         self.Layout()
         self.Refresh()
 
     def set_channel_pending(self, module_name, channel):
         if module_name in self.chats:
             if channel.lower() in self.chats[module_name]:
-                wx.PostEvent(self.parent, StatusChangeEvent(data={
-                    'type': 'channel_state',
-                    'status': self.chats[module_name][channel.lower()]['status'],
-                    'value': wx.Colour(200, 200, 0)
-                }))
+                f_color = wx.Colour(200, 200, 0)
+                wx.CallAfter(self._set_channel_color,
+                             self.chats[module_name][channel.lower()]['status'],
+                             f_color)
         self.Layout()
         self.Refresh()
 
     def set_channel_offline(self, module_name, channel):
         if module_name in self.chats:
             if channel in self.chats[module_name]:
-                wx.PostEvent(self.parent, StatusChangeEvent(data={
-                    'type': 'channel_state',
-                    'status': self.chats[module_name][channel.lower()]['status'],
-                    'value': 'red'
-                }))
+                f_color = wx.Colour(255, 0, 0)
+                wx.CallAfter(self._set_channel_color,
+                             self.chats[module_name][channel.lower()]['status'],
+                             f_color)
         self.Refresh()
 
     def refresh_labels(self, module_name):
@@ -177,7 +187,8 @@ class StatusFrame(wx.Panel):
         show_names = self.chat_modules[module_name]['config']['config']['show_channel_names']
         for name, settings in self.chats[module_name].items():
             channel = '{}: '.format(settings['channel']) if show_names else ''
-            settings['name'].SetLabel(channel)
+            wx.CallAfter(self._update_label,
+                         self.chats[module_name][name]['name'], channel)
         self.Layout()
         self.Refresh()
 
@@ -190,11 +201,9 @@ class StatusFrame(wx.Panel):
             viewers = '{0}k'.format(viewers[:-3])
         if module_name in self.chats:
             if channel.lower() in self.chats[module_name]:
-                wx.PostEvent(self.parent, StatusChangeEvent(data={
-                    'type': 'viewers',
-                    'label': self.chats[module_name][channel.lower()]['label'],
-                    'value': str(viewers)
-                }))
+                wx.CallAfter(self._update_label,
+                             self.chats[module_name][channel.lower()]['label'],
+                             str(viewers))
 
     def is_shown(self, value):
         self.Show(value)
