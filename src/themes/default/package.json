@@ -6,7 +6,8 @@
   "dependencies": {
     "dompurify": "^0.8.5",
     "vue": "^2.2.1",
-    "whatwg-fetch": "^2.0.3"
+    "whatwg-fetch": "^2.0.3",
+    "twemoji": "^2.5.0"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^4.0.1",
