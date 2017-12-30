@@ -12,7 +12,7 @@ import time
 import requests
 from ws4py.client.threadedclient import WebSocketClient
 
-from modules.helper.message import TextMessage, Emote, SystemMessage, RemoveMessageByUser
+from modules.helper.message import TextMessage, Emote, SystemMessage, RemoveMessageByUsers
 from modules.helper.module import ChatModule
 from modules.helper.system import translate_key, EMOTE_FORMAT
 from modules.interface.types import LCStaticBox, LCBool, LCPanel
@@ -57,9 +57,9 @@ class HitboxTextMessage(TextMessage):
 
 
 class HitboxSystemMessage(SystemMessage):
-    def __init__(self, text, category='system'):
+    def __init__(self, text, category='system', **kwargs):
         SystemMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
-                               user=SYSTEM_USER, text=text, category=category)
+                               user=SYSTEM_USER, text=text, category=category, **kwargs)
 
 
 class HitboxMessageHandler(threading.Thread):
@@ -121,12 +121,15 @@ class HitboxMessageHandler(threading.Thread):
 
         self._send_message(msg)
 
-    def _process_info_msg(self, message):
+    def _process_info_msg(self, message, text=None):
+        if self.main_class.conf_params()['config']['config']['show_channel_names']:
+            text = self.main_class.conf_params()['settings'].get('remove_text')
         user_to_delete = message['variables']['user']
         self.message_queue.put(
-            RemoveMessageByUser(
+            RemoveMessageByUsers(
                 user_to_delete,
-                text=self.main_class.conf_params()['settings'].get('remove_text')
+                text=text,
+                platform=SOURCE
             )
         )
 
@@ -278,7 +281,7 @@ class HitboxClient(WebSocketClient):
 
     def system_message(self, msg, category='system'):
         self.main_class.queue.put(
-            HitboxSystemMessage(msg, category=category)
+            HitboxSystemMessage(msg, category=category, channel_name=self.channel)
         )
 
 

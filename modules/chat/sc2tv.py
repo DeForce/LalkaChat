@@ -101,11 +101,9 @@ class FsChatMessage(TextMessage):
 
 
 class FsSystemMessage(SystemMessage):
-    def __init__(self, text, emotes=None, category='system'):
-        if emotes is None:
-            emotes = []
+    def __init__(self, text, category='system', **kwargs):
         SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
-                               user=SYSTEM_USER, emotes=emotes, category=category)
+                               user=SYSTEM_USER, category=category, **kwargs)
 
 
 class FsChat(WebSocketClient):
@@ -158,7 +156,7 @@ class FsChat(WebSocketClient):
             timer.start()
 
     def fs_system_message(self, message, category='system'):
-        self.queue.put(FsSystemMessage(message, category=category))
+        self.queue.put(FsSystemMessage(message, category=category, channel_name=self.glob))
 
     def received_message(self, mes):
         log.debug('received message {}'.format(mes))
@@ -300,9 +298,9 @@ class FsPingThread(threading.Thread):
 
     def run(self):
         while not self.ws.terminated:
+            self.ws.chat_module.set_channel_online(self.ws.glob)
             self.ws.send("2")
             self.ws.chat_module.get_viewers(self.ws)
-            self.ws.chat_module.set_channel_online(self.ws.glob)
             time.sleep(PING_DELAY)
 
 

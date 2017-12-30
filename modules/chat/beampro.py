@@ -11,7 +11,7 @@ import logging
 
 import time
 
-from modules.helper.message import TextMessage, SystemMessage, RemoveMessageByUser, RemoveMessageByID
+from modules.helper.message import TextMessage, SystemMessage, RemoveMessageByUsers, RemoveMessageByIDs
 from modules.helper.module import ChatModule
 from ws4py.client.threadedclient import WebSocketClient
 
@@ -53,9 +53,9 @@ class BeamProTextMessage(TextMessage):
 
 
 class BeamProSystemMessage(SystemMessage):
-    def __init__(self, text, category='system'):
+    def __init__(self, text, category='system', **kwargs):
         SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
-                               user=SYSTEM_USER, category=category)
+                               user=SYSTEM_USER, category=category, **kwargs)
 
 
 class BeamProMessageHandler(threading.Thread):
@@ -101,25 +101,31 @@ class BeamProMessageHandler(threading.Thread):
         message_args = message['data']['message']['message']
         return ''.join([msg['text'] for msg in message_args])
 
-    def _process_delete_event(self, message):
+    def _process_delete_event(self, message, text=None):
+        if self.main_class.conf_params()['config']['config']['show_channel_names']:
+            text = self.main_class.conf_params()['settings'].get('remove_text')
         id_to_delete = ID_PREFIX.format(message['data']['id'])
         self.message_queue.put(
-            RemoveMessageByID(
+            RemoveMessageByIDs(
                 id_to_delete,
-                text=self.main_class.conf_params()['settings'].get('remove_text')
+                text=text,
+                platform=SOURCE
             )
         )
 
-    def _process_purge_event(self, message):
+    def _process_purge_event(self, message, text=None):
+        if self.main_class.conf_params()['config']['config']['show_channel_names']:
+            text = self.main_class.conf_params()['settings'].get('remove_text')
         user_id = message['data']['user_id']
         nickname_req = requests.get(API_URL.format('/channels/{}'.format(user_id)))
         if not nickname_req.ok:
             raise BeamProAPIException("Unable to get user nickname")
         nickname = nickname_req.json()
         self._send_message(
-            RemoveMessageByUser(
+            RemoveMessageByUsers(
                 nickname,
-                text=self.main_class.conf_params()['settings'].get('remove_text')
+                text=text,
+                platform=SOURCE
             )
         )
 
@@ -194,7 +200,7 @@ class BeamProClient(WebSocketClient):
     def system_message(self, msg, category='system'):
         self.main_class.queue.put(
             BeamProSystemMessage(
-                msg, category
+                msg, category, channel_name=self.channel_nick
             )
         )
 

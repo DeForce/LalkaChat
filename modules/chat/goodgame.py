@@ -15,7 +15,7 @@ import requests
 from ws4py.client.threadedclient import WebSocketClient
 
 from modules.gui import MODULE_KEY
-from modules.helper.message import TextMessage, SystemMessage, Emote, RemoveMessageByID
+from modules.helper.message import TextMessage, SystemMessage, Emote, RemoveMessageByIDs
 from modules.helper.module import ChatModule
 from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
 from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText, LCGridSingle
@@ -96,9 +96,9 @@ class GoodgameTextMessage(TextMessage):
 
 
 class GoodgameSystemMessage(SystemMessage):
-    def __init__(self, text, category='system'):
+    def __init__(self, text, category='system', **kwargs):
         SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
-                               user=SYSTEM_USER, category=category)
+                               user=SYSTEM_USER, category=category, **kwargs)
 
 
 class GoodgameMessageHandler(threading.Thread):
@@ -171,10 +171,13 @@ class GoodgameMessageHandler(threading.Thread):
         self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'warning'])).format(
             msg['data']['moder_name'], msg['data']['user_name']), category='chat')
 
-    def _process_remove_message(self, msg):
+    def _process_remove_message(self, msg, text=None):
+        if self.chat_module.conf_params()['config']['config']['show_channel_names']:
+            text = self.kwargs['settings'].get('remove_text')
         remove_id = ID_PREFIX.format(msg['data']['message_id'])
         self.message_queue.put(
-            RemoveMessageByID(remove_id, text=self.kwargs['settings'].get('remove_text'))
+            RemoveMessageByIDs(remove_id, text=text,
+                               platform=SOURCE)
         )
 
     def _process_user_ban(self, msg):
@@ -276,7 +279,7 @@ class GGChat(WebSocketClient):
         self.gg_queue.put(json.loads(str(mes)))
 
     def system_message(self, msg, category='system'):
-        self.queue.put(GoodgameSystemMessage(msg, category=category))
+        self.queue.put(GoodgameSystemMessage(msg, category=category, channel_name=self.main_thread.nick))
 
 
 class GGThread(threading.Thread):

@@ -12,9 +12,12 @@ do
         echo ${folder}
         THEME_NAME=$( echo $folder | rev | cut -d'/' -f1 | rev )
         cd ${folder}
+        rm -rf ./dist
         npm install
         npm start
         rm -rf ${DIR_ROOT}/http/${THEME_NAME}
-        mv dist ${DIR_ROOT}/http/${THEME_NAME}
+        cp -r dist ${DIR_ROOT}/http/${THEME_NAME}
+        rm -rf ${DIR_ROOT}/http/${THEME_NAME}_gui
+        cp -r dist ${DIR_ROOT}/http/${THEME_NAME}_gui
         cd ${THEME_ROOT}
 done

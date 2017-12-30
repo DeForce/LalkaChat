@@ -215,8 +215,8 @@ class ChatModule(BaseModule):
         try:
             gui_class = self._loaded_modules['gui']['class']
             gui_class.gui.status_frame.set_viewers(self._module_name, channel, viewers)
-        except Exception:
-            log.info('Unable to set viewers')
+        except Exception as exc:
+            log.info('Unable to set viewers: %s', exc)
 
     def set_channel_online(self, channel):
         try:

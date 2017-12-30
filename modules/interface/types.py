@@ -165,6 +165,9 @@ class LCChooseSingle(LCObject):
     def simple(self):
         return self.value
 
+    def __repr__(self):
+        return str(self.value)
+
 
 class LCChooseMultiple(LCChooseSingle):
     def __init__(self, value=(), *args, **kwargs):

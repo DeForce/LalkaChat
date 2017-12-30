@@ -680,11 +680,13 @@ class SettingsWindow(wx.Frame):
 
             for item, change in changed_items.iteritems():
                 item_split = item.split(MODULE_KEY)
-                panel_keys = item_split[1:-2]
+                if item_split[-1] in ['list_box']:
+                    del item_split[-1]
+
                 section = item_split[-2]
                 item_name = item_split[-1]
 
-                deep_config = deep_get(module_config, *panel_keys)
+                deep_config = deep_get(module_config, *item_split[1:-1])
                 for d_item in non_dynamic:
                     if section in d_item:
                         if MODULE_KEY.join([section, '*']) in d_item:
@@ -693,16 +695,9 @@ class SettingsWindow(wx.Frame):
                         elif MODULE_KEY.join([section, item_name]) in d_item:
                             non_dynamic_check = True
                             break
-                if item_split[-1] in ['list_box']:
-                    del item_split[-1]
-                    item_name = item_split[-1]
 
-                if len(item_split) == 2:
-                    item_type = type(deep_config[item_name])
-                    deep_config[item_name] = item_type(change['value'])
-                else:
-                    item_type = type(deep_config[section][item_name])
-                    deep_config[section][item_name] = item_type(change['value'])
+                item_type = type(deep_config[item_name])
+                deep_config[item_name] = item_type(change['value'])
                 self.apply_custom_gui_settings(item, change['value'])
             if 'class' in module_settings:
                 module_settings['class'].apply_settings()
@@ -929,22 +924,22 @@ class ChatGui(wx.Frame):
         pass
 
     def process_status_change(self, event):
+        log.debug('PROCESSING STATUS CHANGE %s', event.data)
         data = event.data
-        if data['type'] == 'viewers':
-            data['label'].SetLabel(data['value'])
+        if data['type'] in ['viewers', 'channel_label']:
+            data['item'].SetLabel(data['value'])
         elif data['type'] == 'channel_state':
-            data['status'].SetBackgroundColour(data['value'])
+            data['item'].SetBackgroundColour(data['value'])
         self.Layout()
         pass
 
 
-class GuiThread(threading.Thread, BaseModule):
+class GuiThread(BaseModule):
     title = 'LalkaChat'
     url = 'http://localhost'
     port = '8080'
 
     def __init__(self, **kwargs):
-        threading.Thread.__init__(self)
         BaseModule.__init__(self, **kwargs)
         self._category = 'hidden'
         self.daemon = True
