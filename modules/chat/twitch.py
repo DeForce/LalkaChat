@@ -10,7 +10,7 @@ import time
 import irc.client
 import requests
 
-from helper.parser import update
+from modules.helper.parser import update
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUsers
 from modules.helper.module import ChatModule

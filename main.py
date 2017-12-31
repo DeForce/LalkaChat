@@ -17,7 +17,7 @@ from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FO
     LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException
 from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSpin, LCSlider, LCChooseMultiple
 
-VERSION = '0.3.6'
+VERSION = '0.4.0'
 SEM_VERSION = semantic_version.Version(VERSION)
 LOG_FILES_COUNT = 5
 
