@@ -18,12 +18,13 @@ CONF_FOLDER = os.path.join(PYTHON_FOLDER, "conf")
 MODULE_FOLDER = os.path.join(PYTHON_FOLDER, "modules")
 MAIN_CONF_FILE = os.path.join(CONF_FOLDER, "config.cfg")
 GUI_TAG = 'gui'
+WINDOWS = True if sys.platform == 'win32' else False
 
 LOG_FOLDER = os.path.join(PYTHON_FOLDER, "logs")
 if not os.path.exists(LOG_FOLDER):
     os.makedirs(LOG_FOLDER)
 LOG_FILE = os.path.join(LOG_FOLDER, 'chat_log.log')
-LOG_FORMAT = logging.Formatter("%(asctime)s [%(name)s] [%(levelname)s]  %(message)s")
+LOG_FORMAT = logging.Formatter("%(asctime)s [%(threadName) s%(name)s] [%(levelname)s]  %(message)s")
 
 log = logging.getLogger('system')
 
@@ -142,26 +143,6 @@ def random_string(length):
     return ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(length))
 
 
-def remove_message_by_user(user, text=None):
-    command = {'type': 'command',
-               'command': 'remove_by_user',
-               'user': user}
-    if text:
-        command['text'] = text
-        command['command'] = 'replace_by_user'
-    return command
-
-
-def remove_message_by_id(ids, text=None):
-    command = {'type': 'command',
-               'command': 'remove_by_id',
-               'ids': ids}
-    if text:
-        command['text'] = text
-        command['command'] = 'replace_by_id'
-    return command
-
-
 def get_update(sem_version):
     github_url = "https://api.github.com/repos/DeForce/LalkaChat/releases"
     try:
@@ -183,3 +164,23 @@ def get_update(sem_version):
 def get_language():
     local_name, local_encoding = locale.getdefaultlocale()
     return LANGUAGE_DICT.get(local_name, 'en')
+
+
+def get_key(*args):
+    return MODULE_KEY.join(args)
+
+
+def register_iodc(event):
+    parent = get_wx_parent(event.GetEventObject()).Parent
+    twitch = parent.loaded_modules.get('twitch')['class']
+    if not twitch:
+        raise ValueError('Unable to find loaded Twitch.TV Module')
+
+    twitch.register_iodc(parent)
+    pass
+
+
+def get_wx_parent(item):
+    if item.GrandParent:
+        return get_wx_parent(item.GrandParent)
+    return item

@@ -8,18 +8,7 @@ while [ ${ATTEMPTS} -lt 20 ]; do
     if ! grep "LalkaChat loaded successfully" chat.log; then
         continue
     fi
-
-    if ! grep "GG Testing mode online" chat.log; then
-        continue
-    fi
-
-    if ! grep "sc2tv Testing mode online" chat.log; then
-        continue
-    fi
-
-    if ! grep "twitch Testing mode online" chat.log; then
-        continue
-    fi
+    kill $(ps aux | grep main.py | grep -v grep | awk '{print $2}')
     sleep 5
     exit 0
 done

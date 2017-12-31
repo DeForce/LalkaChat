@@ -1,23 +1,59 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import logging
 import math
 import os
 import random
 import sqlite3
 import xml.etree.ElementTree as ElementTree
-from collections import OrderedDict
 import datetime
 
-from modules.helper.parser import load_from_config_file, save_settings
-from modules.helper.system import system_message, ModuleLoadException, IGNORED_TYPES
+from modules.helper.message import process_text_messages, SystemMessage, ignore_system_messages
+from modules.helper.parser import save_settings
+from modules.helper.system import ModuleLoadException
 from modules.helper.module import MessagingModule
+from modules.interface.types import *
 
 log = logging.getLogger('levels')
 
+CONF_DICT = LCPanel()
+CONF_DICT['config'] = LCStaticBox()
+CONF_DICT['config']['message'] = LCText(u'{0} has leveled up, now he is {1}')
+CONF_DICT['config']['db'] = LCText(os.path.join('conf', u'levels.db'))
+CONF_DICT['config']['experience'] = LCDropdown('geometrical', ['geometrical', 'static', 'random'])
+CONF_DICT['config']['exp_for_level'] = LCText(200)
+CONF_DICT['config']['exp_for_message'] = LCText(1)
+CONF_DICT['config']['decrease_window'] = LCText(1)
 
-class levels(MessagingModule):
+
+CONF_GUI = {
+    'non_dynamic': [
+        'config.db', 'config.experience',
+        'config.exp_for_level', 'config.exp_for_message',
+        'decrease_window'],
+    'config': {
+        'experience': {
+            'view': 'dropdown',
+            'choices': ['static', 'geometrical', 'random']},
+        'exp_for_level': {
+            'view': 'spin',
+            'min': 0,
+            'max': 100000
+        },
+        'exp_for_message': {
+            'view': 'spin',
+            'min': 0,
+            'max': 100000
+        },
+        'decrease_window': {
+            'view': 'spin',
+            'min': 0,
+            'max': 100000
+        }
+    }}
+
+
+class Levels(MessagingModule):
     @staticmethod
     def create_db(db_location):
         if not os.path.exists(db_location):
@@ -29,52 +65,9 @@ class levels(MessagingModule):
             db.commit()
             db.close()
 
-    def __init__(self, conf_folder, **kwargs):
-        MessagingModule.__init__(self)
+    def __init__(self, *args, **kwargs):
+        MessagingModule.__init__(self, *args, **kwargs)
 
-        conf_file = os.path.join(conf_folder, "levels.cfg")
-        conf_dict = OrderedDict()
-        conf_dict['gui_information'] = {'category': 'messaging'}
-        conf_dict['config'] = OrderedDict()
-        conf_dict['config']['message'] = u'{0} has leveled up, now he is {1}'
-        conf_dict['config']['db'] = os.path.join('conf', u'levels.db')
-        conf_dict['config']['experience'] = u'geometrical'
-        conf_dict['config']['exp_for_level'] = 200
-        conf_dict['config']['exp_for_message'] = 1
-        conf_dict['config']['decrease_window'] = 60
-        conf_gui = {'non_dynamic': ['config.db', 'config.experience',
-                                    'config.exp_for_level', 'config.exp_for_message',
-                                    'decrease_window'],
-                    'config': {
-                        'experience': {
-                            'view': 'dropdown',
-                            'choices': ['static', 'geometrical', 'random']},
-                        'exp_for_level': {
-                            'view': 'spin',
-                            'min': 0,
-                            'max': 100000
-                        },
-                        'exp_for_message': {
-                            'view': 'spin',
-                            'min': 0,
-                            'max': 100000
-                        },
-                        'decrease_window': {
-                            'view': 'spin',
-                            'min': 0,
-                            'max': 100000
-                        }
-                    }}
-        config = load_from_config_file(conf_file, conf_dict)
-
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': config,
-             'config': conf_dict,
-             'gui': conf_gui})
-
-        self.conf_folder = None
         self.experience = None
         self.exp_for_level = None
         self.exp_for_message = None
@@ -85,6 +78,12 @@ class levels(MessagingModule):
         self.decrease_window = None
         self.threshold_users = None
 
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
+
+    def _gui_settings(self, *args, **kwargs):
+        return CONF_GUI
+
     def load_module(self, *args, **kwargs):
         MessagingModule.load_module(self, *args, **kwargs)
         if 'webchat' not in self._loaded_modules:
@@ -92,10 +91,8 @@ class levels(MessagingModule):
         else:
             self._loaded_modules['webchat']['class'].add_depend('levels')
 
-        conf_folder = self._conf_params['folder']
         conf_dict = self._conf_params['config']
 
-        self.conf_folder = conf_folder
         self.experience = conf_dict['config'].get('experience')
         self.exp_for_level = float(conf_dict['config'].get('exp_for_level'))
         self.exp_for_message = float(conf_dict['config'].get('exp_for_message'))
@@ -154,8 +151,6 @@ class levels(MessagingModule):
             self.load_levels()
 
     def set_level(self, user, queue):
-        if user == 'System':
-            return []
         db = sqlite3.connect(self.db_location)
 
         cursor = db.cursor()
@@ -189,29 +184,31 @@ class levels(MessagingModule):
                 db.commit()
             else:
                 max_level += 1
-            system_message(
-                self._conf_params['config']['config']['message'].decode('utf-8').format(
-                    user,
-                    self.levels[max_level]['name']),
-                queue, category='module'
+            queue.put(
+                SystemMessage(
+                    self._conf_params['config']['config']['message'].decode('utf-8').format(
+                        user,
+                        self.levels[max_level]['name']),
+                    category='module'
+                )
             )
         cursor.close()
         return self.levels[max_level].copy()
 
-    def process_message(self, message, queue, **kwargs):
-        if message:
-            if message['type'] in IGNORED_TYPES:
-                return message
-            if 'system_msg' not in message or not message['system_msg']:
-                if 'user' in message and message['user'] in self.special_levels:
-                    level_info = self.special_levels[message['user']]
-                    if 's_levels' in message:
-                        message['s_levels'].append(level_info.copy())
-                    else:
-                        message['s_levels'] = [level_info.copy()]
+    @process_text_messages
+    @ignore_system_messages
+    def process_message(self, message, queue=None, **kwargs):
+        if message.user in self.special_levels:
+            level_info = self.special_levels[message.user]
+            try:
+                message.s_levels.append(level_info.copy())
+            except AttributeError:
+                message.s_levels = [level_info.copy()]
+                message.jsonable.append('s_levels')
 
-                message['levels'] = self.set_level(message['user'], queue)
-            return message
+        message.levels = self.set_level(message.user, queue)
+        message.jsonable.append('levels')
+        return message
 
     def calculate_experience(self, user):
         exp_to_add = self.exp_for_message

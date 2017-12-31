@@ -1,5 +1,6 @@
 const Vue = require('vue');
 const DOMPurify = require('dompurify');
+const twemoji = require('twemoji');
 
 (function (WebSocket, Vue, Sanitizer) {
     'use strict';
@@ -7,7 +8,7 @@ const DOMPurify = require('dompurify');
     new Vue({
         el: '#chat-container',
         data: function () {
-            var wsUrl = 'ws://' + window.location.host + window.location.pathname + '/ws';
+            var wsUrl = 'ws://' + window.location.host + window.location.pathname + 'ws';
             var messages = [];
             var socket = new WebSocket(wsUrl);
 
@@ -74,18 +75,12 @@ const DOMPurify = require('dompurify');
                 return clean;
             },
             replaceEmotions: function (message, emotes) {
-                if (!emotes || emotes.length <= 0) {
-                    return message;
-                }
-                return message.replace(/:emote;(\w+|\d+):/g, function (code, emote_key) {
-                    for (var emote in emotes) {
-                        if (!!emotes[emote] && emotes[emote]['emote_id'] == emote_key) {
-                            return '<img class="smile" src="' + emotes[emote]['emote_url'] + '" />';
-                        }
-                    }
-
-                    return code;
-                });
+                var tw_message = twemoji.parse(message)
+                return emotes.reduce(function (m, emote) {
+                    var regex = new RegExp(emote.id, 'g')
+                    return m.replace(regex, '<img class="smile" src="' + emote.url + '" />')
+                    },
+                    tw_message);
             },
             removeByIds: function (ids) {
                 this.messages = this.messages.filter(function (message) {
@@ -102,17 +97,17 @@ const DOMPurify = require('dompurify');
                     return usernames.indexOf(user) < 0;
                 });
             },
-            replaceByUsernames: function (command) {
-                var usernames = command.user.map(function(value) {
+            replaceByUsernames: function (usernames, text) {
+                var usernames_lc = usernames.map(function(value) {
                     return value.toLowerCase();
                 });
 
                 this.messages = this.messages.map(function (message) {
                     var user = message.user.toLowerCase();
-                    var index = usernames.indexOf(user);
+                    var index = usernames_lc.indexOf(user);
 
                     if (index >= 0) {
-                        message.text = command.text;
+                        message.text = text;
                         message.emotes = [];
                         message.bttv_emotes = {};
                     }
@@ -120,12 +115,12 @@ const DOMPurify = require('dompurify');
                     return message;
                 });
             },
-            replaceByIds: function (command) {
+            replaceByIds: function (ids, text) {
                 this.messages = this.messages.map(function (message) {
-                    var index = command.ids.indexOf(message.id);
+                    var index = ids.indexOf(message.id);
 
                     if (index >= 0) {
-                        message.text = command.text;
+                        message.text = text;
                         delete message.emotes;
                         delete message.bttv_emotes;
                     }
@@ -133,24 +128,21 @@ const DOMPurify = require('dompurify');
                 });
             },
             run: function (message) {
-                if (!message.command)
-                    return;
-
                 switch (message.command) {
                     case 'reload':
                         window.location.reload();
                         break;
-                    case 'remove_by_user':
-                        this.removeByUsernames(message.user);
+                    case 'remove_by_users':
+                        this.removeByUsernames(message.users);
                         break;
-                    case 'remove_by_id':
+                    case 'remove_by_ids':
                         this.removeByIds(message.ids);
                         break;
-                    case 'replace_by_id':
-                        this.replaceByIds(message);
+                    case 'replace_by_users':
+                        this.replaceByUsernames(message.users, message.text);
                         break;
-                    case 'replace_by_user':
-                        this.replaceByUsernames(message);
+                    case 'replace_by_ids':
+                        this.replaceByIds(message.ids, message.text);
                         break;
                     default:
                         console.log('Got unknown command ', message.command);
@@ -163,12 +155,12 @@ const DOMPurify = require('dompurify');
 
                 switch (message.type) {
                     case 'command':
-                        this.run(message);
+                        this.run(message.payload);
                         break;
                     default:
-                        message.time = new Date();
-                        message.deleteButton = false;
-                        this.messages.push(message);
+                        message.payload.time = new Date();
+                        message.payload.deleteButton = false;
+                        this.messages.push(message.payload);
                         if (this.messages.length > this.messagesLimit) {
                             this.remove(this.messages[0]);
                         }
