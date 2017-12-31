@@ -1,18 +1,21 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import irc.client
-import threading
-import os
-import re
-import random
-import requests
-import logging.config
 import Queue
+import logging.config
+import os
+import random
+import re
+import threading
 import time
-from collections import OrderedDict
-from modules.helper.parser import load_from_config_file
+
+import irc.client
+import requests
+
+from modules.helper.parser import update
+from modules.gui import MODULE_KEY
+from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUsers
 from modules.helper.module import ChatModule
-from modules.helper.system import system_message, translate_key, remove_message_by_user, EMOTE_FORMAT, NA_MESSAGE
-from gui import MODULE_KEY
+from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE, register_iodc
+from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool, LCButton
 
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -27,20 +30,21 @@ SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 FILE_ICON = os.path.join('img', 'tw.png')
 SYSTEM_USER = 'Twitch.TV'
-BITS_REGEXP = r'(^|\s)(\w+){}(\s|$)'
+BITS_REGEXP = r'(^|\s)(\w+{})(?=(\s|$))'
+API_URL = 'https://api.twitch.tv/kraken/{}'
 
 PING_DELAY = 10
 
-CONF_DICT = OrderedDict()
-CONF_DICT['gui_information'] = {'category': 'chat'}
-CONF_DICT['config'] = OrderedDict()
-CONF_DICT['config']['show_pm'] = True
-CONF_DICT['config']['bttv'] = True
-CONF_DICT['config']['host'] = 'irc.twitch.tv'
-CONF_DICT['config']['port'] = 6667
-CONF_DICT['config']['show_channel_names'] = True
-CONF_DICT['config']['show_nickname_colors'] = False
-CONF_DICT['config']['channels_list'] = []
+CONF_DICT = LCPanel(icon=FILE_ICON)
+CONF_DICT['config'] = LCStaticBox()
+CONF_DICT['config']['host'] = LCText('irc.twitch.tv')
+CONF_DICT['config']['port'] = LCText(6667)
+CONF_DICT['config']['show_pm'] = LCBool(True)
+CONF_DICT['config']['bttv'] = LCBool(True)
+CONF_DICT['config']['show_channel_names'] = LCBool(True)
+CONF_DICT['config']['show_nickname_colors'] = LCBool(False)
+CONF_DICT['config']['register_oidc'] = LCButton(register_iodc)
+
 CONF_GUI = {
     'config': {
         'hidden': ['host', 'port'],
@@ -50,7 +54,8 @@ CONF_GUI = {
         }
     },
     'non_dynamic': ['config.host', 'config.port', 'config.bttv'],
-    'icon': FILE_ICON}
+    'ignored_sections': ['config.register_oidc'],
+}
 
 
 class TwitchUserError(Exception):
@@ -59,6 +64,29 @@ class TwitchUserError(Exception):
 
 class TwitchNormalDisconnect(Exception):
     """Normal Disconnect exception"""
+
+
+class TwitchAPIError(Exception):
+    """Exception of API"""
+
+
+class TwitchTextMessage(TextMessage):
+    def __init__(self, user, text, me):
+        self.bttv_emotes = {}
+        TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
+                             user=user, text=text, me=me)
+
+
+class TwitchSystemMessage(SystemMessage):
+    def __init__(self, text, category='system', **kwargs):
+        SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
+                               user=SYSTEM_USER, category=category, **kwargs)
+
+
+class TwitchEmote(Emote):
+    def __init__(self, emote_id, emote_url, positions):
+        Emote.__init__(self, emote_id=emote_id, emote_url=emote_url)
+        self.positions = positions
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -88,8 +116,10 @@ class TwitchMessageHandler(threading.Thread):
         # Also, there is slight problem with some users, they don't have
         #  the display-name tag, so we have to check their "real" username
         #  and capitalize it because twitch does so, so we do the same.
-        if msg.type in ['pubmsg', 'action']:
+        if msg.type in ['pubmsg']:
             self._handle_message(msg)
+        elif msg.type in ['action']:
+            self._handle_message(msg, me=True)
         elif msg.type in ['clearchat']:
             self._handle_clearchat(msg)
         elif msg.type in ['usernotice']:
@@ -101,7 +131,12 @@ class TwitchMessageHandler(threading.Thread):
             # Fix some of the names
             badge_tag = badge_tag.replace('moderator', 'mod')
 
-            if badge_tag in self.badges:
+            if badge_tag in self.custom_badges:
+                badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
+                url = badge_info.get('image_url_4x',
+                                     badge_info.get('image_url_2x',
+                                                    badge_info.get('image_url_1x')))
+            elif badge_tag in self.badges:
                 badge_info = self.badges.get(badge_tag)
                 if 'svg' in badge_info:
                     url = badge_info.get('svg')
@@ -109,42 +144,45 @@ class TwitchMessageHandler(threading.Thread):
                     url = badge_info.get('image')
                 else:
                     url = 'none'
-            elif badge_tag in self.custom_badges:
-                badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
-                url = badge_info.get('image_url_4x')
             else:
                 url = NOT_FOUND
-            message['badges'].append({'badge': badge_tag, 'size': badge_size, 'url': url})
+            message.badges.append(Badge(badge_tag, url))
 
     @staticmethod
     def _handle_display_name(message, name):
-        message['display_name'] = name if name else message['user']
+        message.user = name if name else message.user
 
     @staticmethod
     def _handle_emotes(message, tag_value):
         for emote in tag_value.split('/'):
             emote_id, emote_pos_diap = emote.split(':')
-            message['emotes'].append({'emote_id': emote_id,
-                                      'positions': emote_pos_diap.split(','),
-                                      'emote_url': EMOTE_SMILE_URL.format(id=emote_id)})
+            message.emotes.append(
+                TwitchEmote(emote_id,
+                            EMOTE_SMILE_URL.format(id=emote_id),
+                            emote_pos_diap.split(','))
+            )
 
     def _handle_bttv_smiles(self, message):
-        for word in message['text'].split():
+        for word in message.text.split():
             if word in self.bttv:
                 bttv_smile = self.bttv.get(word)
-                message['bttv_emotes'][bttv_smile['regex']] = {
-                    'emote_id': bttv_smile['regex'],
-                    'emote_url': 'https:{0}'.format(bttv_smile['url'])
-                }
+                message.bttv_emotes[bttv_smile['regex']] = Emote(
+                    bttv_smile['regex'],
+                    'https:{0}'.format(bttv_smile['url'])
+                )
 
     def _handle_pm(self, message):
-        if re.match('^@?{0}[ ,]?'.format(self.nick), message['text'].lower()):
+        if re.match('^@?{0}[ ,]?'.format(self.nick), message.text.lower()):
             if self.chat_module.conf_params()['config']['config'].get('show_pm'):
-                message['pm'] = True
+                message.pm = True
 
-    def _handle_clearchat(self, msg):
-        self.message_queue.put(remove_message_by_user(msg.arguments,
-                                                      text=self.kwargs['settings'].get('remove_text')))
+    def _handle_clearchat(self, msg, text=None):
+        if self.chat_module.conf_params()['config']['config']['show_channel_names']:
+            text = self.kwargs['settings'].get('remove_text')
+        self.message_queue.put(
+            RemoveMessageByUsers(msg.arguments,
+                                 text=text,
+                                 platform=SOURCE))
 
     def _handle_usernotice(self, msg):
         for tag in msg.tags:
@@ -156,21 +194,10 @@ class TwitchMessageHandler(threading.Thread):
         if msg.arguments:
             self._handle_message(msg, sub_message=True)
 
-    def _handle_message(self, msg, sub_message=False):
-        message = {'source': self.source,
-                   'source_icon': SOURCE_ICON,
-                   'badges': [],
-                   'emotes': [],
-                   'bttv_emotes': {},
-                   'user': msg.source.split('!')[0],
-                   'type': 'message',
-                   'msg_type': msg.type}
-
-        if message['user'] == 'twitchnotify':
-            self.irc_class.system_message(msg.arguments.pop(), category='chat')
-            return
-
-        message['text'] = msg.arguments.pop()
+    def _handle_message(self, msg, sub_message=False, me=False):
+        message = TwitchTextMessage(msg.source.split('!')[0], msg.arguments.pop(), me)
+        if message.user == 'twitchnotify':
+            self.irc_class.queue.put(TwitchSystemMessage(message.text, category='chat'))
 
         for tag in msg.tags:
             tag_value, tag_key = tag.values()
@@ -195,11 +222,11 @@ class TwitchMessageHandler(threading.Thread):
 
     def _handle_viewer_color(self, message, value):
         if self.irc_class.chat_module.conf_params()['config']['config']['show_nickname_colors']:
-            message['nick_color'] = value
+            message.nick_colour = value
 
     @staticmethod
     def _handle_bits(message, amount):
-        regexp = re.search(BITS_REGEXP.format(amount), message['text'])
+        regexp = re.search(BITS_REGEXP.format(amount), message.text)
         emote = regexp.group(2)
         emote_smile = '{}{}'.format(emote, amount)
 
@@ -214,7 +241,7 @@ class TwitchMessageHandler(threading.Thread):
         else:
             color = 'gray'
 
-        message['bits'] = {
+        message.bits = {
             'bits': emote_smile,
             'amount': amount,
             'theme': BITS_THEME,
@@ -222,11 +249,12 @@ class TwitchMessageHandler(threading.Thread):
             'color': color,
             'size': 4
         }
-        message['text'] = message['text'].replace(emote_smile, EMOTE_FORMAT.format(emote_smile))
+        message.text = message.text.replace(emote_smile, EMOTE_FORMAT.format(emote_smile))
 
     @staticmethod
     def _handle_sub_message(message):
-        message['sub_message'] = True
+        message.sub_message = True
+        message.jsonable += ['sub_message']
 
     def _send_message(self, message):
         self._post_process_emotes(message)
@@ -237,45 +265,45 @@ class TwitchMessageHandler(threading.Thread):
 
     @staticmethod
     def _post_process_bits(message):
-        if 'bits' not in message:
+        if not hasattr(message, 'bits'):
             return
-        bits = message['bits']
-        message['emotes'].append({
-            'emote_id': bits['bits'],
-            'emote_url': BITS_URL.format(
+        bits = message.bits
+        message.emotes.append(Emote(
+            bits['bits'],
+            BITS_URL.format(
                 theme=bits['theme'],
                 type=bits['type'],
                 color=bits['color'],
                 size=bits['size']
             )
-        })
+        ))
 
     @staticmethod
     def _post_process_emotes(message):
         conveyor_emotes = []
-        for emote in message['emotes']:
-            for position in emote['positions']:
+        for emote in message.emotes:
+            for position in emote.positions:
                 start, end = position.split('-')
-                conveyor_emotes.append({'emote_id': emote['emote_id'],
+                conveyor_emotes.append({'emote_id': emote.id,
                                         'start': int(start),
                                         'end': int(end)})
         conveyor_emotes = sorted(conveyor_emotes, key=lambda k: k['start'], reverse=True)
 
         for emote in conveyor_emotes:
-            message['text'] = u'{start}{emote}{end}'.format(start=message['text'][:emote['start']],
-                                                            end=message['text'][emote['end'] + 1:],
-                                                            emote=EMOTE_FORMAT.format(emote['emote_id']))
+            message.text = u'{start}{emote}{end}'.format(start=message.text[:emote['start']],
+                                                         end=message.text[emote['end'] + 1:],
+                                                         emote=EMOTE_FORMAT.format(emote['emote_id']))
 
     @staticmethod
     def _post_process_bttv_emotes(message):
-        for emote, data in message['bttv_emotes'].iteritems():
-            message['text'] = message['text'].replace(emote, EMOTE_FORMAT.format(emote))
-            message['emotes'].append(data)
+        for emote, data in message.bttv_emotes.iteritems():
+            message.text = message.text.replace(emote, EMOTE_FORMAT.format(emote))
+            message.emotes.append(data)
 
     def _post_process_multiple_channels(self, message):
         channel_class = self.irc_class.main_class
         if channel_class.chat_module.conf_params()['config']['config']['show_channel_names']:
-            message['channel_name'] = channel_class.display_name
+            message.channel_name = channel_class.display_name
 
 
 class TwitchPingHandler(threading.Thread):
@@ -316,8 +344,7 @@ class IRC(irc.client.SimpleIRCClient):
         self.msg_handler.start()
 
     def system_message(self, message, category='system'):
-        system_message(message, self.queue,
-                       source=SOURCE, icon=SOURCE_ICON, from_user=SYSTEM_USER, category=category)
+        self.queue.put(TwitchSystemMessage(message, category=category, channel_name=self.nick))
 
     def on_disconnect(self, connection, event):
         if 'CLOSE_OK' in event.arguments:
@@ -330,7 +357,7 @@ class IRC(irc.client.SimpleIRCClient):
             log.info("Connection lost")
             log.debug("connection: {}".format(connection))
             log.debug("event: {}".format(event))
-            self.chat_module.set_offline(self.nick)
+            self.chat_module.set_channel_offline(self.nick)
             self.system_message(
                 translate_key(MODULE_KEY.join(['twitch', 'connection_died'])).format(self.nick),
                 category='connection')
@@ -355,7 +382,6 @@ class IRC(irc.client.SimpleIRCClient):
         self.tw_connection = connection
         self.system_message(translate_key(MODULE_KEY.join(['twitch', 'joining'])).format(self.channel),
                             category='connection')
-        self.chat_module.set_online(self.nick)
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilities (Twitch color, Display Name,
         #  Subscriber, etc)
@@ -369,6 +395,7 @@ class IRC(irc.client.SimpleIRCClient):
         log.debug("connection: {}".format(connection))
         log.debug("event: {}".format(event))
         msg = translate_key(MODULE_KEY.join(['twitch', 'join_success'])).format(self.channel)
+        self.chat_module.set_channel_online(self.nick)
         log.info(msg)
         self.system_message(msg, category='connection')
 
@@ -409,6 +436,7 @@ class TWThread(threading.Thread):
         self.kwargs = kwargs
         self.chat_module = kwargs.get('chat_module')
         self.display_name = None
+        self.channel_id = None
         self.irc = None
 
         if bttv_smiles:
@@ -436,6 +464,7 @@ class TWThread(threading.Thread):
                 if self.load_config():
                     self.irc = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
                     self.irc.connect(self.host, self.port, self.nickname)
+                    self.chat_module.set_channel_online(self.nickname)
                     self.irc.start()
                     log.info("Connection closed")
                     break
@@ -458,6 +487,7 @@ class TWThread(threading.Thread):
                 log.info("Channel found, continuing")
                 data = request.json()
                 self.display_name = data['display_name']
+                self.channel_id = data['_id']
             elif request.status_code == 404:
                 raise TwitchUserError
             else:
@@ -513,6 +543,19 @@ class TWThread(threading.Thread):
             log.warning("Unable to get twitch undocumented api badges, error {0}\n"
                         "Args: {1}".format(exc.message, exc.args))
 
+        try:
+            # Warning, undocumented, can change a LOT
+            # Getting CUSTOM twitch badges
+            badges_url = "https://badges.twitch.tv/v1/badges/channels/{0}/display"
+            request = requests.get(badges_url.format(self.channel_id))
+            if request.status_code == 200:
+                update(self.kwargs['custom_badges'], request.json()['badge_sets'])
+            else:
+                raise Exception("Not successful status code: {0}".format(request.status_code))
+        except Exception as exc:
+            log.warning("Unable to get twitch undocumented api badges, error {0}\n"
+                        "Args: {1}".format(exc.message, exc.args))
+
         return True
 
     def stop(self):
@@ -538,14 +581,14 @@ class TwitchMessage(object):
 class TestTwitch(threading.Thread):
     def __init__(self, main_class):
         super(TestTwitch, self).__init__()
-        self.main_class = main_class  # type: twitch
+        self.main_class = main_class  # type: Twitch
         self.main_class.rest_add('POST', 'push_message', self.send_message)
         self.tw_queue = None
 
     def run(self):
         while True:
             try:
-                thread = self.main_class.tw_dict.items()[0][1]
+                thread = self.main_class.channels.items()[0][1]
                 if thread.irc.twitch_queue:
                     self.tw_queue = thread.irc.twitch_queue
                     break
@@ -562,48 +605,35 @@ class TestTwitch(threading.Thread):
         self.tw_queue.put(TwitchMessage(nickname, text, emotes, bits))
 
 
-class twitch(ChatModule):
-    def __init__(self, queue, python_folder, **kwargs):
-        ChatModule.__init__(self)
+class Twitch(ChatModule):
+    def __init__(self, *args, **kwargs):
         log.info("Initializing twitch chat")
+        ChatModule.__init__(self, *args, **kwargs)
 
-        # Reading config from main directory.
-        conf_folder = os.path.join(python_folder, "conf")
-        conf_file = os.path.join(conf_folder, "twitch.cfg")
-
-        config = load_from_config_file(conf_file, CONF_DICT)
-        self._conf_params.update(
-            {'folder': conf_folder, 'file': conf_file,
-             'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-             'parser': config,
-             'config': CONF_DICT,
-             'gui': CONF_GUI,
-             'settings': {}})
-
-        self.queue = queue
         self.host = CONF_DICT['config']['host']
         self.port = int(CONF_DICT['config']['port'])
-        self.channels_list = CONF_DICT['config']['channels_list']
         self.bttv = CONF_DICT['config']['bttv']
-        self.tw_dict = {}
+        self.access_code = self._conf_params['config'].get('access_code')
+        if self.access_code:
+            headers['Authorization'] = 'OAuth {}'.format(self.access_code)
 
-        if len(self.channels_list) == 1:
-            if CONF_DICT['config']['show_channel_names']:
-                CONF_DICT['config']['show_channel_names'] = False
+        self.rest_add('GET', 'oidc', self.parse_oidc_request)
+        self.rest_add('POST', 'oidc', self.oidc_code)
 
-        self.testing = kwargs.get('testing')
-        if self.testing:
-            self.testing = TestTwitch(self)
+    def _conf_settings(self, *args, **kwargs):
+        return CONF_DICT
+
+    def _gui_settings(self, *args, **kwargs):
+        return CONF_GUI
+
+    def _test_class(self):
+        return TestTwitch(self)
 
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
         if 'webchat' in self._loaded_modules:
             self._loaded_modules['webchat']['class'].add_depend('twitch')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        for channel in self.channels_list:
-            self._set_chat_online(channel)
-        if self.testing:
-            self.testing.start()
 
     @staticmethod
     def get_viewers(channel):
@@ -620,22 +650,59 @@ class twitch(ChatModule):
         except Exception as exc:
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
-    def _set_chat_offline(self, chat):
-        ChatModule.set_chat_offline(self, chat)
-        try:
-            self.tw_dict[chat].stop()
-        except Exception as exc:
-            log.debug(exc)
-        del self.tw_dict[chat]
-
-    def _set_chat_online(self, chat):
-        ChatModule.set_chat_online(self, chat)
-        self.tw_dict[chat] = TWThread(self.queue, self.host, self.port, chat, self.bttv,
-                                      settings=self._conf_params['settings'], chat_module=self)
-        self.tw_dict[chat].start()
+    def _add_channel(self, chat):
+        ChatModule.add_channel(self, chat)
+        self.channels[chat] = TWThread(self.queue, self.host, self.port, chat, self.bttv,
+                                       settings=self._conf_params['settings'], chat_module=self)
+        self.channels[chat].start()
 
     def apply_settings(self, **kwargs):
         if 'webchat' in kwargs.get('from_depend', []):
             self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        self._check_chats(self.tw_dict.keys())
         ChatModule.apply_settings(self, **kwargs)
+
+    def parse_oidc_request(self, req):
+        return '<script>' \
+               'var http = new XMLHttpRequest();' \
+               'var params = "request=" + encodeURIComponent(window.location.hash);' \
+               'http.open("POST", "oidc", true);' \
+               'http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");' \
+               'http.send(params);' \
+               '</script>'
+
+    def oidc_code(self, req, **kwargs):
+        def remove_hash(item):
+            return item if '#' not in item else item[1:]
+        items_list = map(remove_hash, kwargs.get('request').split('&'))
+        item_dict = {}
+        for item in items_list:
+            item_dict[item.split('=')[0]] = item.split('=')[1]
+
+        if not self.access_code:
+            self.access_code = item_dict['access_token']
+            self._conf_params['config']['access_code'] = self.access_code
+
+            headers['Authorization'] = 'OAuth {}'.format(self.access_code)
+        if self.channels:
+            self.api_call('channels/{}/editors'.format(self.channels.items()[0][0]))
+        return 'Access Code saved'
+
+    def api_call(self, key):
+        req = requests.get(API_URL.format(key), headers=headers)
+        if req.ok:
+            return req.json()
+        raise TwitchAPIError('Unable to get {}'.format(key))
+
+    def register_iodc(self, parent_window):
+        port = self._loaded_modules['webchat']['port']
+
+        url = 'https://api.twitch.tv/kraken/oauth2/authorize?client_id={}' \
+              '&redirect_uri={}' \
+              '&response_type={}' \
+              '&scope={}'.format(headers['Client-ID'], 'http://localhost:{}/{}'.format(port, 'rest/twitch/oidc'),
+                                 'token', 'channel_editor channel_read')
+        request = requests.get(url)
+
+        if request.ok:
+            parent_window.create_browser(request.url)
+        pass

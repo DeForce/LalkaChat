@@ -1,22 +1,29 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import os
-import imp
 import Queue
-from time import sleep
-import messaging
 import logging
 import logging.config
-import semantic_version
+import logging.handlers
+import os
 from collections import OrderedDict
+from time import sleep
+import semantic_version
+import messaging
+from modules.helper.functions import get_class_from_iname
+from modules.helper.module import BaseModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
     LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException
-from modules.helper.module import BaseModule
+from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSpin, LCSlider, LCChooseMultiple
 
-VERSION = '0.3.6'
+VERSION = '0.4.0'
 SEM_VERSION = semantic_version.Version(VERSION)
+LOG_FILES_COUNT = 5
+
+
+def button_test(event):
+    log.info('HelloWorld')
 
 
 def init():
@@ -34,7 +41,7 @@ def init():
     window = None
 
     # Creating dict with folder settings
-    main_config = {'root_folder': PYTHON_FOLDER,
+    base_config = {'root_folder': PYTHON_FOLDER,
                    'conf_folder': CONF_FOLDER,
                    'main_conf_file': MAIN_CONF_FILE,
                    'main_conf_file_loc': MAIN_CONF_FILE,
@@ -57,24 +64,27 @@ def init():
             exit()
 
     log.info("Loading basic configuration")
-    main_config_dict = OrderedDict()
-    main_config_dict['gui_information'] = OrderedDict()
-    main_config_dict['gui_information']['category'] = 'main'
-    main_config_dict['gui_information']['width'] = '450'
-    main_config_dict['gui_information']['height'] = '500'
-    main_config_dict['system'] = OrderedDict()
-    main_config_dict['system']['log_level'] = 'INFO'
-    main_config_dict['system']['testing_mode'] = False
-    main_config_dict['gui'] = OrderedDict()
-    main_config_dict['gui']['cli'] = False
-    main_config_dict['gui']['show_icons'] = False
-    main_config_dict['gui']['show_hidden'] = False
-    main_config_dict['gui']['gui'] = True
-    main_config_dict['gui']['on_top'] = True
-    main_config_dict['gui']['show_browser'] = True
-    main_config_dict['gui']['show_counters'] = True
-    main_config_dict['gui']['reload'] = None
-    main_config_dict['language'] = get_language()
+    main_config_dict = LCPanel()
+    main_config_dict['gui_information'] = LCStaticBox()
+    main_config_dict['gui_information']['width'] = LCText('450')
+    main_config_dict['gui_information']['height'] = LCText('500')
+    main_config_dict['gui_information']['pos_x'] = LCText('10')
+    main_config_dict['gui_information']['pos_y'] = LCText('10')
+    main_config_dict['system'] = LCStaticBox()
+    main_config_dict['system']['log_level'] = LCText('INFO')
+    main_config_dict['system']['testing_mode'] = LCBool(False)
+    main_config_dict['gui'] = LCStaticBox()
+    main_config_dict['gui']['cli'] = LCBool(False)
+    main_config_dict['gui']['show_icons'] = LCBool(False)
+    main_config_dict['gui']['show_hidden'] = LCBool(False)
+    main_config_dict['gui']['gui'] = LCBool(True)
+    main_config_dict['gui']['on_top'] = LCBool(True)
+    main_config_dict['gui']['show_browser'] = LCBool(True)
+    main_config_dict['gui']['show_counters'] = LCBool(True)
+    main_config_dict['gui']['transparency'] = LCSlider(100, min_v=0, max_v=100)
+    main_config_dict['gui']['borderless'] = LCBool(False)
+    main_config_dict['gui']['reload'] = LCButton(button_test)
+    main_config_dict['language'] = LCText(get_language())
 
     main_config_gui = {
         'language': {
@@ -86,35 +96,52 @@ def init():
             'hidden': ['log_level', 'testing_mode'],
         },
         'gui': {
-            'hidden': ['cli']
+            'hidden': ['cli'],
+            'transparency': {
+                'view': 'slider',
+                'min': 10,
+                'max': 100
+            }
         },
         'ignored_sections': ['gui.reload'],
-        'non_dynamic': ['language.list_box', 'gui.*', 'system.*']
+        'non_dynamic': [
+            'language.list_box',
+            'gui.borderless',
+            'gui.cli',
+            'gui.gui',
+            'gui.show_browser',
+            'gui.show_hidden',
+            'gui.show_icons',
+            'gui.transparency',
+            'system.*'
+        ]
     }
-    config = load_from_config_file(MAIN_CONF_FILE, main_config_dict)
-    root_logger.setLevel(level=logging.getLevelName(main_config_dict['system'].get('log_level', 'INFO')))
     # Adding config for main module
     main_class = BaseModule(
         conf_params={
-            'folder': CONF_FOLDER,
-            'file': main_config['main_conf_file_loc'],
-            'filename': main_config['main_conf_file_name'],
-            'parser': config,
-            'root_folder': main_config['root_folder'],
+            'root_folder': base_config['root_folder'],
             'logs_folder': LOG_FOLDER,
-            'config': main_config_dict,
-            'gui': main_config_gui
-        }
+        },
+        config=main_config_dict,
+        gui=main_config_gui,
+        conf_file_name='config.cfg',
+        category='main'
     )
     loaded_modules['main'] = main_class.conf_params()
+    main_config = main_class.conf_params()['config']
+    root_logger.setLevel(level=logging.getLevelName(main_config['system'].get('log_level', 'INFO')))
 
-    gui_settings['gui'] = main_config_dict[GUI_TAG].get('gui')
-    gui_settings['on_top'] = main_config_dict[GUI_TAG].get('on_top')
-    gui_settings['language'] = main_config_dict.get('language')
-    gui_settings['show_hidden'] = main_config_dict[GUI_TAG].get('show_hidden')
-    gui_settings['size'] = (int(main_config_dict['gui_information'].get('width')),
-                            int(main_config_dict['gui_information'].get('height')))
-    gui_settings['show_browser'] = main_config_dict['gui'].get('show_browser')
+    gui_settings['gui'] = main_config[GUI_TAG].get('gui')
+    gui_settings['on_top'] = main_config[GUI_TAG].get('on_top')
+    gui_settings['transparency'] = main_config[GUI_TAG].get('transparency')
+    gui_settings['borderless'] = main_config[GUI_TAG].get('borderless')
+    gui_settings['language'] = main_config.get('language')
+    gui_settings['show_hidden'] = main_config[GUI_TAG].get('show_hidden')
+    gui_settings['size'] = (int(main_config['gui_information'].get('width')),
+                            int(main_config['gui_information'].get('height')))
+    gui_settings['position'] = (int(main_config['gui_information'].get('pos_x')),
+                                int(main_config['gui_information'].get('pos_y')))
+    gui_settings['show_browser'] = main_config['gui'].get('show_browser')
 
     # Checking updates
     log.info("Checking for updates")
@@ -136,54 +163,51 @@ def init():
     queue = Queue.Queue()
     # Loading module for message processing...
     msg = messaging.Message(queue)
-    loaded_modules.update(msg.load_modules(main_config, loaded_modules['main']))
+    loaded_modules.update(msg.load_modules(base_config, loaded_modules['main']))
     msg.start()
 
     log.info("Loading Chats")
     # Trying to dynamically load chats that are in config file.
-    chat_modules = os.path.join(CONF_FOLDER, "chat_modules.cfg")
+    chat_modules_file = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
-    chat_conf_dict['gui_information'] = {'category': 'chat'}
-    chat_conf_dict['chats'] = []
+    chat_conf_dict['chats'] = LCChooseMultiple(
+        [],
+        check_type='files',
+        folder=os.path.sep.join(['modules', 'chat']),
+        keep_extension=False
+    )
 
     chat_conf_gui = {
-        'chats': {
-            'view': 'choose_multiple',
-            'check_type': 'files',
-            'check': os.path.sep.join(['modules', 'chat']),
-            'file_extension': False},
-        'non_dynamic': ['chats.list_box']}
-    chat_config = load_from_config_file(chat_modules, chat_conf_dict)
+        'non_dynamic': ['chats.list_box']
+    }
 
-    chat_module = BaseModule(
+    chat_init_module = BaseModule(
         conf_params={
-            'folder': CONF_FOLDER, 'file': chat_modules,
-            'filename': ''.join(os.path.basename(chat_modules).split('.')[:-1]),
-            'parser': chat_config,
-            'config': chat_conf_dict,
+            'config': load_from_config_file(chat_modules_file, chat_conf_dict),
             'gui': chat_conf_gui
-        }
+        },
+        conf_file_name='chat_modules.cfg',
+        category='chat'
     )
-    loaded_modules['chat'] = chat_module.conf_params()
+    loaded_modules['chat'] = chat_init_module.conf_params()
 
-    for chat_module in chat_conf_dict['chats']:
-        log.info("Loading chat module: {0}".format(chat_module))
-        module_location = os.path.join(chat_location, chat_module + ".py")
+    for chat_module_name in chat_conf_dict['chats'].simple():
+        log.info("Loading chat module: {0}".format(chat_module_name))
+        module_location = os.path.join(chat_location, chat_module_name + ".py")
         if os.path.isfile(module_location):
-            log.info("found {0}".format(chat_module))
+            log.info("found {0}".format(chat_module_name))
             # After module is find, we are initializing it.
-            # Class should be named as in config
+            # Class should be named same as module(Case insensitive)
             # Also passing core folder to module so it can load it's own
             #  configuration correctly
 
-            tmp = imp.load_source(chat_module, module_location)
-            chat_init = getattr(tmp, chat_module)
-            class_module = chat_init(queue, PYTHON_FOLDER,
+            chat_init = get_class_from_iname(module_location, chat_module_name)
+            class_module = chat_init(queue=queue,
                                      conf_folder=CONF_FOLDER,
-                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module)),
+                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module_name)),
                                      testing=main_config_dict['system']['testing_mode'])
-            loaded_modules[chat_module] = class_module.conf_params()
+            loaded_modules[chat_module_name.lower()] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")
 
@@ -191,8 +215,7 @@ def init():
     for f_module, f_config in loaded_modules.iteritems():
         if 'class' in f_config:
             try:
-                f_config['class'].load_module(main_settings=main_config, loaded_modules=loaded_modules,
-                                              queue=queue)
+                f_config['class'].load_module(main_settings=base_config, loaded_modules=loaded_modules)
                 log.debug('loaded module {}'.format(f_module))
             except ModuleLoadException:
                 msg.modules.remove(loaded_modules[f_module]['class'])
@@ -200,43 +223,44 @@ def init():
     log.info('LalkaChat loaded successfully')
 
     if gui_settings['gui']:
-        import gui
+        from modules import gui
         log.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,
                                main_config=loaded_modules['main'],
                                loaded_modules=loaded_modules,
                                queue=queue)
         loaded_modules['gui'] = window.conf_params()
-        window.start()
-
-    if main_config_dict['gui']['cli']:
-        try:
-            while True:
-                console = raw_input("> ")
-                log.info(console)
-                if console == "exit":
-                    log.info("Exiting now!")
-                    close()
-                else:
-                    log.info("Incorrect Command")
-        except (KeyboardInterrupt, SystemExit):
-            log.info("Exiting now")
-            close()
-        except Exception as exc:
-            log.info(exc)
+        window.run()
     else:
-        try:
-            while True:
-                sleep(1)
-        except (KeyboardInterrupt, SystemExit):
-            log.info("Exiting now")
-            close()
+        if main_config_dict['gui']['cli']:
+            try:
+                while True:
+                    console = raw_input("> ")
+                    log.info(console)
+                    if console == "exit":
+                        log.info("Exiting now!")
+                        close()
+                    else:
+                        log.info("Incorrect Command")
+            except (KeyboardInterrupt, SystemExit):
+                log.info("Exiting now")
+                close()
+            except Exception as exc:
+                log.info(exc)
+        else:
+            try:
+                while True:
+                    sleep(1)
+            except (KeyboardInterrupt, SystemExit):
+                log.info("Exiting now")
+                close()
 
 
 if __name__ == '__main__':
     root_logger = logging.getLogger()
     # Logging level
-    file_handler = logging.FileHandler(LOG_FILE)
+    file_handler = logging.handlers.RotatingFileHandler(
+        LOG_FILE, maxBytes=1000*1024, backupCount=LOG_FILES_COUNT)
     file_handler.setFormatter(LOG_FORMAT)
     root_logger.addHandler(file_handler)
 
