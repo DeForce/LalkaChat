@@ -34,6 +34,10 @@ s_queue = Queue.Queue()
 log = logging.getLogger('webchat')
 REMOVED_TRIGGER = '%%REMOVED%%'
 
+SETTINGS_FILE = 'settings.json'
+SETTINGS_GUI_FILE = 'settings_ui.json'
+SETTINGS_FORMAT_FILE = 'settings_format.json'
+
 WS_THREADS = THREADS + 3
 
 CONF_DICT = LCPanel()
@@ -669,21 +673,24 @@ class Webchat(MessagingModule):
         cherrypy.engine.publish('websocket-broadcast',
                                 RemoveMessageByIDs(list(path)).json())
 
-    def get_style_from_file(self, style_name):
-        file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
+    def get_style_from_file(self, style_name, style_type):
+        file_name = SETTINGS_GUI_FILE if style_type == 'gui'else SETTINGS_FILE
+
+        file_path = os.path.join(self.get_style_path(style_name), file_name)
         if file_path and os.path.exists(file_path):
             with open(file_path, 'r') as style_file:
                 return json.load(style_file, object_pairs_hook=OrderedDict)
         return {}
 
     def write_style_to_file(self, style_name, style_type):
-        file_path = os.path.join(self.get_style_path(style_name), 'settings.json')
+        file_name = SETTINGS_GUI_FILE if style_type == 'gui'else SETTINGS_FILE
+        file_path = os.path.join(self.get_style_path(style_name), file_name)
         with open(file_path, 'w') as style_file:
             data = self._conf_params['style_settings'][style_type]['keys']
             json.dump(convert_to_dict(data, ordered=True), style_file, indent=2)
 
-    def get_style_gui_from_file(self, style_name):
-        file_path = os.path.join(self.get_style_path(style_name), 'settings_gui.json')
+    def get_style_format_from_file(self, style_name):
+        file_path = os.path.join(self.get_style_path(style_name), SETTINGS_FORMAT_FILE)
         if file_path and os.path.exists(file_path):
             with open(file_path, 'r') as gui_file:
                 return json.load(gui_file)
@@ -697,14 +704,13 @@ class Webchat(MessagingModule):
             style_type = keys['all_settings']['type']
         web_type = 'gui' if style_type == 'gui_chat' else 'chat'
 
-        lc_settings = alter_data_to_lc_style(self.get_style_from_file(style_name),
-                                             self.get_style_gui_from_file(style_name))
+        lc_settings = alter_data_to_lc_style(self.get_style_from_file(style_name, web_type),
+                                             self.get_style_format_from_file(style_name))
 
-        # params['config'][style_type].update({'style_settings': lc_settings})
         update(params['config'][style_type], {'style_settings': lc_settings})
         params['style_settings'][web_type]['keys'] = params['config'][style_type]['style_settings']
         params['gui'][style_type].update(
-            {'style_settings': self.get_style_gui_from_file(style_name)})
+            {'style_settings': self.get_style_format_from_file(style_name)})
         return params['config'][style_type]['style_settings']
 
     def update_style_settings(self, chat_style, gui_style):
@@ -740,7 +746,7 @@ class Webchat(MessagingModule):
                         'redraw_trigger': ['style'],
                         'type': 'server_chat',
                         'get_config': self.load_style_settings,
-                        'get_gui': self.get_style_gui_from_file
+                        'get_gui': self.get_style_format_from_file
                     },
                 }
             },
@@ -750,7 +756,7 @@ class Webchat(MessagingModule):
                         'redraw_trigger': ['style'],
                         'type': 'gui_chat',
                         'get_config': self.load_style_settings,
-                        'get_gui': self.get_style_gui_from_file
+                        'get_gui': self.get_style_format_from_file
                     },
                 }
             },

@@ -17,7 +17,5 @@ do
         npm start
         rm -rf ${DIR_ROOT}/http/${THEME_NAME}
         cp -r dist ${DIR_ROOT}/http/${THEME_NAME}
-        rm -rf ${DIR_ROOT}/http/${THEME_NAME}_gui
-        cp -r dist ${DIR_ROOT}/http/${THEME_NAME}_gui
         cd ${THEME_ROOT}
 done

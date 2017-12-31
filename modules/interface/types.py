@@ -177,6 +177,7 @@ class LCChooseMultiple(LCChooseSingle):
     def simple(self):
         return list(self.value)
 
+
 TYPE_TO_LC = {
     OrderedDict: LCStaticBox,
     bool: LCBool,
