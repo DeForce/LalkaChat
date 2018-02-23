@@ -81,7 +81,7 @@ def init():
     main_config_dict['gui']['on_top'] = LCBool(True)
     main_config_dict['gui']['show_browser'] = LCBool(True)
     main_config_dict['gui']['show_counters'] = LCBool(True)
-    main_config_dict['gui']['transparency'] = LCSlider(100, min_v=0, max_v=100)
+    main_config_dict['gui']['transparency'] = LCSlider(0, min_v=0, max_v=90)
     main_config_dict['gui']['borderless'] = LCBool(False)
     main_config_dict['gui']['reload'] = LCButton(button_test)
     main_config_dict['language'] = LCText(get_language())
@@ -97,11 +97,6 @@ def init():
         },
         'gui': {
             'hidden': ['cli'],
-            'transparency': {
-                'view': 'slider',
-                'min': 10,
-                'max': 100
-            }
         },
         'ignored_sections': ['gui.reload'],
         'non_dynamic': [
@@ -112,7 +107,6 @@ def init():
             'gui.show_browser',
             'gui.show_hidden',
             'gui.show_icons',
-            'gui.transparency',
             'system.*'
         ]
     }
