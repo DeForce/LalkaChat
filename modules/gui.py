@@ -19,7 +19,6 @@ except ImportError:
     HAS_CHROME = False
 
 from collections import OrderedDict
-import threading
 import os
 import logging
 import webbrowser
@@ -37,6 +36,7 @@ SKIP_TXT_CONTROLS = ['list_input', 'list_input2']
 SKIP_BUTTONS = ['list_add', 'list_remove', 'apply_button', 'cancel_button', 'ok_button']
 ITEM_SPACING_VERT = 6
 ITEM_SPACING_HORZ = 30
+TRANSPARENCY_MULTIPLIER = 2.55
 
 
 def check_duplicate(item, window):
@@ -741,18 +741,20 @@ class SettingsWindow(wx.Frame):
     def apply_custom_gui_settings(self, item, value):
         if item == get_key('main', 'gui', 'show_hidden'):
             self.show_hidden = value
-        if item == get_key('main', 'gui', 'show_counters'):
+        elif item == get_key('main', 'gui', 'show_counters'):
             if self.main_class.status_frame.chat_count:
                 self.main_class.status_frame.is_shown(value)
             else:
                 self.main_class.status_frame.is_shown(False)
-        if item == get_key('main', 'gui', 'on_top'):
+        elif item == get_key('main', 'gui', 'on_top'):
             if value:
                 style = self.main_class.styles | wx.STAY_ON_TOP
             else:
                 style = self.main_class.styles ^ wx.STAY_ON_TOP
             self.main_class.styles = style
             self.main_class.SetWindowStyle(style)
+        elif item == get_key('main', 'gui', 'transparency'):
+            self.main_class.SetTransparent((100 - value) * TRANSPARENCY_MULTIPLIER)
 
 
 class ChatGui(wx.Frame):
@@ -771,9 +773,12 @@ class ChatGui(wx.Frame):
                           size=self.gui_settings.get('size'),
                           pos=self.gui_settings.get('position'))
         # Set window style
-        if self.gui_settings.get('transparency') < 100:
+        if self.gui_settings.get('transparency') > 0:
+            transp = self.gui_settings.get('transparency')
+            if transp > 90:
+                transp = 90
             log.info("Application is transparent")
-            self.SetTransparent(self.gui_settings['transparency'] * 2.55)
+            self.SetTransparent((100 - transp) * TRANSPARENCY_MULTIPLIER)
         if self.gui_settings.get('borderless', False):
             log.info("Application is in borderless mode")
             styles = wx.CLIP_CHILDREN | wx.BORDER_NONE | wx.FRAME_SHAPED

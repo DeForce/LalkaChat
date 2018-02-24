@@ -296,9 +296,9 @@ def create_slider(panel=None, value=None, key=None, bind=None, gui=None, **kwarg
     item_name = MODULE_KEY.join(key)
     style = wx.SL_VALUE_LABEL | wx.SL_AUTOTICKS
     item_box = wx.Slider(panel, id=id_renew(item_name, update=True),
-                         minValue=gui['min'], maxValue=gui['max'],
+                         minValue=value.min, maxValue=value.max,
                          value=int(value), style=style)
-    freq = (gui['max'] - gui['min'])/5
+    freq = (value.max - value.min)/5
     item_box.SetTickFreq(freq)
     item_box.SetLineSize(4)
     item_box.Bind(wx.EVT_SCROLL, bind)
