@@ -512,7 +512,7 @@ class TWThread(threading.Thread):
         try:
             # Getting Better Twitch TV smiles
             if self.bttv_smiles:
-                request = requests.get("https://api.betterttv.net/emotes")
+                request = requests.get("https://api.betterttv.net/emotes", timeout=10)
                 if request.status_code == 200:
                     for smile in request.json()['emotes']:
                         self.kwargs['bttv_smiles_dict'][smile.get('regex')] = smile
