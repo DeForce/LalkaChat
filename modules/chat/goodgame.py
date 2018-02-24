@@ -28,6 +28,7 @@ SOURCE_ICON = 'http://goodgame.ru/images/icons/favicon.png'
 FILE_ICON = os.path.join('img', 'gg.png')
 SYSTEM_USER = 'GoodGame'
 ID_PREFIX = 'gg_{0}'
+API = 'http://api2.goodgame.ru/{}'
 
 CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['config'] = LCStaticBox()
@@ -303,8 +304,14 @@ class GGThread(threading.Thread):
 
     def load_config(self):
         try:
+            requests.get(API.format(''), timeout=5)
+        except Exception as exc:
+            log.error('API is not working')
+            return False
+
+        try:
             self.kwargs['smiles'] = {}
-            smile_request = requests.get("http://api2.goodgame.ru/smiles")
+            smile_request = requests.get(API.format('smiles'))
             next_page = smile_request.json()['_links']['first']['href']
             while True:
                 req_smile = requests.get(next_page)
@@ -323,13 +330,13 @@ class GGThread(threading.Thread):
 
         try:
             if self.ch_id:
-                request = requests.get("http://api2.goodgame.ru/streams/{0}".format(self.ch_id))
+                request = requests.get(API.format('streams/{}').format(self.ch_id))
                 if request.status_code == 200:
                     channel_name = request.json()['channel']['key']
                     if self.nick != channel_name:
                         self.nick = channel_name
             else:
-                request = requests.get("http://api2.goodgame.ru/streams/{0}".format(self.nick))
+                request = requests.get(API.format('streams/{}').format(self.nick))
                 if request.status_code == 200:
                     self.ch_id = request.json()['channel']['id']
         except Exception as exc:
@@ -429,7 +436,7 @@ class GoodGame(ChatModule):
     def get_viewers(self, channel):
         if not self._conf_params['config']['config']['check_viewers']:
             return NA_MESSAGE
-        streams_url = 'http://api2.goodgame.ru/streams/{0}'.format(channel)
+        streams_url = API.format('streams/{0}'.format(channel))
         try:
             request = requests.get(streams_url)
             if request.status_code == 200:
