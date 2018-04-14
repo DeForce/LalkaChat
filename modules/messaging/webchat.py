@@ -42,7 +42,7 @@ WS_THREADS = THREADS + 3
 
 CONF_DICT = LCPanel()
 CONF_DICT['server'] = LCStaticBox()
-CONF_DICT['server']['host'] = LCText('127.0.0.1')
+CONF_DICT['server']['host'] = LCDropdown('127.0.0.1', ['127.0.0.1', '0.0.0.0'])
 CONF_DICT['server']['port'] = LCText('8080')
 
 CONF_DICT['gui_chat'] = LCPanel()
@@ -514,7 +514,10 @@ class SocketThread(threading.Thread):
 
         self.update_settings()
         self.mount_dirs()
-        cherrypy.engine.start()
+        try:
+            cherrypy.engine.start()
+        except Exception as exc:
+            log.error('Unable to start webchat: %s', exc)
 
     def mount_dirs(self):
         cherrypy.tree.mount(CssRoot(self.style_settings['gui']), '/gui/css', self.gui_css_config)
@@ -577,10 +580,13 @@ class Webchat(MessagingModule):
         host = self._conf_params['host']
         port = self._conf_params['port']
         if socket_open(host, port):
-            self.s_thread = SocketThread(host, port, CONF_FOLDER,
-                                         style_settings=self._conf_params['style_settings'],
-                                         modules=self._loaded_modules)
-            self.s_thread.start()
+            try:
+                self.s_thread = SocketThread(host, port, CONF_FOLDER,
+                                             style_settings=self._conf_params['style_settings'],
+                                             modules=self._loaded_modules)
+                self.s_thread.start()
+            except:
+                log.error('Unable to bind at {}:{}'.format(host, port))
 
             for thread in range(WS_THREADS):
                 self.message_threads.append(MessagingThread(self._conf_params['style_settings']))
