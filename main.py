@@ -14,8 +14,10 @@ from modules.helper.functions import get_class_from_iname
 from modules.helper.module import BaseModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
-    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException
-from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSpin, LCSlider, LCChooseMultiple
+    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException, \
+    get_languages
+from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSpin, LCSlider, LCChooseMultiple, \
+    LCDropdown
 
 VERSION = '0.4.0'
 SEM_VERSION = semantic_version.Version(VERSION)
@@ -84,14 +86,9 @@ def init():
     main_config_dict['gui']['transparency'] = LCSlider(0, min_v=0, max_v=90)
     main_config_dict['gui']['borderless'] = LCBool(False)
     main_config_dict['gui']['reload'] = LCButton(button_test)
-    main_config_dict['language'] = LCText(get_language())
+    main_config_dict['language'] = LCDropdown(get_language(), get_languages())
 
     main_config_gui = {
-        'language': {
-            'view': 'choose_single',
-            'check_type': 'dir',
-            'check': 'translations'
-        },
         'system': {
             'hidden': ['log_level', 'testing_mode'],
         },

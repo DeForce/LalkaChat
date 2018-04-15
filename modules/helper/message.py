@@ -43,12 +43,13 @@ class NonExistentCommand(Exception):
 
 
 class Message(object):
-    def __init__(self):
+    def __init__(self, only_gui=False):
         """
             Basic Message class
         """
         self._jsonable = []
         self._timestamp = datetime.datetime.now()
+        self._only_gui = only_gui
         self._type = 'message'
 
     def json(self):
@@ -59,6 +60,10 @@ class Message(object):
     @property
     def type(self):
         return self._type
+
+    @property
+    def only_gui(self):
+        return self._only_gui
 
     @property
     def timestamp(self):
@@ -79,13 +84,13 @@ class Message(object):
 
 
 class CommandMessage(Message):
-    def __init__(self, command='', platform=None):
+    def __init__(self, command='', platform=None, **kwargs):
         """
             Command Message class
               Used to control chat behaviour
         :param command: Which command to use
         """
-        Message.__init__(self)
+        Message.__init__(self, **kwargs)
         self._type = 'command'
         self._command = _validate_command(command)
         self._platform = platform
@@ -133,7 +138,7 @@ class RemoveMessageByIDs(CommandMessage):
 class TextMessage(Message):
     def __init__(self, platform_id, icon, user, text,
                  emotes=None, badges=None, pm=False,
-                 nick_colour=None, mid=None, me=False, channel_name=None):
+                 nick_colour=None, mid=None, me=False, channel_name=None, **kwargs):
         """
             Text message used by main chat logic
         :param badges: Badges to display
@@ -147,7 +152,7 @@ class TextMessage(Message):
         :param emotes: 
         :param pm: 
         """
-        Message.__init__(self)
+        Message.__init__(self, **kwargs)
 
         self._platform = Platform(platform_id, icon)
         self._user = user
@@ -242,7 +247,7 @@ class TextMessage(Message):
 
 class SystemMessage(TextMessage):
     def __init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON, user=SOURCE_USER,
-                 emotes=None, category='system', channel_name=None):
+                 emotes=None, category='system', channel_name=None, **kwargs):
         """
             Text message used by main chat logic
               Serves system messages from modules
@@ -255,7 +260,7 @@ class SystemMessage(TextMessage):
         if emotes is None:
             emotes = []
         TextMessage.__init__(self, platform_id, icon, user, text,
-                             emotes=emotes, channel_name=channel_name)
+                             emotes=emotes, channel_name=channel_name, **kwargs)
         self._category = category
 
     @property

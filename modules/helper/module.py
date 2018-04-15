@@ -43,6 +43,7 @@ class BaseModule:
         self._rest_api = {}
         self._module_name = self.__class__.__name__.lower()
         self._load_queue = {}
+        self._msg_queue = kwargs.get('queue')
 
         self._category = kwargs.get('category', 'main')
 

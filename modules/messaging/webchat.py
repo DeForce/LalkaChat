@@ -148,7 +148,8 @@ class MessagingThread(threading.Thread):
             if isinstance(message, SystemMessage) and not self.settings['chat']['keys'].get('show_system_msg', True):
                 continue
 
-            self.send_message(message, 'chat')
+            if not message.only_gui:
+                self.send_message(message, 'chat')
             self.send_message(message, 'gui')
         log.info("Messaging thread stopping")
 
