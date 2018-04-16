@@ -14,7 +14,6 @@ from modules.helper.parser import load_from_config_file
 from modules.interface.types import LCPanel, LCChooseMultiple
 
 log = logging.getLogger('messaging')
-MODULE_PRI_DEFAULT = '100'
 
 
 class MessageHandler(threading.Thread):

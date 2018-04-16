@@ -87,7 +87,7 @@ def load_translations_keys(translation_folder, language):
                         key, value = map(str.strip, line.strip().split(SPLIT_TRANSLATION))
                         if key not in TRANSLATIONS:
                             TRANSLATIONS[key] = value
-    language = language.lower()
+    language = language.simple().lower()
     dir_list = [f_item for f_item in os.listdir(translation_folder)
                 if os.path.isdir(os.path.join(translation_folder, f_item))]
     languages_to_load = [language, DEFAULT_LANGUAGE]
@@ -164,6 +164,11 @@ def get_update(sem_version):
 def get_language():
     local_name, local_encoding = locale.getdefaultlocale()
     return LANGUAGE_DICT.get(local_name, 'en')
+
+
+def get_languages():
+    item_path = os.path.join(PYTHON_FOLDER, 'translations')
+    return [item for item in item_path if os.path.isdir(item)]
 
 
 def get_key(*args):

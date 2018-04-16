@@ -73,6 +73,7 @@ class TwitchAPIError(Exception):
 class TwitchTextMessage(TextMessage):
     def __init__(self, user, text, me):
         self.bttv_emotes = {}
+        self.bits = {}
         TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
                              user=user, text=text, me=me)
 
@@ -208,7 +209,7 @@ class TwitchMessageHandler(threading.Thread):
             elif tag_key == 'emotes' and tag_value:
                 self._handle_emotes(message, tag_value)
             elif tag_key == 'bits' and tag_value:
-                self._handle_bits(message, tag_value)
+                self._handle_bits(message, int(tag_value))
             elif tag_key == 'color' and tag_value:
                 self._handle_viewer_color(message, tag_value)
 
@@ -228,7 +229,6 @@ class TwitchMessageHandler(threading.Thread):
     def _handle_bits(message, amount):
         regexp = re.search(BITS_REGEXP.format(amount), message.text)
         emote = regexp.group(2)
-        emote_smile = '{}{}'.format(emote, amount)
 
         if amount >= 10000:
             color = 'red'
@@ -242,14 +242,14 @@ class TwitchMessageHandler(threading.Thread):
             color = 'gray'
 
         message.bits = {
-            'bits': emote_smile,
+            'bits': emote,
             'amount': amount,
             'theme': BITS_THEME,
             'type': BITS_TYPE,
             'color': color,
             'size': 4
         }
-        message.text = message.text.replace(emote_smile, EMOTE_FORMAT.format(emote_smile))
+        message.text = message.text.replace(emote, EMOTE_FORMAT.format(emote))
 
     @staticmethod
     def _handle_sub_message(message):
@@ -265,16 +265,15 @@ class TwitchMessageHandler(threading.Thread):
 
     @staticmethod
     def _post_process_bits(message):
-        if not hasattr(message, 'bits'):
+        if not message.bits:
             return
-        bits = message.bits
         message.emotes.append(Emote(
-            bits['bits'],
+            message.bits['bits'],
             BITS_URL.format(
-                theme=bits['theme'],
-                type=bits['type'],
-                color=bits['color'],
-                size=bits['size']
+                theme=message.bits['theme'],
+                type=message.bits['type'],
+                color=message.bits['color'],
+                size=message.bits['size']
             )
         ))
 

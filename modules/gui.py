@@ -6,7 +6,7 @@ import sys
 from modules.helper.functions import find_by_type, parse_keys_to_string, deep_get, get_config_item_path
 from modules.interface.controls import KeyListBox, MainMenuToolBar
 
-import modules.interface.functions
+import modules.interface.elements
 from modules.interface.events import StatusChangeEvent, EVT_STATUS_CHANGE
 from modules.interface.frames import OAuthBrowser, StatusFrame
 from modules.interface.types import *
@@ -100,15 +100,15 @@ class SettingsWindow(wx.Frame):
         self.buttons = {}
         self.groups = {
             LCPanel: {
-                'function': modules.interface.functions.create_panel,
+                'function': modules.interface.elements.create_panel,
                 'bind': None
             },
             LCStaticBox: {
-                'function': modules.interface.functions.create_static_box,
+                'function': modules.interface.elements.create_static_box,
                 'bind': None
             },
             LCGridDual: {
-                'function': modules.interface.functions.create_list,
+                'function': modules.interface.elements.create_list,
                 'bind': {
                     'add': self.button_clicked,
                     'remove': self.button_clicked,
@@ -117,7 +117,7 @@ class SettingsWindow(wx.Frame):
                 }
             },
             LCGridSingle: {
-                'function': modules.interface.functions.create_list,
+                'function': modules.interface.elements.create_list,
                 'bind': {
                     'add': self.button_clicked,
                     'remove': self.button_clicked,
@@ -126,14 +126,14 @@ class SettingsWindow(wx.Frame):
                 }
             },
             LCChooseMultiple: {
-                'function': modules.interface.functions.create_choose,
+                'function': modules.interface.elements.create_choose,
                 'bind': {
                     'change': self.on_listbox_change,
                     'check_change': self.on_checklist_box_change
                 }
             },
             LCChooseSingle: {
-                'function': modules.interface.functions.create_choose,
+                'function': modules.interface.elements.create_choose,
                 'bind': {
                     'change': self.on_listbox_change,
                     'check_change': self.on_checklist_box_change
@@ -142,35 +142,35 @@ class SettingsWindow(wx.Frame):
         }
         self.controls = {
             LCButton: {
-                'function': modules.interface.functions.create_button,
+                'function': modules.interface.elements.create_button,
                 'bind': self.button_clicked
             },
             LCBool: {
-                'function': modules.interface.functions.create_checkbox,
+                'function': modules.interface.elements.create_checkbox,
                 'bind': self.on_check_change
             },
             LCText: {
-                'function': modules.interface.functions.create_textctrl,
+                'function': modules.interface.elements.create_textctrl,
                 'bind': self.on_textctrl
             },
             LCSpin: {
-                'function': modules.interface.functions.create_spin,
+                'function': modules.interface.elements.create_spin,
                 'bind': self.on_spinctrl
             },
             LCDropdown: {
-                'function': modules.interface.functions.create_dropdown,
+                'function': modules.interface.elements.create_dropdown,
                 'bind': self.on_dropdown
             },
             LCSlider: {
-                'function': modules.interface.functions.create_slider,
+                'function': modules.interface.elements.create_slider,
                 'bind': self.on_sliderctrl
             },
             LCColour: {
-                'function': modules.interface.functions.create_colour_picker,
+                'function': modules.interface.elements.create_colour_picker,
                 'bind': self.on_color_picker
             },
             LCList: {
-                'function': modules.interface.functions.create_list,
+                'function': modules.interface.elements.create_list,
                 'bind': {
                     'add': self.button_clicked,
                     'remove': self.button_clicked,
@@ -413,7 +413,7 @@ class SettingsWindow(wx.Frame):
 
         image_list = wx.ImageList(16, 16)
 
-        tree_ctrl_id = modules.interface.functions.id_renew('settings.tree', update=True)
+        tree_ctrl_id = modules.interface.controls.id_renew('settings.tree', update=True)
         self.tree_ctrl = wx.TreeCtrl(self, id=tree_ctrl_id, style=style)
         root_key = get_key('settings', 'tree', 'root')
         root_node = self.tree_ctrl.AddRoot(translate_key(root_key))
@@ -453,7 +453,7 @@ class SettingsWindow(wx.Frame):
 
         self.main_grid.Add(self.tree_ctrl, 7, wx.EXPAND | wx.ALL, 7)
 
-        content_page_id = modules.interface.functions.id_renew(MODULE_KEY.join(['settings', 'content']))
+        content_page_id = modules.interface.controls.id_renew(MODULE_KEY.join(['settings', 'content']))
         self.content_page = wx.Panel(self, id=content_page_id)
         self.main_grid.Add(self.content_page, 15, wx.EXPAND)
 
@@ -521,7 +521,7 @@ class SettingsWindow(wx.Frame):
         self.create_page_buttons(sizer=page_sizer, panel=panel)
 
     def create_page_items(self, page_sizer, panel, config, gui, key):
-        page_sc_window = wx.ScrolledWindow(panel, id=modules.interface.functions.id_renew(gui), style=wx.VSCROLL)
+        page_sc_window = wx.ScrolledWindow(panel, id=modules.interface.controls.id_renew(gui), style=wx.VSCROLL)
         page_sc_window.SetScrollbars(5, 5, 10, 10)
         sizer = wx.BoxSizer(wx.VERTICAL)
         joined_keys = MODULE_KEY.join(key)
@@ -574,17 +574,17 @@ class SettingsWindow(wx.Frame):
     def create_page_buttons(self, sizer, panel):
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         button_sizer.Add(
-            modules.interface.functions.create_button(
+            modules.interface.elements.create_button(
                 self, panel=panel, key=['settings', 'ok_button'],
                 bind=self.button_clicked, multiple=True)['item'],
             0, wx.ALIGN_RIGHT)
         button_sizer.Add(
-            modules.interface.functions.create_button(
+            modules.interface.elements.create_button(
                 self, panel=panel, key=['settings', 'apply_button'],
                 bind=self.button_clicked, enabled=False, multiple=True)['item'],
             0, wx.ALIGN_RIGHT)
         button_sizer.Add(
-            modules.interface.functions.create_button(
+            modules.interface.elements.create_button(
                 self, panel=panel, key=['settings', 'cancel_button'],
                 bind=self.button_clicked, multiple=True)['item'],
             0, wx.ALIGN_RIGHT)
@@ -893,7 +893,7 @@ class ChatGui(wx.Frame):
         log.debug("Got event from {0}".format(modules.interface.controls.IDS[event.GetId()]))
         module_groups = modules.interface.controls.IDS[event.GetId()].split(MODULE_KEY)
         settings_category = MODULE_KEY.join(module_groups[1:-1])
-        settings_menu_id = modules.interface.functions.id_renew(settings_category, update=True)
+        settings_menu_id = modules.interface.controls.id_renew(settings_category, update=True)
         if self.settings_window:
             self.settings_window.SetFocus()
         else:

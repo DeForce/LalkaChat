@@ -22,26 +22,6 @@ CONF_GUI = {
 C2B_REGEXP = ur'(^|\s)({})(?=(\s|$))'
 
 
-def twitch_replace_indexes(filter_name, text, filter_size, replace_size, emotes_list):
-    emotes = []
-    message_index_list = [m.start() for m in re.finditer(filter_name, text)]
-
-    offset = replace_size - filter_size
-    for emote_data in emotes_list:
-        emote = {'emote_id': emote_data['emote_id'],
-                 'emote_pos': []}
-        for emote_pos in emote_data['emote_pos']:
-            e_start, e_end = emote_pos.split('-')
-            mod_offset = 0
-            for index, item in enumerate(message_index_list):
-                if item < int(e_start):
-                    mod_offset = offset * (index + 1)
-            emote['emote_pos'].append('{0}-{1}'.format(int(e_start) + mod_offset,
-                                                       int(e_end) + mod_offset))
-        emotes.append(emote)
-    return emotes
-
-
 class C2B(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
