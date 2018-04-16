@@ -168,7 +168,8 @@ def get_language():
 
 def get_languages():
     item_path = os.path.join(PYTHON_FOLDER, 'translations')
-    return [item for item in item_path if os.path.isdir(item)]
+    return [item for item in os.listdir(item_path)
+            if os.path.isdir(os.path.join(item_path, item))]
 
 
 def get_key(*args):

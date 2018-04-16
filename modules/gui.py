@@ -470,7 +470,7 @@ class SettingsWindow(wx.Frame):
             raise CategoryKeyError("Key not found in categories")
 
         category = keys[1]
-        module_id = keys[1] if not MODULE_KEY.join(keys[2:]) else MODULE_KEY.join(keys[2:])
+        module_id = keys[1] if not keys[2:] else MODULE_KEY.join(keys[2:])
 
         if module_id not in self.categories[category]:
             raise ModuleKeyError("Key not found in modules")
@@ -696,8 +696,7 @@ class SettingsWindow(wx.Frame):
                             non_dynamic_check = True
                             break
 
-                item_type = type(deep_config[item_name])
-                deep_config[item_name] = item_type(change['value'])
+                deep_config[item_name].value = change['value']
                 self.apply_custom_gui_settings(item, change['value'])
             if 'class' in module_settings:
                 module_settings['class'].apply_settings()

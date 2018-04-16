@@ -291,7 +291,7 @@ class GGThread(threading.Thread):
         # all threads will exit too.
         self.daemon = True
         self.queue = queue
-        self.address = address
+        self.address = str(address)
         self.nick = nick
 
         self.chat_module = kwargs.get('chat_module')

@@ -18,6 +18,7 @@ from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
 from modules.gui import MODULE_KEY
+from modules.helper.functions import get_themes
 from modules.helper.html_template import HTML_TEMPLATE
 from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByIDs
 from modules.helper.module import MessagingModule
@@ -46,21 +47,15 @@ CONF_DICT['server']['host'] = LCDropdown('127.0.0.1', ['127.0.0.1', '0.0.0.0'])
 CONF_DICT['server']['port'] = LCText('8080')
 
 CONF_DICT['gui_chat'] = LCPanel()
-CONF_DICT['gui_chat']['style'] = LCChooseSingle(
-    DEFAULT_GUI_STYLE,
-    check_type='dir',
-    folder='http',
-    empty_label=True)
+CONF_DICT['gui_chat']['style'] = LCChooseSingle(DEFAULT_GUI_STYLE,
+                                                available_list=get_themes())
 CONF_DICT['gui_chat']['style_settings'] = LCStaticBox()
 CONF_DICT['gui_chat']['style_settings']['show_system_msg'] = LCBool(True)
 CONF_DICT['gui_chat']['style_settings']['show_history'] = LCBool(True)
 
 CONF_DICT['server_chat'] = LCPanel()
-CONF_DICT['server_chat']['style'] = LCChooseSingle(
-    DEFAULT_STYLE,
-    check_type='dir',
-    folder='http',
-    empty_label=True)
+CONF_DICT['server_chat']['style'] = LCChooseSingle(DEFAULT_STYLE,
+                                                   available_list=get_themes())
 CONF_DICT['server_chat']['style_settings'] = LCStaticBox()
 CONF_DICT['server_chat']['style_settings']['show_system_msg'] = LCBool(True)
 CONF_DICT['server_chat']['style_settings']['show_history'] = LCBool(True)
@@ -403,7 +398,7 @@ class CssRoot(object):
         css_namespace = Namespace()
         for key, value in self.settings['keys'].items():
             if isinstance(value, LCText):
-                css_value = String(value)
+                css_value = String(unicode(value))
             elif isinstance(value, LCColour):
                 css_value = Color.from_hex(value)
             elif isinstance(value, LCBool):

@@ -1,6 +1,7 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import os
 import collections
+
+import os
 
 import yaml
 from ConfigParser import RawConfigParser
@@ -18,7 +19,7 @@ def update(dst, src, overwrite=True):
         has_key = k in dst
         dst_type = type(dst.get(k, v))
 
-        if isinstance(v, collections.Mapping):
+        if isinstance(v, (LCDict, collections.Mapping)):
             r = update(dst.get(k, {}), v, overwrite=overwrite)
             dst[k] = r
         else:

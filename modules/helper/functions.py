@@ -2,6 +2,11 @@ import collections
 
 import imp
 
+import os
+
+from modules.helper.system import PYTHON_FOLDER
+from modules.interface.types import LCDict
+
 
 def find_by_type(data, type_to_find):
     found = collections.OrderedDict()
@@ -27,14 +32,32 @@ def parse_keys_to_string(data):
     return keys
 
 
+def dict_instance(d):
+    return isinstance(d, (collections.Mapping, LCDict))
+
+
 def deep_get(dictionary, *keys):
-    return reduce(lambda d, key: d.get(key, None) if isinstance(d, collections.Mapping) else None, keys, dictionary)
+    return reduce(lambda d, key: d.get(key, None) if dict_instance(d) else None, keys, dictionary)
 
 
 def get_config_item_path(*keys):
     new_list = list(*keys)
     new_list.insert(1, 'config')
     return new_list
+
+
+def get_modules_in_folder(folder):
+    item_path = os.path.join(PYTHON_FOLDER, 'modules', folder)
+    return [item.strip('.py') for item in os.listdir(item_path)
+            if os.path.isfile(os.path.join(item_path, item))
+            and not item.startswith('_')
+            and not item.endswith('.pyc')]
+
+
+def get_themes():
+    item_path = os.path.join(PYTHON_FOLDER, 'http')
+    return [item for item in os.listdir(item_path)
+            if os.path.isdir(os.path.join(item_path, item))]
 
 
 def get_class_from_iname(python_module_path, name):

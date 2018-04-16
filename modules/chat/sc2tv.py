@@ -312,7 +312,7 @@ class FsThread(threading.Thread):
         # all threads will exit too.
         self.daemon = "True"
         self.queue = queue
-        self.socket = socket
+        self.socket = str(socket)
         self.channel_name = get_channel_name(channel_name)
         self.glob = channel_name
         self.chat_module = kwargs.get('chat_module')

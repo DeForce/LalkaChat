@@ -12,7 +12,7 @@ def create_textctrl(panel=None, value=None, key=None, bind=None, **kwargs):
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
     item_name = MODULE_KEY.join(key)
     item_box = wx.TextCtrl(panel, id=id_renew(item_name, update=True),
-                           value=unicode(value))
+                           value=unicode(value.simple()))
     item_box.Bind(wx.EVT_TEXT, bind)
     item_text = wx.StaticText(panel, label=translate_key(item_name))
     item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
@@ -203,58 +203,45 @@ def create_colour_picker(panel=None, value=None, key=None, bind=None, **kwargs):
 
 
 def create_choose(panel=None, value=None, key=None, bind=None, **kwargs):
-    item_list = value.value
     item_class = value
 
-    is_single = False if value.multiple else True
+    active_items = item_class.value
+    available_items = item_class.list
+    translated_items = [translate_key(item) for item in available_items]
+
+    is_single = False if item_class.multiple else True
     style = wx.LB_SINGLE if is_single else wx.LB_EXTENDED
     border_sizer = wx.BoxSizer(wx.VERTICAL)
     item_sizer = wx.BoxSizer(wx.VERTICAL)
-    list_items = []
-    translated_items = []
 
     static_label = MODULE_KEY.join(key)
     if not item_class.empty_label:
         static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
         item_sizer.Add(static_text)
 
-    if item_class.check_type in ['dir', 'folder', 'files']:
-        check_type = item_class.check_type
-        for item_in_list in os.listdir(os.path.join(PYTHON_FOLDER, item_class.folder)):
-            item_path = os.path.join(PYTHON_FOLDER, item_class.folder, item_in_list)
-            if check_type in ['dir', 'folder'] and os.path.isdir(item_path):
-                list_items.append(item_in_list)
-            elif check_type == 'files' and os.path.isfile(item_path):
-                if not item_class.keep_extension:
-                    item_in_list = ''.join(os.path.basename(item_path).split('.')[:-1])
-                if '__init__' not in item_in_list:
-                    if item_in_list not in list_items:
-                        list_items.append(item_in_list)
-                        translated_items.append(translate_key(item_in_list))
-
     item_key = MODULE_KEY.join(key + ['list_box'])
     label_text = translate_key(item_key)
     if label_text:
         item_sizer.Add(wx.StaticText(panel, label=label_text, style=wx.ALIGN_RIGHT))
     if is_single:
-        item_list_box = KeyListBox(panel, id=id_renew(item_key, update=True), keys=list_items,
-                                   choices=translated_items if translated_items else list_items, style=style)
+        item_list_box = KeyListBox(panel, id=id_renew(item_key, update=True), keys=available_items,
+                                   choices=translated_items if translated_items else available_items, style=style)
     else:
-        item_list_box = KeyCheckListBox(panel, id=id_renew(item_key, update=True), keys=list_items,
-                                        choices=translated_items if translated_items else list_items)
+        item_list_box = KeyCheckListBox(panel, id=id_renew(item_key, update=True), keys=available_items,
+                                        choices=translated_items if translated_items else available_items)
         item_list_box.Bind(wx.EVT_CHECKLISTBOX, bind['check_change'])
     item_list_box.Bind(wx.EVT_LISTBOX, bind['change'])
 
-    section_for = item_list if not is_single else {item_list: None}
+    section_for = active_items if not is_single else {active_items: None}
     if is_single:
         item, value = section_for.items()[0]
         if item not in item_list_box.GetItems():
             if item_list_box.GetItems():
                 item_list_box.SetSelection(0)
         else:
-            item_list_box.SetSelection(list_items.index(item))
+            item_list_box.SetSelection(available_items.index(item))
     else:
-        check_items = [list_items.index(item) for item in section_for]
+        check_items = [available_items.index(item) for item in section_for]
         item_list_box.SetChecked(check_items)
 
     if item_class.description:
