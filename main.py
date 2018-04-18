@@ -10,7 +10,7 @@ from collections import OrderedDict
 from time import sleep
 import semantic_version
 import messaging
-from modules.helper.functions import get_class_from_iname
+from modules.helper.functions import get_class_from_iname, get_modules_in_folder
 from modules.helper.module import BaseModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
@@ -120,7 +120,7 @@ def init():
     )
     loaded_modules['main'] = main_class.conf_params()
     main_config = main_class.conf_params()['config']
-    root_logger.setLevel(level=logging.getLevelName(main_config['system'].get('log_level', 'INFO')))
+    root_logger.setLevel(level=logging.getLevelName(str(main_config['system'].get('log_level', 'INFO'))))
 
     gui_settings['gui'] = main_config[GUI_TAG].get('gui')
     gui_settings['on_top'] = main_config[GUI_TAG].get('on_top')
@@ -128,10 +128,10 @@ def init():
     gui_settings['borderless'] = main_config[GUI_TAG].get('borderless')
     gui_settings['language'] = main_config.get('language')
     gui_settings['show_hidden'] = main_config[GUI_TAG].get('show_hidden')
-    gui_settings['size'] = (int(main_config['gui_information'].get('width')),
-                            int(main_config['gui_information'].get('height')))
-    gui_settings['position'] = (int(main_config['gui_information'].get('pos_x')),
-                                int(main_config['gui_information'].get('pos_y')))
+    gui_settings['size'] = (int(main_config['gui_information']['width']),
+                            int(main_config['gui_information']['height']))
+    gui_settings['position'] = (int(main_config['gui_information']['pos_x']),
+                                int(main_config['gui_information']['pos_y']))
     gui_settings['show_browser'] = main_config['gui'].get('show_browser')
 
     # Checking updates
@@ -162,12 +162,7 @@ def init():
     chat_modules_file = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
-    chat_conf_dict['chats'] = LCChooseMultiple(
-        [],
-        check_type='files',
-        folder=os.path.sep.join(['modules', 'chat']),
-        keep_extension=False
-    )
+    chat_conf_dict['chats'] = LCChooseMultiple([], available_list=get_modules_in_folder('chat'))
 
     chat_conf_gui = {
         'non_dynamic': ['chats.list_box']

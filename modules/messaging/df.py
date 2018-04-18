@@ -26,7 +26,7 @@ class DF(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, *args, **kwargs)
         # Dwarf professions.
-        self.file = CONF_DICT['grep']['file']
+        self.file = str(CONF_DICT['grep']['file'])
 
         dir_name = os.path.dirname(self.file)
         if not os.path.exists(dir_name):

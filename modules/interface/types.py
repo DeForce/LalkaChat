@@ -5,7 +5,7 @@ log = logging.getLogger('interface/types')
 
 
 class LCObject(object):
-    def __init__(self, value, *args, **kwargs):
+    def __init__(self, value=None, *args, **kwargs):
         self._value = value
 
     @property
@@ -17,23 +17,62 @@ class LCObject(object):
         self._value = value
 
 
-class LCPanel(OrderedDict, LCObject):
-    def __init__(self, icon=None, *args, **kwargs):
-        self.icon = icon
-        OrderedDict.__init__(self, *args, **kwargs)
-
-
-class LCStaticBox(OrderedDict, LCObject):
+class LCDict(LCObject):
     def __init__(self, *args, **kwargs):
-        OrderedDict.__init__(self, *args, **kwargs)
+        super(LCDict, self).__init__(*args, **kwargs)
+        self._value = OrderedDict()
+
+    def __setitem__(self, key, value):
+        self._value[key] = value
+
+    def __getitem__(self, item):
+        return self._value[item]
+
+    def __contains__(self, item):
+        return item in self._value
+
+    def get(self, key, default=None):
+        return self._value.get(key, default)
+
+    def items(self):
+        return self._value.items()
+
+    def iteritems(self):
+        return self._value.iteritems()
 
 
-class LCText(unicode, LCObject):
+class LCPanel(LCDict):
+    def __init__(self, icon=None, *args, **kwargs):
+        super(LCPanel, self).__init__(*args, **kwargs)
+        self.icon = icon
+
+
+class LCStaticBox(LCDict):
+    def __init__(self, *args, **kwargs):
+        super(LCStaticBox, self).__init__(*args, **kwargs)
+
+
+class LCText(LCObject):
     def __init__(self, value=None):
-        unicode.__init__(value)
+        LCObject.__init__(self, value)
 
     def simple(self):
-        return unicode(self)
+        return unicode(self._value)
+
+    def __repr__(self):
+        return unicode(self._value)
+
+    def __str__(self):
+        return unicode(self._value)
+
+    def __int__(self):
+        return int(self._value)
+
+    def __float__(self):
+        return float(self._value)
+
+    def __unicode__(self):
+        return unicode(self._value)
 
 
 class LCColour(LCObject):
@@ -67,12 +106,15 @@ class LCBool(LCObject):
         return bool(self)
 
 
-class LCList(list, LCObject):
-    def __init__(self, value=()):
-        list.__init__(self, value)
+class LCList(LCObject):
+    def __init__(self, value=(), *args, **kwargs):
+        super(LCList, self).__init__(value, *args, **kwargs)
+
+    def __iter__(self):
+        return self.value.__iter__()
 
     def simple(self):
-        return list(self)
+        return list(self._value)
 
 
 class LCButton(LCObject):
@@ -152,15 +194,13 @@ class LCGridSingle(list, LCObject):
 
 
 class LCChooseSingle(LCObject):
-    def __init__(self, value=(), check_type=None, empty_label=False, *args, **kwargs):
+    def __init__(self, value=(), empty_label=False, available_list=(), *args, **kwargs):
         super(LCChooseSingle, self).__init__(value, *args, **kwargs)
+        self.list = available_list
         self.multiple = False
-        self.check_type = check_type
         self.keep_extension = kwargs.get('keep_extension', False)
         self.description = kwargs.get('description')
         self.empty_label = empty_label
-        if check_type in ['dir', 'folder', 'files']:
-            self.folder = kwargs.get('folder')
 
     def simple(self):
         return self.value

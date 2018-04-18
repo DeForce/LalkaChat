@@ -7,7 +7,7 @@ import operator
 import logging
 from collections import OrderedDict
 
-from modules.helper.functions import get_class_from_iname
+from modules.helper.functions import get_class_from_iname, get_modules_in_folder
 from modules.helper.module import BaseModule, MessagingModule
 from modules.helper.system import ModuleLoadException, THREADS, CONF_FOLDER
 from modules.helper.parser import load_from_config_file
@@ -44,13 +44,9 @@ class Message(threading.Thread):
         conf_file = os.path.join(main_config['conf_folder'], "messaging_modules.cfg")
         conf_dict = LCPanel()
         conf_dict['gui_information'] = {'category': 'messaging'}
-        conf_dict['messaging'] = LCChooseMultiple(
-            ['webchat'],
-            check_type='files',
-            folder='modules/messaging',
-            keep_extension=False,
-            description=True
-        )
+        conf_dict['messaging'] = LCChooseMultiple(['webchat'],
+                                                  available_list=get_modules_in_folder('messaging'),
+                                                  description=True)
 
         conf_gui = {
             'non_dynamic': ['messaging.*']

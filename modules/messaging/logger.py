@@ -25,7 +25,7 @@ class Logger(MessagingModule):
         self._load_priority = 20
         # Creating filter and replace strings.
         self.format = CONF_DICT['config']['file_format']
-        self.ts_format = CONF_DICT['config']['message_date_format']
+        self.ts_format = str(CONF_DICT['config']['message_date_format'])
         self.logging = CONF_DICT['config']['logging']
         self.rotation = CONF_DICT['config']['rotation']
 
@@ -44,7 +44,7 @@ class Logger(MessagingModule):
     @process_text_messages
     def process_message(self, message, **kwargs):
         with open('{0}.txt'.format(
-                os.path.join(self.destination, datetime.datetime.now().strftime(self.format))), 'a') as f:
+                os.path.join(self.destination, datetime.datetime.now().strftime(str(self.format)))), 'a') as f:
             f.write('[{3}] [{0}] {1}: {2}\n'.format(
                 message.platform.id.encode('utf-8'),
                 message.user.encode('utf-8'),
