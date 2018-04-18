@@ -177,20 +177,23 @@ class LCDropdown(LCObject):
         return str(self._value)
 
 
-class LCGridDual(OrderedDict, LCObject):
+class LCGridDual(LCDict):
     def __init__(self, *args, **kwargs):
-        OrderedDict.__init__(self, *args, **kwargs)
+        super(LCGridDual, self).__init__(*args, **kwargs)
 
     def simple(self):
-        return OrderedDict(self)
+        return dict(self._value)
 
 
-class LCGridSingle(list, LCObject):
-    def __init__(self, value=list()):
-        list.__init__(self, value)
+class LCGridSingle(LCObject):
+    def __init__(self, *args, **kwargs):
+        super(LCGridSingle, self).__init__(*args, **kwargs)
+
+    def __iter__(self):
+        return self._value.__iter__()
 
     def simple(self):
-        return list(self)
+        return list(self._value)
 
 
 class LCChooseSingle(LCObject):
@@ -225,10 +228,10 @@ TYPE_TO_LC = {
     unicode: LCText,
     int: LCText,
     'spin': LCSpin,
-    'dropdown': list,
-    'slider': int,
+    'dropdown': LCDropdown,
+    'slider': LCSlider,
     'colour_picker': LCColour,
-    'list': list,
+    'list': LCList,
     'button': LCButton
 }
 
