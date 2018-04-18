@@ -169,6 +169,7 @@ def create_list(panel=None, value=None, key=None, bind=None, gui=None, from_sb=N
     list_box.SetColLabelSize(1)
     list_box.SetRowLabelSize(1)
 
+    max_rows = 7
     if addable_sizer:
         col_size = addable_sizer.GetMinSize()[0] - 2
         if is_dual:
@@ -177,6 +178,11 @@ def create_list(panel=None, value=None, key=None, bind=None, gui=None, from_sb=N
             list_box.SetColSize(1, second_col_size)
         else:
             list_box.SetDefaultColSize(col_size, resizeExistingCols=True)
+        if list_box.GetNumberRows() > max_rows:
+            scroll_size = wx.SystemSettings_GetMetric(wx.SYS_VSCROLL_X)
+            max_size = wx.Size(list_box.GetBestSize()[0], list_box.GetDefaultRowSize()*max_rows)
+            list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
+            list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
     else:
         list_box.AutoSize()
 
