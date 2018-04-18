@@ -48,14 +48,16 @@ CONF_DICT['server']['port'] = LCText('8080')
 
 CONF_DICT['gui_chat'] = LCPanel()
 CONF_DICT['gui_chat']['style'] = LCChooseSingle(DEFAULT_GUI_STYLE,
-                                                available_list=get_themes())
+                                                available_list=get_themes(),
+                                                empty_label=True)
 CONF_DICT['gui_chat']['style_settings'] = LCStaticBox()
 CONF_DICT['gui_chat']['style_settings']['show_system_msg'] = LCBool(True)
 CONF_DICT['gui_chat']['style_settings']['show_history'] = LCBool(True)
 
 CONF_DICT['server_chat'] = LCPanel()
 CONF_DICT['server_chat']['style'] = LCChooseSingle(DEFAULT_STYLE,
-                                                   available_list=get_themes())
+                                                   available_list=get_themes(),
+                                                   empty_label=True)
 CONF_DICT['server_chat']['style_settings'] = LCStaticBox()
 CONF_DICT['server_chat']['style_settings']['show_system_msg'] = LCBool(True)
 CONF_DICT['server_chat']['style_settings']['show_history'] = LCBool(True)

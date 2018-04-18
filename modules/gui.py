@@ -388,9 +388,15 @@ class SettingsWindow(wx.Frame):
             self.content_page.GetSizer().Layout()
         else:
             scroll_size = wx.SystemSettings_GetMetric(wx.SYS_VSCROLL_X)
-            max_size = self.list_map[key]
-            list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
-            list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
+            max_size = self.list_map.get(key)
+            if max_size:
+                list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
+                list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
+            else:
+                max_size = (list_box.GetBestSize()[0], list_box.GetDefaultRowSize()*max_rows)
+                list_box.SetMinSize((max_size[0], max_size[1]))
+                list_box.SetSize((max_size[0], max_size[1]))
+            self.content_page.GetSizer().Layout()
         if rows == max_rows:
             self.list_map[key] = list_box.GetBestSize()
         self.on_change(key, grid_elements, item_type='gridbox')
