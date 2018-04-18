@@ -380,7 +380,7 @@ class SettingsWindow(wx.Frame):
                 grid_elements[item] = value
 
         else:
-            grid_elements = list(set([list_box.GetCellValue(row, 0) for row in range(rows)]))
+            grid_elements = OrderedDict.fromkeys([list_box.GetCellValue(row, 0) for row in range(rows)]).keys()
 
         max_rows = 7
         if rows <= max_rows:
