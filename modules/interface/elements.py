@@ -1,8 +1,7 @@
-import os
 import wx
 import wx.grid
 
-from modules.helper.system import MODULE_KEY, translate_key, log, PYTHON_FOLDER
+from modules.helper.system import MODULE_KEY, translate_key, log
 from modules.interface.controls import GuiCreationError, CustomColourPickerCtrl, KeyListBox, KeyCheckListBox, KeyChoice, \
     id_renew
 from modules.interface.types import LCPanel
