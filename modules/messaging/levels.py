@@ -8,6 +8,8 @@ import sqlite3
 import xml.etree.ElementTree as ElementTree
 import datetime
 
+import sys
+
 from modules.helper.message import process_text_messages, SystemMessage, ignore_system_messages
 from modules.helper.parser import save_settings
 from modules.helper.system import ModuleLoadException
@@ -21,36 +23,14 @@ CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['message'] = LCText(u'{0} has leveled up, now he is {1}')
 CONF_DICT['config']['db'] = LCText(os.path.join('conf', u'levels.db'))
 CONF_DICT['config']['experience'] = LCDropdown('geometrical', ['geometrical', 'static', 'random'])
-CONF_DICT['config']['exp_for_level'] = LCText(200)
-CONF_DICT['config']['exp_for_message'] = LCText(1)
-CONF_DICT['config']['decrease_window'] = LCText(1)
+CONF_DICT['config']['exp_for_level'] = LCSpin(200)
+CONF_DICT['config']['exp_for_message'] = LCSpin(1, min=0, max=sys.maxint)
+CONF_DICT['config']['decrease_window'] = LCSpin(1, min=0, max=sys.maxint)
 
 
 CONF_GUI = {
-    'non_dynamic': [
-        'config.db', 'config.experience',
-        'config.exp_for_level', 'config.exp_for_message',
-        'decrease_window'],
-    'config': {
-        'experience': {
-            'view': 'dropdown',
-            'choices': ['static', 'geometrical', 'random']},
-        'exp_for_level': {
-            'view': 'spin',
-            'min': 0,
-            'max': 100000
-        },
-        'exp_for_message': {
-            'view': 'spin',
-            'min': 0,
-            'max': 100000
-        },
-        'decrease_window': {
-            'view': 'spin',
-            'min': 0,
-            'max': 100000
-        }
-    }}
+    'non_dynamic': ['config.db']
+}
 
 
 class Levels(MessagingModule):
@@ -93,9 +73,9 @@ class Levels(MessagingModule):
 
         conf_dict = self._conf_params['config']
 
-        self.experience = conf_dict['config'].get('experience')
-        self.exp_for_level = float(conf_dict['config'].get('exp_for_level'))
-        self.exp_for_message = float(conf_dict['config'].get('exp_for_message'))
+        self.experience = None
+        self.exp_for_level = None
+        self.exp_for_message = None
         self.level_file = None
         self.levels = []
         self.special_levels = {}
@@ -118,6 +98,10 @@ class Levels(MessagingModule):
         self.load_levels()
 
     def load_levels(self):
+        self.experience = str(self._conf_params['config']['config'].get('experience'))
+        self.exp_for_level = float(self._conf_params['config']['config'].get('exp_for_level'))
+        self.exp_for_message = float(self._conf_params['config']['config'].get('exp_for_message'))
+
         if self.levels:
             self.levels = []
 
@@ -147,8 +131,7 @@ class Levels(MessagingModule):
 
     def apply_settings(self, **kwargs):
         save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections', ()))
-        if 'webchat' in kwargs.get('from_depend', []):
-            self.load_levels()
+        self.load_levels()
 
     def set_level(self, user, queue):
         db = sqlite3.connect(self.db_location)
