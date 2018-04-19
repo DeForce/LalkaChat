@@ -99,7 +99,7 @@ class Levels(MessagingModule):
         self.level_file = None
         self.levels = []
         self.special_levels = {}
-        self.db_location = str(os.path.join(conf_dict['config'].get('db')))
+        self.db_location = os.path.join(str(conf_dict['config'].get('db')))
         self.decrease_window = int(conf_dict['config'].get('decrease_window'))
         self.threshold_users = {}
 

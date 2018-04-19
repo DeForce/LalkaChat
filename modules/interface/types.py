@@ -8,6 +8,12 @@ class LCObject(object):
     def __init__(self, value=None, *args, **kwargs):
         self._value = value
 
+    def __len__(self):
+        return len(self._value)
+
+    def __contains__(self, item):
+        return item in self._value
+
     @property
     def value(self):
         return self._value
@@ -27,9 +33,6 @@ class LCDict(LCObject):
 
     def __getitem__(self, item):
         return self._value[item]
-
-    def __contains__(self, item):
-        return item in self._value
 
     def get(self, key, default=None):
         return self._value.get(key, default)
@@ -122,12 +125,11 @@ class LCList(LCObject):
 
 class LCButton(LCObject):
     def __init__(self, fnc=None, *args, **kwargs):
-        if fnc is None:
-            fnc = self.pass_function
-        super(LCButton, self).__init__(fnc, *args, **kwargs)
+        self.function = fnc if fnc else None
+        super(LCButton, self).__init__(value=str(fnc), *args, **kwargs)
 
     def __repr__(self):
-        return str(self.value)
+        return str(self._value)
 
     def pass_function(self):
         pass
