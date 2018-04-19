@@ -187,7 +187,7 @@ class LCGridDual(LCDict):
         super(LCGridDual, self).__init__(value, *args, **kwargs)
 
     def simple(self):
-        return dict(self._value)
+        return self._value
 
 
 class LCGridSingle(LCObject):

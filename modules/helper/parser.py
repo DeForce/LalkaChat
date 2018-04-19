@@ -3,7 +3,7 @@ import collections
 
 import os
 
-import yaml
+import rtyaml
 from ConfigParser import RawConfigParser
 
 from modules.interface.types import *
@@ -44,7 +44,7 @@ def load_from_config_file(conf_file, conf_dict=None):
     if not os.path.exists(conf_file):
         return conf_dict
     with open(conf_file, 'r') as conf_f:
-        loaded_dict = yaml.safe_load(conf_f.read())
+        loaded_dict = rtyaml.load(conf_f.read())
     if loaded_dict:
         update(conf_dict, loaded_dict)
 
@@ -76,7 +76,7 @@ def get_config(conf_file):
     return heal_config
 
 
-def convert_to_dict(source, ignored_keys=(), ordered=False):
+def convert_to_dict(source, ignored_keys=(), ordered=True):
     output = OrderedDict() if ordered else {}
     if not source:
         return output
@@ -87,13 +87,8 @@ def convert_to_dict(source, ignored_keys=(), ordered=False):
         if type(value) in DICT_MAPPING:
             output[item] = convert_to_dict(
                 value,
-                [key.replace('{}.'.format(item), '') for key in ignored_keys if key.startswith(item)]
-            )
-        elif isinstance(value, OrderedDict):
-            output[item] = convert_to_dict(
-                value,
-                [key.replace('{}.'.format(item), '') for key in ignored_keys if key.startswith(item)]
-            )
+                [key.replace('{}.'.format(item), '') for key in ignored_keys if key.startswith(item)],
+                ordered=ordered)
         else:
             try:
                 output[item] = value.simple()
@@ -107,5 +102,5 @@ def save_settings(conf_dict, ignored_sections=()):
         return
     output = convert_to_dict(conf_dict.get('config'), ignored_sections)
     with open(conf_dict.get('file'), 'w+') as conf_file:
-        dump_text = yaml.safe_dump(output, default_flow_style=False, allow_unicode=True)
+        dump_text = rtyaml.dump(output)
         conf_file.write(dump_text)

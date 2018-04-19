@@ -375,7 +375,7 @@ class SettingsWindow(wx.Frame):
             list_box_item = [[list_box.GetCellValue(row, col).strip()
                               for col in range(cols)]
                              for row in range(rows)]
-            grid_elements = {}
+            grid_elements = OrderedDict()
             for (item, value) in list_box_item:
                 grid_elements[item] = value
 
@@ -900,7 +900,9 @@ class ChatGui(wx.Frame):
         settings_category = MODULE_KEY.join(module_groups[1:-1])
         settings_menu_id = modules.interface.controls.id_renew(settings_category, update=True)
         if self.settings_window:
+            self.settings_window.Maximize(False)
             self.settings_window.Raise()
+            self.settings_window.Restore()
             self.settings_window.SetFocus()
         else:
             self.settings_window = SettingsWindow(

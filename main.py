@@ -165,7 +165,7 @@ def init():
     chat_conf_dict['chats'] = LCChooseMultiple([], available_list=get_modules_in_folder('chat'))
 
     chat_conf_gui = {
-        'non_dynamic': ['chats.list_box']
+        'non_dynamic': ['chat.chats']
     }
 
     chat_init_module = BaseModule(
