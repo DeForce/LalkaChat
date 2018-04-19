@@ -211,7 +211,7 @@ def create_choose(panel=None, value=None, key=None, bind=None, **kwargs):
     item_class = value
 
     active_items = item_class.value
-    available_items = item_class.list
+    available_items = [item for item in item_class.list if item not in item_class.skip]
     translated_items = [translate_key(item) for item in available_items]
 
     is_single = False if item_class.multiple else True
@@ -246,7 +246,7 @@ def create_choose(panel=None, value=None, key=None, bind=None, **kwargs):
         else:
             item_list_box.SetSelection(available_items.index(item))
     else:
-        check_items = [available_items.index(item) for item in section_for]
+        check_items = [available_items.index(item) for item in section_for if item in available_items]
         item_list_box.SetChecked(check_items)
 
     if item_class.description:
