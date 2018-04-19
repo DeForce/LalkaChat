@@ -77,6 +77,12 @@ class LCText(LCObject):
     def __unicode__(self):
         return unicode(self._value)
 
+    def decode(self, *args, **kwargs):
+        return self._value.decode(*args, **kwargs)
+
+    def encode(self, *args, **kwargs):
+        return self._value.encode(*args, **kwargs)
+
     def format(self, *args):
         return self._value.format(*args)
 
@@ -145,7 +151,10 @@ class LCSpin(LCObject):
         return str(self._value)
 
     def __int__(self):
-        return self.value
+        return int(self._value)
+
+    def __float__(self):
+        return float(self._value)
 
     def simple(self):
         return int(self.value)
