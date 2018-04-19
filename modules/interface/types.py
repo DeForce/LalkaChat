@@ -74,6 +74,9 @@ class LCText(LCObject):
     def __unicode__(self):
         return unicode(self._value)
 
+    def format(self, *args):
+        return self._value.format(*args)
+
 
 class LCColour(LCObject):
     def __init__(self, *args, **kwargs):
@@ -178,16 +181,16 @@ class LCDropdown(LCObject):
 
 
 class LCGridDual(LCDict):
-    def __init__(self, *args, **kwargs):
-        super(LCGridDual, self).__init__(*args, **kwargs)
+    def __init__(self, value=OrderedDict(), *args, **kwargs):
+        super(LCGridDual, self).__init__(value, *args, **kwargs)
 
     def simple(self):
         return dict(self._value)
 
 
 class LCGridSingle(LCObject):
-    def __init__(self, *args, **kwargs):
-        super(LCGridSingle, self).__init__(*args, **kwargs)
+    def __init__(self, value=(), *args, **kwargs):
+        super(LCGridSingle, self).__init__(value, *args, **kwargs)
 
     def __iter__(self):
         return self._value.__iter__()
