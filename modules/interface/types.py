@@ -211,13 +211,22 @@ class LCGridSingle(LCObject):
 
 
 class LCChooseSingle(LCObject):
-    def __init__(self, value=(), empty_label=False, available_list=(), *args, **kwargs):
+    def __init__(self, value=(), empty_label=False, available_list=(), hidden=(), *args, **kwargs):
         super(LCChooseSingle, self).__init__(value, *args, **kwargs)
         self.list = available_list
         self.multiple = False
         self.keep_extension = kwargs.get('keep_extension', False)
         self.description = kwargs.get('description')
         self.empty_label = empty_label
+        self._skip = {item: True if item == value else False for item in hidden}
+
+    @property
+    def skip(self):
+        return self._skip
+
+    @skip.setter
+    def skip(self, value):
+        return
 
     def simple(self):
         return self.value
@@ -227,9 +236,21 @@ class LCChooseSingle(LCObject):
 
 
 class LCChooseMultiple(LCChooseSingle):
-    def __init__(self, value=(), *args, **kwargs):
+    def __init__(self, value=(), hidden=None, *args, **kwargs):
+        if hidden is None:
+            hidden = {}
+
         super(LCChooseMultiple, self).__init__(value, *args, **kwargs)
         self.multiple = True
+        self._skip = {item: True if item in value else False for item in hidden}
+
+    @property
+    def value(self):
+        return self._value + [item for item, value in self._skip.items() if value and item not in self._value]
+
+    @value.setter
+    def value(self, value):
+        self._value = value
 
     def simple(self):
         return list(self.value)

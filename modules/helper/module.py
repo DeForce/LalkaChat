@@ -19,33 +19,31 @@ CHAT_DICT['config'] = LCStaticBox()
 CHAT_DICT['config']['show_channel_names'] = LCBool(False)
 CHAT_DICT['config']['channels_list'] = LCList()
 
-CHAT_GUI = {
-    'config': {
-        'channels_list': {
-            'view': 'list',
-            'addable': 'true'
-        }
-    }
-}
+CHAT_GUI = {}
 
 log = logging.getLogger('modules')
 
 
 class BaseModule:
-    def __init__(self, *args, **kwargs):
+    def __init__(self, config=None, gui=None, queue=None, category='main',
+                 *args, **kwargs):
+        if gui is None:
+            gui = {}
+        if config is None:
+            config = dict()
+
         self._conf_params = BASE_DICT.copy()
         self._conf_params['dependencies'] = set()
 
-        self.__conf_settings = kwargs.get('config', {})
-        self.__gui_settings = kwargs.get('gui', {})
+        self.__conf_settings = config
+        self.__gui_settings = gui
 
         self._loaded_modules = {}
         self._rest_api = {}
         self._module_name = self.__class__.__name__.lower()
         self._load_queue = {}
-        self._msg_queue = kwargs.get('queue')
-
-        self._category = kwargs.get('category', 'main')
+        self._msg_queue = queue
+        self._category = category
 
         if 'conf_file_name' in kwargs:
             conf_file_name = kwargs.get('conf_file_name')

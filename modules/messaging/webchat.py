@@ -535,7 +535,7 @@ def socket_open(host, port):
 
 class Webchat(MessagingModule):
     def __init__(self, *args, **kwargs):
-        MessagingModule.__init__(self, *args, **kwargs)
+        MessagingModule.__init__(self, hidden=True, *args, **kwargs)
         self._load_priority = 9001
         self._category = 'main'
         conf_params = self._conf_params['config']

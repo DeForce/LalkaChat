@@ -22,6 +22,7 @@ from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPan
 VERSION = '0.4.0'
 SEM_VERSION = semantic_version.Version(VERSION)
 LOG_FILES_COUNT = 5
+HIDDEN_CHATS = ['hitbox', 'beampro']
 
 
 def button_test(event):
@@ -193,6 +194,8 @@ def init():
                                      conf_folder=CONF_FOLDER,
                                      conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module_name)),
                                      testing=main_config_dict['system']['testing_mode'])
+            if chat_module_name in HIDDEN_CHATS:
+                chat_conf_dict['chats'].skip[chat_module_name] = True
             loaded_modules[chat_module_name.lower()] = class_module.conf_params()
         else:
             log.error("Unable to find {0} module")

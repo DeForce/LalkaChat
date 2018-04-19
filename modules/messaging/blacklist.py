@@ -48,11 +48,11 @@ class Blacklist(MessagingModule):
     @ignore_system_messages
     def process_message(self, message, **kwargs):
         self._blocked(message)
-        if self._hidden(message):
+        if self._bl_hidden(message):
             message.hidden = True
         return message
 
-    def _hidden(self, message):
+    def _bl_hidden(self, message):
         if message.user.lower() in self._conf_params['config']['users_hide']:
             return True
 

@@ -1,6 +1,8 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
+import collections
+
 import os
 import threading
 import operator
@@ -13,6 +15,7 @@ from modules.helper.system import ModuleLoadException, THREADS, CONF_FOLDER
 from modules.helper.parser import load_from_config_file
 from modules.interface.types import LCPanel, LCChooseMultiple
 
+HIDDEN_MODULES = ['webchat']
 log = logging.getLogger('messaging')
 
 
@@ -46,7 +49,8 @@ class Message(threading.Thread):
         conf_dict['gui_information'] = {'category': 'messaging'}
         conf_dict['messaging'] = LCChooseMultiple(['webchat'],
                                                   available_list=get_modules_in_folder('messaging'),
-                                                  description=True)
+                                                  description=True,
+                                                  hidden=HIDDEN_MODULES)
 
         conf_gui = {
             'non_dynamic': ['messaging.messaging']
@@ -65,9 +69,9 @@ class Message(threading.Thread):
 
         modules_list['messaging'] = messaging_module.conf_params()
 
-        modules = {}
+        modules = collections.defaultdict(list)
         # Loading modules from cfg.
-        if len(conf_dict['messaging'].value) > 0:
+        if conf_dict['messaging'].value:
             for m_module_name in conf_dict['messaging'].value:
                 log.info("Loading %s" % m_module_name)
                 # We load the module, and then we initalize it.
@@ -86,12 +90,10 @@ class Message(threading.Thread):
 
                     params = class_module.conf_params()
                     priority = class_module.load_priority
+                    if m_module_name in HIDDEN_MODULES:
+                        conf_dict['messaging'].skip[m_module_name] = True
 
-                    if int(priority) in modules:
-                        modules[int(priority)].append(class_module)
-                    else:
-                        modules[int(priority)] = [class_module]
-
+                    modules[int(priority)].append(class_module)
                     modules_list[m_module_name.lower()] = params
                 except ModuleLoadException:
                     log.error("Unable to load module {0}".format(m_module_name))
