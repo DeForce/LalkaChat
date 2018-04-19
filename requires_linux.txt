@@ -5,5 +5,5 @@ irc
 semantic_version
 jinja2
 pyScss
-pyyaml
+rtyaml
 html_sanitizer

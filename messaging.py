@@ -49,7 +49,7 @@ class Message(threading.Thread):
                                                   description=True)
 
         conf_gui = {
-            'non_dynamic': ['messaging.*']
+            'non_dynamic': ['messaging.messaging']
         }
         config = load_from_config_file(conf_file, conf_dict)
         messaging_module = BaseModule(
