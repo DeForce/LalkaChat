@@ -21,9 +21,11 @@ logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('twitch')
 headers = {'Client-ID': '5jwove9dketiiz2kozapz8rhjdsxqxc'}
+headers_v5 = {'Client-ID': '5jwove9dketiiz2kozapz8rhjdsxqxc',
+              'Accept': 'application/vnd.twitchtv.v5+json'}
 BITS_THEME = 'dark'
 BITS_TYPE = 'animated'
-BITS_URL = 'http://static-cdn.jtvnw.net/bits/{theme}/{type}/{color}/{size}'
+BITS_SCALE = '4'
 EMOTE_SMILE_URL = 'http://static-cdn.jtvnw.net/emoticons/v1/{id}/1.0'
 NOT_FOUND = 'none'
 SOURCE = 'tw'
@@ -103,6 +105,8 @@ class TwitchMessageHandler(threading.Thread):
         self.bttv = kwargs.get('bttv_smiles_dict', {})
         self.badges = kwargs.get('badges')
         self.custom_badges = kwargs.get('custom_badges')
+        self.bits = self._reformat_bits(kwargs.get('bits'))
+
         self.chat_module = kwargs.get('chat_module')
         self.kwargs = kwargs
 
@@ -225,30 +229,24 @@ class TwitchMessageHandler(threading.Thread):
         if self.irc_class.chat_module.conf_params()['config']['config']['show_nickname_colors']:
             message.nick_colour = value
 
-    @staticmethod
-    def _handle_bits(message, amount):
+    def _handle_bits(self, message, amount):
+        emote = None
         regexp = re.search(BITS_REGEXP.format(amount), message.text)
-        emote = regexp.group(2)
-
-        if amount >= 10000:
-            color = 'red'
-        elif amount >= 5000:
-            color = 'blue'
-        elif amount >= 1000:
-            color = 'green'
-        elif amount >= 100:
-            color = 'purple'
+        if regexp:
+            emote = regexp.group(2).replace(str(amount), '').lower()
         else:
-            color = 'gray'
+            for cheer in self.bits.keys():
+                for word in message.text.split(' '):
+                    if cheer in word:
+                        emote = cheer
+        if not emote:
+            return
 
-        message.bits = {
-            'bits': emote,
-            'amount': amount,
-            'theme': BITS_THEME,
-            'type': BITS_TYPE,
-            'color': color,
-            'size': 4
-        }
+        tier = min([tier for tier in self.bits[emote]['tiers'].keys() if tier - amount <= 0],
+                   key=lambda x: (abs(x - amount), x))
+
+        message.bits = {'emote': emote,
+                        'info': self.bits[emote]['tiers'][tier]}
         message.text = message.text.replace(emote, EMOTE_FORMAT.format(emote))
 
     @staticmethod
@@ -263,18 +261,12 @@ class TwitchMessageHandler(threading.Thread):
         self._post_process_bits(message)
         self.message_queue.put(message)
 
-    @staticmethod
-    def _post_process_bits(message):
+    def _post_process_bits(self, message):
         if not message.bits:
             return
         message.emotes.append(Emote(
-            message.bits['bits'],
-            BITS_URL.format(
-                theme=message.bits['theme'],
-                type=message.bits['type'],
-                color=message.bits['color'],
-                size=message.bits['size']
-            )
+            message.bits['emote'],
+            message.bits['info']['images'][BITS_THEME][BITS_TYPE][BITS_SCALE]
         ))
 
     @staticmethod
@@ -303,6 +295,16 @@ class TwitchMessageHandler(threading.Thread):
         channel_class = self.irc_class.main_class
         if channel_class.chat_module.conf_params()['config']['config']['show_channel_names']:
             message.channel_name = channel_class.display_name
+
+    @staticmethod
+    def _reformat_bits(bits):
+        return {
+            prefix: {
+                'tiers': {int(tier['id']): tier for tier in data['tiers']},
+                'states': data['states'],
+                'scales': data['scales']
+            } for prefix, data in bits.items()
+        }
 
 
 class TwitchPingHandler(threading.Thread):
@@ -549,6 +551,18 @@ class TWThread(threading.Thread):
             request = requests.get(badges_url.format(self.channel_id))
             if request.status_code == 200:
                 update(self.kwargs['custom_badges'], request.json()['badge_sets'])
+            else:
+                raise Exception("Not successful status code: {0}".format(request.status_code))
+        except Exception as exc:
+            log.warning("Unable to get twitch undocumented api badges, error {0}\n"
+                        "Args: {1}".format(exc.message, exc.args))
+
+        try:
+            bits_url = "https://api.twitch.tv/kraken/bits/actions/?channel_id={}"
+            request = requests.get(bits_url.format(self.channel_id), headers=headers_v5)
+            if request.status_code == 200:
+                data = request.json()['actions']
+                self.kwargs['bits'] = {item['prefix'].lower(): item for item in data}
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:

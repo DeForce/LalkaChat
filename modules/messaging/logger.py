@@ -4,7 +4,7 @@
 import os
 import datetime
 
-from modules.helper.message import process_text_messages
+from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
 from modules.helper.system import CONF_FOLDER
 from modules.interface.types import *
@@ -42,6 +42,7 @@ class Logger(MessagingModule):
         return CONF_GUI
 
     @process_text_messages
+    @ignore_system_messages
     def process_message(self, message, **kwargs):
         with open('{0}.txt'.format(
                 os.path.join(self.destination, datetime.datetime.now().strftime(str(self.format)))), 'a') as f:

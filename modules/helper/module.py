@@ -1,6 +1,8 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import logging
 import os
+
+from modules.helper.functions import deep_get
 from modules.helper import parser
 from modules.helper.message import TextMessage, Message
 from modules.interface.types import LCPanel, LCStaticBox, LCBool, LCList
@@ -95,6 +97,9 @@ class BaseModule:
         :return: Settings for GUI (dict)
         """
         return self.__gui_settings
+
+    def get(self, *keys):
+        return deep_get(self._conf_params['config'], *keys)
 
     def load_module(self, *args, **kwargs):
         self._loaded_modules = kwargs.get('loaded_modules')
