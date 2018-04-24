@@ -86,7 +86,7 @@ def prepare_message(message, style_settings, msg_class):
     payload = message['payload']
 
     if 'text' in payload and payload['text'] == REMOVED_TRIGGER:
-        payload['text'] = style_settings.get('remove_text')
+        payload['text'] = str(style_settings.get('remove_text'))
 
     if 'type' not in message:
         for m_class, m_type in TYPE_DICT.items():
@@ -95,7 +95,7 @@ def prepare_message(message, style_settings, msg_class):
 
     if message['type'] == 'command':
         if payload['command'].startswith('replace'):
-            payload['text'] = style_settings['keys']['remove_text']
+            payload['text'] = unicode(style_settings['keys']['remove_text'])
         return message
 
     if 'levels' in payload:
