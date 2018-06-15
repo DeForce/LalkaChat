@@ -57,6 +57,13 @@ class LCStaticBox(LCDict):
 
 class LCText(LCObject):
     def __init__(self, value=None):
+        if isinstance(value, str):
+            value = value.decode('utf8')
+        elif isinstance(value, int):
+            value = unicode(value)
+        elif not isinstance(value, unicode) and not isinstance(value, LCText):
+            raise TypeError('LCText should be text, not {}'.format(type(value)))
+
         LCObject.__init__(self, value)
 
     def simple(self):
@@ -73,9 +80,6 @@ class LCText(LCObject):
 
     def __float__(self):
         return float(self._value)
-
-    def __unicode__(self):
-        return unicode(self._value)
 
     def decode(self, *args, **kwargs):
         return self._value.decode(*args, **kwargs)

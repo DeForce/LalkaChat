@@ -3,7 +3,7 @@ import collections
 
 import sys
 
-from modules.helper.functions import find_by_type, parse_keys_to_string, deep_get, get_config_item_path
+from modules.helper.functions import find_by_type, parse_keys_to_string, deep_get, get_config_item_path, get_unicode
 from modules.interface.controls import KeyListBox, MainMenuToolBar
 
 import modules.interface.elements
@@ -310,7 +310,7 @@ class SettingsWindow(wx.Frame):
     def on_textctrl(self, event):
         text_ctrl = event.EventObject
         self.on_change(modules.interface.controls.IDS[event.GetId()],
-                       text_ctrl.GetValue().encode('utf-8'), item_type='textctrl')
+                       get_unicode(text_ctrl.GetValue()), item_type='textctrl')
         event.Skip()
 
     def on_spinctrl(self, event):
