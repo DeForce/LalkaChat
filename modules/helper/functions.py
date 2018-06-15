@@ -40,6 +40,12 @@ def deep_get(dictionary, *keys):
     return reduce(lambda d, key: d.get(key, None) if dict_instance(d) else None, keys, dictionary)
 
 
+def get_unicode(string):
+    if isinstance(string, str):
+        return string.decode('utf8')
+    return string
+
+
 def get_config_item_path(*keys):
     new_list = list(*keys)
     new_list.insert(1, 'config')

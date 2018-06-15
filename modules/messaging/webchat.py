@@ -683,8 +683,11 @@ class Webchat(MessagingModule):
         file_path = os.path.join(self.get_style_path(style_name), file_name)
         if file_path and os.path.exists(file_path):
             with open(file_path, 'r') as style_file:
-                return json.load(style_file, object_pairs_hook=OrderedDict)
-        return {}
+                try:
+                    return json.load(style_file, object_pairs_hook=OrderedDict)
+                except ValueError as exc:
+                    return OrderedDict()
+        return OrderedDict
 
     def write_style_to_file(self, style_name, style_type):
         file_name = SETTINGS_GUI_FILE if style_type == 'gui'else SETTINGS_FILE

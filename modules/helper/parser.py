@@ -92,7 +92,8 @@ def convert_to_dict(source, ignored_keys=(), ordered=True):
         else:
             try:
                 output[item] = value.simple()
-            except:
+            except Exception as exc:
+                logging.debug(exc)
                 output[item] = value
     return output
 
