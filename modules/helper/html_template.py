@@ -15,8 +15,8 @@ HTML_TEMPLATE = """
             var host = 'localhost:{{ port }}';
  
             var interval = 1 * 1000;
-            var wsUrl = 'ws://' + host + '/gui/ws';
-            var appUrl = 'http://' + host + '/gui';
+            var wsUrl = 'ws://' + host + '/ws';
+            var appUrl = 'http://' + host + '';
  
             function RWebSocket() {}
  
