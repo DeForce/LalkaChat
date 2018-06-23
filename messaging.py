@@ -10,7 +10,7 @@ import logging
 from collections import OrderedDict
 
 from modules.helper.functions import get_class_from_iname, get_modules_in_folder
-from modules.helper.module import BaseModule, MessagingModule
+from modules.helper.module import MessagingModule, ConfigModule
 from modules.helper.system import ModuleLoadException, THREADS, CONF_FOLDER
 from modules.helper.parser import load_from_config_file
 from modules.interface.types import LCPanel, LCChooseMultiple
@@ -56,7 +56,7 @@ class Message(threading.Thread):
             'non_dynamic': ['messaging.messaging']
         }
         config = load_from_config_file(conf_file, conf_dict)
-        messaging_module = BaseModule(
+        messaging_module = ConfigModule(
             conf_params={
                 'folder': main_config['conf_folder'], 'file': conf_file,
                 'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),

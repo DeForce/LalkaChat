@@ -12,7 +12,7 @@ import logging
 import time
 
 from modules.helper.message import TextMessage, SystemMessage, RemoveMessageByUsers, RemoveMessageByIDs
-from modules.helper.module import ChatModule
+from modules.helper.module import ChatModule, Channel
 from ws4py.client.threadedclient import WebSocketClient
 
 from modules.helper.system import NA_MESSAGE, translate_key
@@ -218,9 +218,11 @@ class BeamProClient(WebSocketClient):
             time.sleep(10)
 
 
-class BeamProInitThread(threading.Thread):
+class BeamProChannel(threading.Thread, Channel):
     def __init__(self, *args, **kwargs):
         threading.Thread.__init__(self)
+        Channel.__init__(self)
+
         self.daemon = True
 
         self.queue = kwargs.get('queue')
@@ -343,7 +345,7 @@ class beampro(ChatModule):
 
     def _add_channel(self, chat):
         ChatModule._add_channel(self, chat)
-        self.channels[chat] = BeamProInitThread(
+        self.channels[chat] = BeamProChannel(
             queue=self.queue,
             channel=chat,
             settings=self._conf_params['settings'],

@@ -14,7 +14,7 @@ from ws4py.client.threadedclient import WebSocketClient
 
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Emote
-from modules.helper.module import ChatModule
+from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_NO_VIEWERS, CHANNEL_OFFLINE
 from modules.helper.system import translate_key, EMOTE_FORMAT
 from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText
 
@@ -47,6 +47,12 @@ CONF_GUI = {
     },
     'non_dynamic': ['config.socket'],
 }
+
+CONNECTION_SUCCESS = translate_key(MODULE_KEY.join(['sc2tv', 'connection_success']))
+CONNECTION_DIED = translate_key(MODULE_KEY.join(['sc2tv', 'connection_died']))
+CONNECTION_CLOSED = translate_key(MODULE_KEY.join(['sc2tv', 'connection_closed']))
+CONNECTION_JOINING = translate_key(MODULE_KEY.join(['sc2tv', 'joining']))
+CHANNEL_JOIN_SUCCESS = translate_key(MODULE_KEY.join(['sc2tv', 'join_success']))
 
 
 class Peka2TVAPIError(Exception):
@@ -114,7 +120,8 @@ class FsChat(WebSocketClient):
         self.queue = queue
         self.channel_name = channel_name
         self.glob = kwargs.get('glob')
-        self.main_thread = kwargs.get('main_thread')  # type: FsThread
+
+        self.main_thread = kwargs.get('main_thread')  # type: FsChannel
         self.chat_module = kwargs.get('chat_module')  # type: SC2TV
         self.crit_error = False
 
@@ -130,7 +137,7 @@ class FsChat(WebSocketClient):
 
     def opened(self):
         log.info("Websocket Connection Succesfull")
-        self.fs_system_message(translate_key(MODULE_KEY.join(['sc2tv', 'connection_success'])), category='connection')
+        self.fs_system_message(CONNECTION_SUCCESS, category='connection')
 
     def closed(self, code, reason=None):
         """
@@ -141,16 +148,15 @@ class FsChat(WebSocketClient):
         :param code: 
         :param reason: 
         """
-        self.chat_module.set_channel_offline(self.glob)
+        self.main_thread.status = CHANNEL_OFFLINE
         if code in [4000, 4001]:
             self.crit_error = True
-            self.fs_system_message(translate_key(
-                MODULE_KEY.join(['sc2tv', 'connection_closed'])).format(self.glob),
-                                category='connection')
+            self.fs_system_message(CONNECTION_CLOSED.format(self.glob),
+                                   category='connection')
         else:
             log.info("Websocket Connection Closed Down with error %s, %s", code, reason)
             self.fs_system_message(
-                translate_key(MODULE_KEY.join(['sc2tv', 'connection_died'])).format(self.glob),
+                CONNECTION_DIED.format(self.glob),
                 category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
@@ -210,7 +216,7 @@ class FsChat(WebSocketClient):
             ]
             self.fs_send(payload)
 
-            msg_joining = translate_key(MODULE_KEY.join(['sc2tv', 'joining']))
+            msg_joining = CONNECTION_JOINING
             self.fs_system_message(msg_joining.format(self.glob), category='connection')
             log.debug(msg_joining.format(self.channel_id))
 
@@ -273,12 +279,11 @@ class FsChat(WebSocketClient):
             self._send_message(msg)
 
     def _process_joined(self):
-        self.chat_module.set_channel_online(self.glob)
-        self.fs_system_message(
-            translate_key(MODULE_KEY.join(['sc2tv', 'join_success'])).format(self.glob), category='connection')
+        self.main_thread.status = CHANNEL_ONLINE
+        self.fs_system_message(CHANNEL_JOIN_SUCCESS.format(self.glob), category='connection')
 
     def _process_channel_list(self, message):
-        self.chat_module.set_viewers(self.glob, message['result']['amount'])
+        self.main_thread.viewers = message['result']['amount']
 
     def _post_process_multiple_channels(self, message):
         if self.chat_module.conf_params()['config']['config']['show_channel_names']:
@@ -298,15 +303,17 @@ class FsPingThread(threading.Thread):
 
     def run(self):
         while not self.ws.terminated:
-            self.ws.chat_module.set_channel_online(self.ws.glob)
+            self.ws.main_thread.status = CHANNEL_ONLINE
             self.ws.send("2")
-            self.ws.chat_module.get_viewers(self.ws)
+            self.ws.main_thread.get_viewers()
             time.sleep(PING_DELAY)
 
 
-class FsThread(threading.Thread):
+class FsChannel(threading.Thread, Channel):
     def __init__(self, queue, socket, channel_name, **kwargs):
         threading.Thread.__init__(self)
+        Channel.__init__(self)
+
         # Basic value setting.
         # Daemon is needed so when main programm exits
         # all threads will exit too.
@@ -341,11 +348,34 @@ class FsThread(threading.Thread):
                 self.ws.run_forever()
                 break
             time.sleep(5)
-        self.chat_module.remove_channel(self.glob)
 
     def stop(self):
         self.ws.send("11")
         self.ws.close(4000, reason="CLOSE_OK")
+
+    def get_viewers(self):
+        user_data = {'name': self.glob}
+        status_data = {'slug': self.glob}
+        request = ['/chat/channel/list', {'channel': 'stream/{0}'.format(str(self.ws.channel_id))}]
+
+        try:
+            user_request = requests.post(API_URL.format('/user'), timeout=5, data=user_data)
+            if user_request.status_code == 200:
+                status_data['slug'] = user_request.json()['slug']
+        except requests.ConnectionError:
+            log.error("Unable to get user slug")
+
+        try:
+            status_request = requests.post(API_URL.format('/stream'), timeout=5, data=status_data)
+            if status_request.status_code == 200:
+                if status_request.json()['online']:
+                    self.status = CHANNEL_ONLINE
+                    self.ws.fs_send(request)
+                else:
+                    self.viewers = CHANNEL_NO_VIEWERS
+
+        except requests.ConnectionError:
+            log.error("Unable to get viewers")
 
     def _get_info(self):
         if not self.smiles:
@@ -417,33 +447,8 @@ class SC2TV(ChatModule):
     def _test_class(self):
         return TestSc2tv(self)
 
-    def get_viewers(self, ws):
-        user_data = {'name': ws.channel_name}
-        status_data = {'slug': ws.channel_name}
-        request = ['/chat/channel/list', {'channel': 'stream/{0}'.format(str(ws.channel_id))}]
-
-        try:
-            user_request = requests.post(API_URL.format('/user'), timeout=5, data=user_data)
-            if user_request.status_code == 200:
-                status_data['slug'] = user_request.json()['slug']
-        except requests.ConnectionError:
-            log.error("Unable to get smiles")
-
-        try:
-            status_request = requests.post(API_URL.format('/stream'), timeout=5, data=status_data)
-            if status_request.status_code == 200:
-                if status_request.json()['online']:
-                    self.set_channel_online(ws.channel_name)
-                    ws.fs_send(request)
-                else:
-                    self.set_viewers(ws.channel_name, 'N/A')
-
-        except requests.ConnectionError:
-            log.error("Unable to get smiles")
-
     def _add_channel(self, chat):
-        ChatModule.add_channel(self, chat)
-        self.channels[chat] = FsThread(self.queue, self.socket, chat, chat_module=self)
+        self.channels[chat] = FsChannel(self.queue, self.socket, chat, chat_module=self)
         self.channels[chat].start()
 
     def apply_settings(self, **kwargs):

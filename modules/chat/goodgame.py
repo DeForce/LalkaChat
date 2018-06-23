@@ -16,7 +16,7 @@ from ws4py.client.threadedclient import WebSocketClient
 
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Emote, RemoveMessageByIDs
-from modules.helper.module import ChatModule
+from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_PENDING, CHANNEL_OFFLINE
 from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
 from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText, LCGridSingle
 
@@ -50,6 +50,17 @@ CONF_GUI = {
     },
     'non_dynamic': ['config.socket']
 }
+
+CONNECTION_SUCCESS = translate_key(MODULE_KEY.join(['goodgame', 'connection_success']))
+CONNECTION_DIED = translate_key(MODULE_KEY.join(['goodgame', 'connection_died']))
+CONNECTION_CLOSED = translate_key(MODULE_KEY.join(['goodgame', 'connection_closed']))
+CONNECTION_JOINING = translate_key(MODULE_KEY.join(['goodgame', 'joining']))
+CHANNEL_JOIN_SUCCESS = translate_key(MODULE_KEY.join(['goodgame', 'join_success']))
+
+MESSAGE_WARNING = translate_key(MODULE_KEY.join(['goodgame', 'warning']))
+MESSAGE_BAN = translate_key(MODULE_KEY.join(['goodgame', 'warning']))
+MESSAGE_BAN_PERM = translate_key(MODULE_KEY.join(['goodgame', 'ban_permanent']))
+MESSAGE_UNBAN = translate_key(MODULE_KEY.join(['goodgame', 'unban']))
 
 
 class GoodgameTextMessage(TextMessage):
@@ -113,6 +124,7 @@ class GoodgameMessageHandler(threading.Thread):
 
         self.nick = kwargs.get('nick')
         self.smiles = kwargs.get('smiles')
+        self.main_thread = kwargs.get('main_thread')
         self.chat_module = kwargs.get('chat_module')
         self.kwargs = kwargs
 
@@ -159,8 +171,7 @@ class GoodgameMessageHandler(threading.Thread):
         self._send_message(message)
 
     def _process_join(self):
-        self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'join_success'])).format(self.nick),
-                                     category='connection')
+        self.ws_class.system_message(CONNECTION_SUCCESS.format(self.nick), category='connection')
 
     def _process_error(self, msg):
         log.info("Received error message: {0}".format(msg))
@@ -169,21 +180,18 @@ class GoodgameMessageHandler(threading.Thread):
             log.error("Failed to find channel on GoodGame, please check channel name")
 
     def _process_user_warn(self, msg):
-        self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'warning'])).format(
+        self.ws_class.system_message(MESSAGE_WARNING.format(
             msg['data']['moder_name'], msg['data']['user_name']), category='chat')
 
     def _process_remove_message(self, msg, text=None):
         if self.chat_module.conf_params()['config']['config']['show_channel_names']:
             text = self.kwargs['settings'].get('remove_text')
         remove_id = ID_PREFIX.format(msg['data']['message_id'])
-        self.message_queue.put(
-            RemoveMessageByIDs(remove_id, text=text,
-                               platform=SOURCE)
-        )
+        self.message_queue.put(RemoveMessageByIDs(remove_id, text=text, platform=SOURCE))
 
     def _process_user_ban(self, msg):
         if msg['data']['duration']:
-            self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'ban'])).format(
+            self.ws_class.system_message(MESSAGE_BAN.format(
                 msg['data']['moder_name'],
                 msg['data']['user_name'],
                 msg['data']['duration']/60,
@@ -192,25 +200,22 @@ class GoodgameMessageHandler(threading.Thread):
         else:
             if msg['data']['permanent']:
                 self.ws_class.system_message(
-                    translate_key(MODULE_KEY.join(['goodgame', 'ban_permanent'])).format(msg['data']['moder_name'],
-                                                                                         msg['data']['user_name']),
-                    category='chat'
-                )
+                    MESSAGE_BAN_PERM.format(msg['data']['moder_name'], msg['data']['user_name']),
+                    category='chat')
             else:
-                self.ws_class.system_message(translate_key(MODULE_KEY.join(['goodgame', 'unban'])).format(
+                self.ws_class.system_message(MESSAGE_UNBAN.format(
                     msg['data']['moder_name'],
                     msg['data']['user_name']), category='chat')
 
     def _process_channel_counters(self):
         try:
-            self.chat_module.set_viewers(self.ws_class.main_thread.nick,
-                                         self.chat_module.get_viewers(self.ws_class.main_thread.nick))
+            self.main_thread.viewers = self.main_thread.get_viewers()
         except Exception as exc:
             log.exception(exc)
 
     def _post_process_multiple_channels(self, message):
         if self.chat_module.conf_params()['config']['config']['show_channel_names']:
-            message.channel_name = self.ws_class.main_thread.nick
+            message.channel_name = self.main_thread.nick
 
     def _send_message(self, comp):
         self._post_process_multiple_channels(comp)
@@ -226,7 +231,7 @@ class GGChat(WebSocketClient):
         self.queue = kwargs.get('queue')
         self.gg_queue = Queue.Queue()
 
-        self.main_thread = kwargs.get('main_thread')
+        self.main_thread = kwargs.get('main_thread')  # type: GGChannel
         self.chat_module = kwargs.get('chat_module')
         self.crit_error = False
 
@@ -236,16 +241,12 @@ class GGChat(WebSocketClient):
     def opened(self):
         success_msg = "Connection Successful"
         log.info(success_msg)
-        self.chat_module.set_channel_online(self.main_thread.nick)
+        self.main_thread.status = CHANNEL_ONLINE
         try:
-            self.chat_module.set_viewers(self.main_thread.nick,
-                                         self.chat_module.get_viewers(self.main_thread.nick))
+            self.main_thread.viewers = self.main_thread.get_viewers()
         except Exception as exc:
             log.exception(exc)
-        self.system_message(
-            translate_key(MODULE_KEY.join(['goodgame', 'connection_success'])).format(self.main_thread.nick),
-            category='connection'
-        )
+        self.system_message(CONNECTION_SUCCESS.format(self.main_thread.nick), category='connection')
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
@@ -262,15 +263,13 @@ class GGChat(WebSocketClient):
         :param reason: 
         """
         log.info("Connection Closed Down")
-        self.chat_module.set_channel_offline(self.main_thread.nick)
+        self.main_thread.status = CHANNEL_OFFLINE
         if code in [4000, 4001]:
             self.crit_error = True
-            self.system_message(translate_key(
-                MODULE_KEY.join(['goodgame', 'connection_closed'])).format(self.main_thread.nick),
+            self.system_message(CONNECTION_CLOSED.format(self.main_thread.nick),
                                 category='connection')
         else:
-            self.system_message(translate_key(
-                MODULE_KEY.join(['goodgame', 'connection_died'])).format(self.main_thread.nick),
+            self.system_message(CONNECTION_DIED.format(self.main_thread.nick),
                                 category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
@@ -283,9 +282,11 @@ class GGChat(WebSocketClient):
         self.queue.put(GoodgameSystemMessage(msg, category=category, channel_name=self.main_thread.nick))
 
 
-class GGThread(threading.Thread):
+class GGChannel(threading.Thread, Channel):
     def __init__(self, queue, address, nick, use_chid, **kwargs):
         threading.Thread.__init__(self)
+        Channel.__init__(self)
+
         # Basic value setting.
         # Daemon is needed so when main programm exits
         # all threads will exit too.
@@ -344,6 +345,23 @@ class GGThread(threading.Thread):
 
         return True
 
+    def get_viewers(self):
+        if not self.chat_module.conf_params()['config']['config']['check_viewers']:
+            return NA_MESSAGE
+        streams_url = API.format('streams/{0}'.format(self.nick))
+        try:
+            request = requests.get(streams_url)
+            if request.status_code == 200:
+                json_data = request.json()
+                if json_data['status'] == 'Live':
+                    return request.json().get('player_viewers')
+                else:
+                    return NA_MESSAGE
+            else:
+                raise Exception("Not successful status code: {0}".format(request.status_code))
+        except Exception as exc:
+            log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
+
     def run(self):
         self.connect()
 
@@ -352,7 +370,8 @@ class GGThread(threading.Thread):
         while True:
             try_count += 1
             log.info("Connecting, try {0}".format(try_count))
-            self.chat_module.set_channel_pending(self.nick)
+
+            self.status = CHANNEL_PENDING
             if self.load_config():
                 # Connecting to goodgame websocket
                 self.ws = GGChat(self.address, protocols=['websocket'], queue=self.queue,
@@ -433,28 +452,10 @@ class GoodGame(ChatModule):
     def _test_class(self):
         return TestGG(self)
 
-    def get_viewers(self, channel):
-        if not self._conf_params['config']['config']['check_viewers']:
-            return NA_MESSAGE
-        streams_url = API.format('streams/{0}'.format(channel))
-        try:
-            request = requests.get(streams_url)
-            if request.status_code == 200:
-                json_data = request.json()
-                if json_data['status'] == 'Live':
-                    return request.json().get('player_viewers')
-                else:
-                    return NA_MESSAGE
-            else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
-        except Exception as exc:
-            log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
-
     def _add_channel(self, chat):
-        ChatModule.add_channel(self, chat)
-        gg = GGThread(self.queue, self.host, chat,
-                      self._conf_params['config']['config']['use_channel_id'],
-                      settings=self._conf_params['settings'], chat_module=self)
+        gg = GGChannel(self.queue, self.host, chat,
+                       self._conf_params['config']['config']['use_channel_id'],
+                       settings=self._conf_params['settings'], chat_module=self)
         self.channels[chat] = gg
         gg.start()
 

@@ -11,12 +11,12 @@ from time import sleep
 import semantic_version
 import messaging
 from modules.helper.functions import get_class_from_iname, get_modules_in_folder
-from modules.helper.module import BaseModule
+from modules.helper.module import ConfigModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
     LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException, \
     get_languages
-from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSpin, LCSlider, LCChooseMultiple, \
+from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSlider, LCChooseMultiple, \
     LCDropdown
 
 VERSION = '0.4.0'
@@ -109,7 +109,7 @@ def init():
         ]
     }
     # Adding config for main module
-    main_class = BaseModule(
+    main_class = ConfigModule(
         conf_params={
             'root_folder': base_config['root_folder'],
             'logs_folder': LOG_FOLDER,
@@ -169,7 +169,7 @@ def init():
         'non_dynamic': ['chat.chats']
     }
 
-    chat_init_module = BaseModule(
+    chat_init_module = ConfigModule(
         conf_params={
             'config': load_from_config_file(chat_modules_file, chat_conf_dict),
             'gui': chat_conf_gui
