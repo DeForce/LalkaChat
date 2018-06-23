@@ -1,4 +1,5 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
+import collections
 import logging
 import os
 
@@ -11,6 +12,11 @@ from system import RestApiException, CONF_FOLDER
 
 DEFAULT_PRIORITY = 30
 
+CHANNEL_ONLINE = 'online'
+CHANNEL_OFFLINE = 'offline'
+CHANNEL_PENDING = 'pending'
+CHANNEL_STATUSES = [CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING]
+CHANNEL_NO_VIEWERS = 'N/A'
 
 BASE_DICT = {
     'custom_renderer': False
@@ -26,7 +32,7 @@ CHAT_GUI = {}
 log = logging.getLogger('modules')
 
 
-class BaseModule:
+class BaseModule(object):
     def __init__(self, config=None, gui=None, queue=None, category='main',
                  *args, **kwargs):
         if gui is None:
@@ -140,6 +146,15 @@ class BaseModule:
         self._rest_api[method][path] = function_to_call
 
 
+class ConfigModule(BaseModule):
+    def __init__(self, *args, **kwargs):
+        super(ConfigModule, self).__init__(*args, **kwargs)
+
+
+class UIModule(BaseModule):
+    pass
+
+
 class MessagingModule(BaseModule):
     def __init__(self, *args, **kwargs):
         BaseModule.__init__(self, *args, **kwargs)
@@ -180,13 +195,9 @@ class ChatModule(BaseModule):
         if self.testing:
             self.testing = self._test_class()
 
-    def load_module(self, *args, **kwargs):
-        BaseModule.load_module(self, *args, **kwargs)
-        for channel in self.channels_list:
-            self._add_channel(channel)
-
-        if self.testing and self.channels:
-            self.testing = self.testing.start()
+    @property
+    def viewers(self):
+        return {}
 
     def _test_class(self):
         """
@@ -195,77 +206,10 @@ class ChatModule(BaseModule):
         """
         return {}
 
-    def apply_settings(self, **kwargs):
-        BaseModule.apply_settings(self, **kwargs)
-        self._check_chats(self.channels.keys())
-        self.refresh_channel_names()
-
-    def refresh_channel_names(self):
-        try:
-            gui_class = self._loaded_modules['gui']['class']
-            gui_class.gui.status_frame.refresh_labels(self._module_name)
-        except Exception as exc:
-            log.info('Unable to update channel names')
-
-    def get_viewers(self, *args, **kwargs):
-        """
-            Overwrite this method
-        :param args: 
-        :param kwargs: 
-        """
-        pass
-
-    def set_viewers(self, channel, viewers):
-        try:
-            gui_class = self._loaded_modules['gui']['class']
-            if not gui_class:
-                return
-
-            if hasattr(gui_class.gui, 'status_frame'):
-                gui_class.gui.status_frame.set_viewers(self._module_name, channel, viewers)
-        except Exception as exc:
-            log.info('Unable to set viewers: %s', exc)
-
-    def set_channel_online(self, channel):
-        try:
-            gui_class = self._loaded_modules['gui']['class']
-            gui_class.gui.status_frame.set_channel_online(self._module_name, channel)
-        except Exception as exc:
-            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_online'})
-
-    def set_channel_pending(self, channel):
-        try:
-            gui_class = self._loaded_modules['gui']['class']
-            gui_class.gui.status_frame.set_channel_pending(self._module_name, channel)
-        except Exception:
-            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_pending'})
-
-    def set_channel_offline(self, channel):
-        try:
-            gui_class = self._loaded_modules['gui']['class']
-            gui_class.gui.status_frame.set_channel_offline(self._module_name, channel)
-        except Exception:
-            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'set_offline'})
-
-    def add_channel(self, channel):
-        try:
-            gui_class = self._loaded_modules['gui']['class']
-            gui_class.gui.status_frame.add_channel(self._module_name, channel)
-        except Exception:
-            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'add'})
-
-    def remove_channel(self, channel):
-        try:
-            gui_class = self._loaded_modules['gui']['class']
-            gui_class.gui.status_frame.remove_channel(self._module_name, channel)
-        except Exception:
-            self.add_to_queue('status_frame', {'name': self._module_name, 'channel': channel, 'action': 'remove'})
-
     def _remove_channel(self, chat):
         """
-        :param chat: 
+        :param chat:
         """
-        self.remove_channel(chat)
         try:
             self.channels[chat].stop()
         except Exception as exc:
@@ -276,10 +220,7 @@ class ChatModule(BaseModule):
     def _add_channel(self, chat):
         """
             Overwite this method
-        :param args: 
-        :param kwargs: 
         """
-        self.add_channel(chat)
 
     def _check_chats(self, online_chats):
         chats = self._conf_params['config']['config']['channels_list']
@@ -290,6 +231,18 @@ class ChatModule(BaseModule):
         chats_to_set_online = [chat for chat in chats if chat not in online_chats]
         [self._add_channel(chat) for chat in chats_to_set_online]
 
+    def load_module(self, *args, **kwargs):
+        BaseModule.load_module(self, *args, **kwargs)
+        for channel in self.channels_list:
+            self._add_channel(channel)
+
+        if self.testing and self.channels:
+            self.testing = self.testing.start()
+
+    def apply_settings(self, **kwargs):
+        BaseModule.apply_settings(self, **kwargs)
+        self._check_chats(self.channels.keys())
+
     def get_remove_text(self):
         remove_dict = {}
         st_settings = self._loaded_modules['webchat']['style_settings']
@@ -298,3 +251,34 @@ class ChatModule(BaseModule):
         if st_settings['chat']['keys'].get('remove_message'):
             remove_dict['chat'] = st_settings['chat']['keys'].get('remove_text')
         return remove_dict
+
+
+class Channel(object):
+    def __init__(self):
+        self._viewers = None
+        self._status = CHANNEL_OFFLINE
+
+    @property
+    def viewers(self):
+        return self._viewers
+
+    @viewers.setter
+    def viewers(self, value):
+        self._viewers = value
+
+    def get_viewers(self):
+        """
+        Overwrite this.
+        :return:
+        """
+
+    @property
+    def status(self):
+        return self._status
+
+    @status.setter
+    def status(self, value):
+        if value in CHANNEL_STATUSES:
+            self._status = value
+        else:
+            raise TypeError('Invalid channel status: {}', value)

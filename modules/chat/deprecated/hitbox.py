@@ -13,7 +13,7 @@ import requests
 from ws4py.client.threadedclient import WebSocketClient
 
 from modules.helper.message import TextMessage, Emote, SystemMessage, RemoveMessageByUsers
-from modules.helper.module import ChatModule
+from modules.helper.module import ChatModule, Channel
 from modules.helper.system import translate_key, EMOTE_FORMAT
 from modules.interface.types import LCStaticBox, LCBool, LCPanel
 
@@ -285,9 +285,11 @@ class HitboxClient(WebSocketClient):
         )
 
 
-class HitboxInitThread(threading.Thread):
+class HitboxChannel(threading.Thread, Channel):
     def __init__(self, *args, **kwargs):
         threading.Thread.__init__(self)
+        Channel.__init__(self)
+
         self.daemon = True
 
         self.queue = kwargs.get('queue')
@@ -399,7 +401,7 @@ class hitbox(ChatModule):
 
     def _add_channel(self, chat):
         ChatModule._add_channel(self, chat)
-        self.channels[chat] = HitboxInitThread(
+        self.channels[chat] = HitboxChannel(
             queue=self.queue,
             channel=chat,
             settings=self._conf_params['settings'],

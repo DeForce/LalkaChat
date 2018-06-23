@@ -25,7 +25,8 @@ import webbrowser
 import wx
 from modules.helper.system import MODULE_KEY, translate_key, get_key, WINDOWS
 from modules.helper.parser import return_type
-from modules.helper.module import BaseModule
+from modules.helper.module import UIModule
+
 # ToDO: Support customization of borders/spacings
 
 log = logging.getLogger('chat_gui')
@@ -760,6 +761,7 @@ class SettingsWindow(wx.Frame):
             self.main_class.SetWindowStyle(style)
         elif item == get_key('main', 'gui', 'transparency'):
             self.main_class.SetTransparent((100 - value) * TRANSPARENCY_MULTIPLIER)
+        self.main_class.status_frame.refresh_labels()
 
 
 class ChatGui(wx.Frame):
@@ -807,6 +809,7 @@ class ChatGui(wx.Frame):
 
         self.status_frame = StatusFrame(self)
         self.status_frame.load()
+
         vbox.Add(self.status_frame, 0, wx.EXPAND)
         if self.main_config['config']['gui']['show_counters']:
             if self.status_frame.chats:
@@ -947,13 +950,13 @@ class ChatGui(wx.Frame):
         pass
 
 
-class GuiThread(BaseModule):
+class GuiThread(UIModule):
     title = 'LalkaChat'
     url = 'http://localhost'
     port = '8080'
 
     def __init__(self, **kwargs):
-        BaseModule.__init__(self, **kwargs)
+        UIModule.__init__(self, **kwargs)
         self._category = 'hidden'
         self.daemon = True
         self.gui = None

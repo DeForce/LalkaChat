@@ -13,7 +13,7 @@ import requests
 from modules.helper.parser import update
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUsers
-from modules.helper.module import ChatModule
+from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_OFFLINE
 from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE, register_iodc
 from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool, LCButton
 
@@ -58,6 +58,13 @@ CONF_GUI = {
     'non_dynamic': ['config.host', 'config.port', 'config.bttv'],
     'ignored_sections': ['config.register_oidc'],
 }
+
+CONNECTION_SUCCESS = translate_key(MODULE_KEY.join(['twitch', 'connection_success']))
+CONNECTION_DIED = translate_key(MODULE_KEY.join(['twitch', 'connection_died']))
+CONNECTION_CLOSED = translate_key(MODULE_KEY.join(['twitch', 'connection_closed']))
+CONNECTION_JOINING = translate_key(MODULE_KEY.join(['twitch', 'joining']))
+CHANNEL_JOIN_SUCCESS = translate_key(MODULE_KEY.join(['twitch', 'join_success']))
+CHANNEL_JOINING = translate_key(MODULE_KEY.join(['twitch', 'joining']))
 
 
 class TwitchUserError(Exception):
@@ -308,10 +315,10 @@ class TwitchMessageHandler(threading.Thread):
 
 
 class TwitchPingHandler(threading.Thread):
-    def __init__(self, irc_connection, chat_module, irc_class):
+    def __init__(self, irc_connection, main_class, irc_class):
         threading.Thread.__init__(self)
         self.irc_connection = irc_connection
-        self.chat_module = chat_module
+        self.main_class = main_class
         self.irc_class = irc_class
 
     def run(self):
@@ -319,8 +326,7 @@ class TwitchPingHandler(threading.Thread):
         while self.irc_connection.connected:
             self.irc_connection.ping("keep-alive")
             try:
-                self.chat_module.set_viewers(self.irc_class.nick,
-                                             self.chat_module.get_viewers(self.irc_class.nick))
+                self.main_class.viewers = self.main_class.get_viewers()
             except Exception as exc:
                 log.exception(exc)
             time.sleep(PING_DELAY)
@@ -350,18 +356,14 @@ class IRC(irc.client.SimpleIRCClient):
     def on_disconnect(self, connection, event):
         if 'CLOSE_OK' in event.arguments:
             log.info("Connection closed")
-            self.system_message(
-                translate_key(MODULE_KEY.join(['twitch', 'connection_closed'])).format(self.nick),
-                category='connection')
+            self.system_message(CONNECTION_CLOSED.format(self.nick), category='connection')
             raise TwitchNormalDisconnect()
         else:
             log.info("Connection lost")
             log.debug("connection: {}".format(connection))
             log.debug("event: {}".format(event))
-            self.chat_module.set_channel_offline(self.nick)
-            self.system_message(
-                translate_key(MODULE_KEY.join(['twitch', 'connection_died'])).format(self.nick),
-                category='connection')
+            self.main_class.status = CHANNEL_OFFLINE
+            self.system_message(CONNECTION_DIED.format(self.nick), category='connection')
             timer = threading.Timer(5.0, self.reconnect,
                                     args=[self.main_class.host, self.main_class.port, self.main_class.nickname])
             timer.start()
@@ -381,7 +383,7 @@ class IRC(irc.client.SimpleIRCClient):
         log.info("Welcome Received, joining {0} channel".format(self.channel))
         log.debug("event: {}".format(event))
         self.tw_connection = connection
-        self.system_message(translate_key(MODULE_KEY.join(['twitch', 'joining'])).format(self.channel),
+        self.system_message(CHANNEL_JOINING.format(self.channel),
                             category='connection')
         # After we receive IRC Welcome we send request for join and
         #  request for Capabilities (Twitch color, Display Name,
@@ -389,14 +391,14 @@ class IRC(irc.client.SimpleIRCClient):
         connection.join(self.channel)
         connection.cap('REQ', ':twitch.tv/tags')
         connection.cap('REQ', ':twitch.tv/commands')
-        ping_handler = TwitchPingHandler(connection, self.chat_module, self)
+        ping_handler = TwitchPingHandler(connection, self.main_class, self)
         ping_handler.start()
 
     def on_join(self, connection, event):
         log.debug("connection: {}".format(connection))
         log.debug("event: {}".format(event))
-        msg = translate_key(MODULE_KEY.join(['twitch', 'join_success'])).format(self.channel)
-        self.chat_module.set_channel_online(self.nick)
+        msg = CHANNEL_JOIN_SUCCESS.format(self.channel)
+        self.main_class.status = CHANNEL_ONLINE
         log.info(msg)
         self.system_message(msg, category='connection')
 
@@ -421,9 +423,11 @@ class IRC(irc.client.SimpleIRCClient):
         self.twitch_queue.put(event)
 
 
-class TWThread(threading.Thread):
+class TWChannel(threading.Thread, Channel):
     def __init__(self, queue, host, port, channel, bttv_smiles, anon=True, **kwargs):
         threading.Thread.__init__(self)
+        Channel.__init__(self)
+
         # Basic value setting.
         # Daemon is needed so when main programm exits
         # all threads will exit too.
@@ -465,17 +469,17 @@ class TWThread(threading.Thread):
                 if self.load_config():
                     self.irc = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
                     self.irc.connect(self.host, self.port, self.nickname)
-                    self.chat_module.set_channel_online(self.nickname)
+                    self.status = CHANNEL_ONLINE
                     self.irc.start()
                     log.info("Connection closed")
                     break
             except TwitchUserError:
                 log.critical("Unable to find twitch user, please fix")
-                self.chat_module.set_offline(self.nickname)
+                self.status = CHANNEL_OFFLINE
                 break
             except TwitchNormalDisconnect:
                 log.info("Twitch closing")
-                self.chat_module.set_offline(self.nickname)
+                self.status = CHANNEL_OFFLINE
                 break
             except Exception as exc:
                 log.exception(exc)
@@ -574,6 +578,20 @@ class TWThread(threading.Thread):
     def stop(self):
         self.irc.tw_connection.disconnect("CLOSE_OK")
 
+    def get_viewers(self):
+        streams_url = 'https://api.twitch.tv/kraken/streams/{0}'.format(self.channel)
+        try:
+            request = requests.get(streams_url, headers=headers)
+            if request.status_code == 200:
+                json_data = request.json()
+                if json_data['stream']:
+                    return request.json()['stream'].get('viewers', NA_MESSAGE)
+                return NA_MESSAGE
+            else:
+                raise Exception("Not successful status code: {0}".format(request.status_code))
+        except Exception as exc:
+            log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
+
 
 class TwitchMessage(object):
     def __init__(self, source, text, emotes=False, bits=False):
@@ -648,25 +666,9 @@ class Twitch(ChatModule):
             self._loaded_modules['webchat']['class'].add_depend('twitch')
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
 
-    @staticmethod
-    def get_viewers(channel):
-        streams_url = 'https://api.twitch.tv/kraken/streams/{0}'.format(channel)
-        try:
-            request = requests.get(streams_url, headers=headers)
-            if request.status_code == 200:
-                json_data = request.json()
-                if json_data['stream']:
-                    return request.json()['stream'].get('viewers', NA_MESSAGE)
-                return NA_MESSAGE
-            else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
-        except Exception as exc:
-            log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
-
     def _add_channel(self, chat):
-        ChatModule.add_channel(self, chat)
-        self.channels[chat] = TWThread(self.queue, self.host, self.port, chat, self.bttv,
-                                       settings=self._conf_params['settings'], chat_module=self)
+        self.channels[chat] = TWChannel(self.queue, self.host, self.port, chat, self.bttv,
+                                        settings=self._conf_params['settings'], chat_module=self)
         self.channels[chat].start()
 
     def apply_settings(self, **kwargs):

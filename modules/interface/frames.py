@@ -1,7 +1,10 @@
 import logging
+import threading
 
+import time
 import wx
 
+from modules.helper.module import ConfigModule, CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING
 from modules.helper.system import WINDOWS
 
 try:
@@ -11,6 +14,12 @@ except ImportError:
     from wx import html2 as browser
 
 log = logging.getLogger('chat_gui')
+
+CHANNEL_STATUS_COLORS = {
+    CHANNEL_ONLINE: wx.Colour(0, 128, 0),
+    CHANNEL_OFFLINE: wx.Colour(255, 0, 0),
+    CHANNEL_PENDING: wx.Colour(200, 200, 0)
+}
 
 
 class OAuthBrowser(wx.Frame):
@@ -37,6 +46,7 @@ class StatusFrame(wx.Panel):
         self.chats = {}
         self.border_sizer = self._create_sizer()
         self.chat_modules = None
+        self._update_thread = None
 
         if WINDOWS:
             self.SetBackgroundColour('cream')
@@ -46,20 +56,16 @@ class StatusFrame(wx.Panel):
         for chat_name, chat_settings in self.chat_modules.items():
             if chat_name == 'chat':
                 continue
-            if chat_settings['class'].get_queue('status_frame'):
-                for item in chat_settings['class'].get_queue('status_frame'):
-                    if item['action'] == 'add':
-                        self.add_channel(chat_name, item['channel'])
-                        del item
 
-                for item in chat_settings['class'].get_queue('status_frame'):
-                    if item['action'] == 'set_online':
-                        self.set_channel_online(chat_name, item['channel'])
-                    elif item['action'] == 'set_pending':
-                        self.set_channel_pending(chat_name, item['channel'])
-                    elif item['action'] == 'set_offline':
-                        self.set_channel_offline(chat_name, item['channel'])
-                    del item
+            class_item = chat_settings['class']
+            channels = class_item.channels
+
+            for channel_name, channel_class in channels.items():
+                wx.CallAfter(self.add_channel, chat_name, channel_name)
+
+        self._update_thread = threading.Thread(target=self._frame_update, name='StatusFrameUpdateThread')
+        self._update_thread.daemon = True
+        self._update_thread.start()
 
         self.Fit()
         self.Layout()
@@ -68,6 +74,31 @@ class StatusFrame(wx.Panel):
     @property
     def chat_count(self):
         return sum([len(item.values()) for item in self.chats.values()])
+
+    def _frame_update(self):
+        while True:
+            for chat_name, chat_settings in self.chat_modules.items():
+                if isinstance(chat_settings['class'], ConfigModule):
+                    continue
+
+                class_item = chat_settings['class']
+
+                for channel_name, channel in class_item.channels.items():
+                    if channel not in self.chats.get(chat_name, {}):
+                        wx.CallAfter(self.add_channel, chat_name, channel_name)
+
+                    self.set_channel_status(chat_name, channel_name, channel.status)
+                    self.set_viewers(chat_name, channel_name, channel.viewers)
+
+                difference = [item for item in self.chats.get(chat_name, {})
+                              if item.lower() not in [channel.lower() for channel in class_item.channels]]
+                if difference:
+                    for channel in difference:
+                        wx.CallAfter(self.remove_channel, chat_name, channel)
+
+            wx.CallAfter(self.Layout)
+            wx.CallAfter(self.Refresh)
+            time.sleep(1)
 
     def _create_sizer(self):
         border_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -122,8 +153,10 @@ class StatusFrame(wx.Panel):
         if self.chats and self.parent.main_config['config']['gui']['show_counters']:
             self.Show(True)
             self.parent.Layout()
-        self.Layout()
-        self.Refresh()
+
+        if self.Shown:
+            self.Layout()
+            self.Refresh()
 
     def remove_channel(self, module_name, channel):
         channel = channel.lower()
@@ -139,8 +172,9 @@ class StatusFrame(wx.Panel):
         if not self.chat_count:
             self.Show(False)
             self.parent.Layout()
-        self.Layout()
-        self.Refresh()
+        if self.Shown:
+            self.Layout()
+            self.Refresh()
 
     def _set_channel_color(self, element, color):
         if element.GetBackgroundColour() != color:
@@ -152,45 +186,21 @@ class StatusFrame(wx.Panel):
             log.debug('Changing element label')
             element.SetLabel(label)
 
-    def set_channel_online(self, module_name, channel):
+    def set_channel_status(self, module_name, channel, status):
         if module_name in self.chats:
             if channel.lower() in self.chats[module_name]:
-                f_color = wx.Colour(0, 128, 0)
+                f_color = CHANNEL_STATUS_COLORS[status]
                 wx.CallAfter(self._set_channel_color,
                              self.chats[module_name][channel.lower()]['status'],
                              f_color)
-        self.Layout()
-        self.Refresh()
 
-    def set_channel_pending(self, module_name, channel):
-        if module_name in self.chats:
-            if channel.lower() in self.chats[module_name]:
-                f_color = wx.Colour(200, 200, 0)
-                wx.CallAfter(self._set_channel_color,
-                             self.chats[module_name][channel.lower()]['status'],
-                             f_color)
-        self.Layout()
-        self.Refresh()
-
-    def set_channel_offline(self, module_name, channel):
-        if module_name in self.chats:
-            if channel in self.chats[module_name]:
-                f_color = wx.Colour(255, 0, 0)
-                wx.CallAfter(self._set_channel_color,
-                             self.chats[module_name][channel.lower()]['status'],
-                             f_color)
-        self.Refresh()
-
-    def refresh_labels(self, module_name):
-        if module_name not in self.chats:
-            return
-        show_names = self.chat_modules[module_name]['config']['config']['show_channel_names']
-        for name, settings in self.chats[module_name].items():
-            channel = '{}: '.format(settings['channel']) if show_names else ''
-            wx.CallAfter(self._update_label,
-                         self.chats[module_name][name]['name'], channel)
-        self.Layout()
-        self.Refresh()
+    def refresh_labels(self):
+        for chat_name, chat in self.chats.items():
+            show_names = self.chat_modules[chat_name]['config']['config']['show_channel_names']
+            for name, settings in self.chats[chat_name].items():
+                channel = '{}: '.format(settings['channel']) if show_names else ''
+                wx.CallAfter(self._update_label,
+                             self.chats[chat_name][name]['name'], channel)
 
     def set_viewers(self, module_name, channel, viewers):
         if not viewers:
