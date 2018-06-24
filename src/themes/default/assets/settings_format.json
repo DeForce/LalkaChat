@@ -1,28 +1,28 @@
 {
   "font_size": {
     "view": "spin",
-    "min": 10,
-    "max": 100
+    "min_v": 10,
+    "max_v": 100
   },
   "timer": {
     "view": "spin",
-    "min": -1,
-    "max": 3600
+    "min_v": -1,
+    "max_v": 3600
   },
   "smile_size": {
     "view": "spin",
-    "min": 8,
-    "max": 128
+    "min_v": 8,
+    "max_v": 128
   },
   "message_opacity": {
     "view": "spin",
-    "min": 0,
-    "max": 100
+    "min_v": 0,
+    "max_v": 100
   },
   "badge_size": {
     "view": "spin",
-    "min": 8,
-    "max": 128
+    "min_v": 8,
+    "max_v": 128
   },
   "background_colour": {
     "view": "colour_picker"

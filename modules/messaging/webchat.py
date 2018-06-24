@@ -22,7 +22,7 @@ from modules.helper.functions import get_themes
 from modules.helper.html_template import HTML_TEMPLATE
 from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByIDs
 from modules.helper.module import MessagingModule
-from modules.helper.parser import save_settings, convert_to_dict, update
+from modules.helper.parser import save_settings, convert_to_dict, update, lc_replace
 from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER, EMOTE_FORMAT
 from modules.interface.types import *
 
@@ -714,7 +714,7 @@ class Webchat(MessagingModule):
         lc_settings = alter_data_to_lc_style(self.get_style_from_file(style_name, web_type),
                                              self.get_style_format_from_file(style_name))
 
-        update(params['config'][style_type], {'style_settings': lc_settings})
+        lc_replace(params['config'][style_type]['style_settings'], lc_settings)
         params['style_settings'][web_type]['keys'] = params['config'][style_type]['style_settings']
         params['gui'][style_type].update(
             {'style_settings': self.get_style_format_from_file(style_name)})

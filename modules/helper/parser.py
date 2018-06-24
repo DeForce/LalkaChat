@@ -40,6 +40,16 @@ def update(dst, src, overwrite=True):
     return dst
 
 
+def lc_replace(dst, src):
+    for k, v in src.items():
+        if isinstance(v, LCDict):
+            dst[k] = update(dst[k], v)
+        else:
+            item_value = dst[k].value if k in dst else src[k].value
+            dst[k] = src[k]
+            dst[k].value = item_value
+
+
 def load_from_config_file(conf_file, conf_dict=None):
     if not os.path.exists(conf_file):
         return conf_dict
