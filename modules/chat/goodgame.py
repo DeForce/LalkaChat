@@ -171,7 +171,7 @@ class GoodgameMessageHandler(threading.Thread):
         self._send_message(message)
 
     def _process_join(self):
-        self.ws_class.system_message(CONNECTION_SUCCESS.format(self.nick), category='connection')
+        self.ws_class.system_message(CHANNEL_JOIN_SUCCESS.format(self.nick), category='connection')
 
     def _process_error(self, msg):
         log.info("Received error message: {0}".format(msg))

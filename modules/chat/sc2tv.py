@@ -22,19 +22,19 @@ logging.getLogger('requests').setLevel(logging.ERROR)
 logging.getLogger('urllib3').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
-SOURCE_ICON = 'http://funstream.tv/build/images/icon_home.png'
+SOURCE_ICON = 'https://peka2.tv/favicon-32x32.png'
 FILE_ICON = os.path.join('img', 'fs.png')
 SYSTEM_USER = 'Peka2.tv'
 SMILE_REGEXP = r':(\w+|\d+):'
 SMILE_FORMAT = ':{}:'
-API_URL = 'http://funstream.tv/api{}'
+API_URL = 'https://peka2.tv/api{}'
 
 PING_DELAY = 10
 
 CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['show_pm'] = LCBool(True)
-CONF_DICT['config']['socket'] = LCText('ws://funstream.tv/socket.io/')
+CONF_DICT['config']['socket'] = LCText('wss://peka2.tv/socket.io/')
 CONF_DICT['config']['show_channel_names'] = LCBool(True)
 
 CONF_GUI = {
@@ -183,7 +183,6 @@ class FsChat(WebSocketClient):
         # We get ID from POST request to funstream API, and it hopefuly
         #  answers us the correct ID of the channel we need to connect to
         payload = {
-            'id': None,
             'name': self.channel_name
         }
         try:
