@@ -272,10 +272,11 @@ def create_choose(panel=None, value=None, key=None, bind=None, **kwargs):
 def create_dropdown(panel=None, value=None, key=None, bind=None, gui=None, **kwargs):
     item_sizer = wx.BoxSizer(wx.HORIZONTAL)
     choices = value.list
+    translated_choices = [translate_key(item) for item in choices]
     item_name = MODULE_KEY.join(key)
     item_text = wx.StaticText(panel, label=translate_key(item_name))
     item_box = KeyChoice(panel, id=id_renew(item_name, update=True),
-                         keys=choices, choices=choices)
+                         keys=choices, choices=translated_choices)
     item_box.Bind(wx.EVT_CHOICE, bind)
     item_box.SetSelection(choices.index(str(value)))
     item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)

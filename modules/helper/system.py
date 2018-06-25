@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import locale
 import logging
@@ -168,7 +169,7 @@ def get_language():
 
 def get_languages():
     item_path = os.path.join(PYTHON_FOLDER, 'translations')
-    return [item for item in os.listdir(item_path)
+    return [translate_key(item) for item in os.listdir(item_path)
             if os.path.isdir(os.path.join(item_path, item))]
 
 

@@ -77,6 +77,7 @@ def init():
     main_config_dict['system']['log_level'] = LCText('INFO')
     main_config_dict['system']['testing_mode'] = LCBool(False)
     main_config_dict['gui'] = LCStaticBox()
+    main_config_dict['gui']['language'] = LCDropdown(get_language(), get_languages())
     main_config_dict['gui']['cli'] = LCBool(False)
     main_config_dict['gui']['show_icons'] = LCBool(False)
     main_config_dict['gui']['show_hidden'] = LCBool(False)
@@ -87,7 +88,6 @@ def init():
     main_config_dict['gui']['transparency'] = LCSlider(0, min_v=0, max_v=90)
     main_config_dict['gui']['borderless'] = LCBool(False)
     main_config_dict['gui']['reload'] = LCButton(button_test)
-    main_config_dict['language'] = LCDropdown(get_language(), get_languages())
 
     main_config_gui = {
         'system': {
@@ -104,7 +104,7 @@ def init():
             'gui.gui',
             'gui.show_browser',
             'gui.show_hidden',
-            'gui.show_icons',
+            'gui.language',
             'system.*'
         ]
     }
@@ -127,7 +127,7 @@ def init():
     gui_settings['on_top'] = main_config[GUI_TAG].get('on_top')
     gui_settings['transparency'] = main_config[GUI_TAG].get('transparency')
     gui_settings['borderless'] = main_config[GUI_TAG].get('borderless')
-    gui_settings['language'] = main_config.get('language')
+    gui_settings['language'] = main_config[GUI_TAG].get('language')
     gui_settings['show_hidden'] = main_config[GUI_TAG].get('show_hidden')
     gui_settings['size'] = (int(main_config['gui_information']['width']),
                             int(main_config['gui_information']['height']))
