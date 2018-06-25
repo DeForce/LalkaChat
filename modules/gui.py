@@ -327,7 +327,7 @@ class SettingsWindow(wx.Frame):
     def on_dropdown(self, event):
         drop_ctrl = event.EventObject
         self.on_change(modules.interface.controls.IDS[event.GetId()],
-                       drop_ctrl.GetString(drop_ctrl.GetCurrentSelection()),
+                       drop_ctrl.get_key_from_index(drop_ctrl.GetCurrentSelection()),
                        item_type='dropctrl')
         event.Skip()
 
@@ -651,8 +651,8 @@ class SettingsWindow(wx.Frame):
                 log.debug('Got non-dynamic changes')
                 dialog = wx.MessageDialog(self,
                                           message=translate_key(MODULE_KEY.join(['main', 'save', 'non_dynamic'])),
-                                          caption="Caption",
-                                          style=wx.OK_DEFAULT,
+                                          caption='Restart Warning',
+                                          style=wx.OK_DEFAULT | wx.ICON_ERROR,
                                           pos=wx.DefaultPosition)
                 dialog.ShowModal()
             if last_key == 'ok_button':
