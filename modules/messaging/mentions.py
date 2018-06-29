@@ -45,13 +45,13 @@ class Mentions(MessagingModule):
 
     def _check_mentions(self, message):
         for mention in self._conf_params['config']['mentions']:
-            if re.search(mention, message.text.lower()):
+            if mention in message.text.lower().split(' '):
                 message.mention = True
                 message.jsonable += ['mention']
                 break
 
     def _check_addressed(self, message):
         for address in self._conf_params['config']['address']:
-            if re.match(address, message.text.lower()):
+            if address == message.text.lower().split(' ')[0]:
                 message.pm = True
                 break

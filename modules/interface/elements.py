@@ -278,7 +278,11 @@ def create_dropdown(panel=None, value=None, key=None, bind=None, gui=None, **kwa
     item_box = KeyChoice(panel, id=id_renew(item_name, update=True),
                          keys=choices, choices=translated_choices)
     item_box.Bind(wx.EVT_CHOICE, bind)
-    item_box.SetSelection(choices.index(str(value)))
+    if str(value) in choices:
+        item_box.SetSelection(choices.index(str(value)))
+    else:
+        item_box.SetSelection(0)
+
     item_sizer.Add(item_text, 0, wx.ALIGN_CENTER)
     item_sizer.Add(item_box)
     return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}

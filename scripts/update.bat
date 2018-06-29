@@ -1,0 +1,1 @@
+start /b "" "cmd /c scripts\launch.bat %1 %2"

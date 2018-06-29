@@ -6,6 +6,7 @@ levels.db*
 /dist
 /libs
 /conf
+/dl
 *.log
 govno_rutony.py
 /node_modules/

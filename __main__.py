@@ -1,3 +1,3 @@
 import main
 
-main.init()
+main.main()

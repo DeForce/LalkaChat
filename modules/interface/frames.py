@@ -6,6 +6,7 @@ import wx
 
 from modules.helper.module import ConfigModule, CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING
 from modules.helper.system import WINDOWS
+from modules.interface.controls import id_renew
 
 try:
     from cefpython3.wx import chromectrl as browser
@@ -218,3 +219,26 @@ class StatusFrame(wx.Panel):
     def is_shown(self, value):
         self.Show(value)
         self.parent.Layout()
+
+
+class UpdateDialog(wx.Dialog):
+    def __init__(self, parent):
+        wx.Dialog.__init__(self, parent, title='Update', size=wx.Size(250, 90))
+        self.progress = 0
+
+        self.gauge = wx.Gauge(self, range=100)
+        self.update_text = wx.StaticText(self, label='Downloading new version...')
+        self.button_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+        self.button_sizer.AffirmativeButton.Disable()
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.update_text, 0, wx.EXPAND)
+        sizer.Add(self.gauge, 0, wx.EXPAND)
+        sizer.Add(self.button_sizer, 1, wx.EXPAND | wx.BOTTOM)
+        self.SetSizer(sizer)
+
+        self.Layout()
+
+    def update_progress(self, amount):
+        old = self.gauge.GetValue()
+        self.gauge.SetValue(old + amount)
