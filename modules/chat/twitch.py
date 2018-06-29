@@ -32,7 +32,7 @@ SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 FILE_ICON = os.path.join('img', 'tw.png')
 SYSTEM_USER = 'Twitch.TV'
-BITS_REGEXP = r'(^|\s)(\w+{})(?=(\s|$))'
+BITS_REGEXP = r'(.*)(\d+)'
 API_URL = 'https://api.twitch.tv/kraken/{}'
 
 PING_DELAY = 10
@@ -236,25 +236,22 @@ class TwitchMessageHandler(threading.Thread):
         if self.irc_class.chat_module.conf_params()['config']['config']['show_nickname_colors']:
             message.nick_colour = value
 
-    def _handle_bits(self, message, amount):
-        emote = None
-        regexp = re.search(BITS_REGEXP.format(amount), message.text)
-        if regexp:
-            emote = regexp.group(2).replace(str(amount), '').lower()
-        else:
-            for cheer in self.bits.keys():
-                for word in message.text.split(' '):
-                    if cheer in word:
-                        emote = cheer
-        if not emote:
-            return
+    def _handle_bits(self, message, total_amount):
+        for word in message.text.split():
+            reg = re.match(BITS_REGEXP, word)
+            if not reg:
+                continue
 
-        tier = min([tier for tier in self.bits[emote]['tiers'].keys() if tier - amount <= 0],
-                   key=lambda x: (abs(x - amount), x))
+            emote, amount = reg.groups()
+            tier = min([tier for tier in self.bits[emote]['tiers'].keys() if tier - int(amount) <= 0],
+                       key=lambda x: (abs(x - int(amount)), x))
 
-        message.bits = {'emote': emote,
-                        'info': self.bits[emote]['tiers'][tier]}
-        message.text = message.text.replace(emote, EMOTE_FORMAT.format(emote))
+            emote_key = '{}-{}'.format(emote, tier)
+            if emote_key in message.bits:
+                continue
+
+            message.bits[emote_key] = self.bits[emote]['tiers'][tier]
+            message.text = message.text.replace(emote, EMOTE_FORMAT.format(emote))
 
     @staticmethod
     def _handle_sub_message(message):
@@ -271,10 +268,12 @@ class TwitchMessageHandler(threading.Thread):
     def _post_process_bits(self, message):
         if not message.bits:
             return
-        message.emotes.append(Emote(
-            message.bits['emote'],
-            message.bits['info']['images'][BITS_THEME][BITS_TYPE][BITS_SCALE]
-        ))
+        for emote_key, bit in message.bits.items():
+            emote = emote_key.split('-')[0]
+            message.emotes.append(Emote(
+                emote,
+                bit['images'][BITS_THEME][BITS_TYPE][BITS_SCALE]
+            ))
 
     @staticmethod
     def _post_process_emotes(message):
