@@ -70,6 +70,14 @@ TYPE_DICT = {
 SANITIZER = Sanitizer()
 
 
+def class_replace(dst, src):
+    for k, v in src.items():
+        if isinstance(v, LCDict):
+            dst[k] = update(dst[k], v)
+        else:
+            dst[k] = src[k]
+
+
 def process_emotes(emotes):
     return [{'id': EMOTE_FORMAT.format(emote.id), 'url': emote.url} for emote in emotes]
 
@@ -714,7 +722,7 @@ class Webchat(MessagingModule):
         lc_settings = alter_data_to_lc_style(self.get_style_from_file(style_name, web_type),
                                              self.get_style_format_from_file(style_name))
 
-        lc_replace(params['config'][style_type]['style_settings'], lc_settings)
+        class_replace(params['config'][style_type]['style_settings'], lc_settings)
         params['style_settings'][web_type]['keys'] = params['config'][style_type]['style_settings']
         params['gui'][style_type].update(
             {'style_settings': self.get_style_format_from_file(style_name)})

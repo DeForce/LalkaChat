@@ -32,7 +32,7 @@ SOURCE = 'tw'
 SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 FILE_ICON = os.path.join('img', 'tw.png')
 SYSTEM_USER = 'Twitch.TV'
-BITS_REGEXP = r'(.*)(\d+)'
+BITS_REGEXP = r'(\D+)(\d+)'
 API_URL = 'https://api.twitch.tv/kraken/{}'
 
 PING_DELAY = 10
