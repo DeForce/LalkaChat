@@ -33,11 +33,9 @@ class C2B(MessagingModule):
         # Replacing the message if needed.
         # Please do the needful
         for item, replace in self._conf_params['config']['config'].iteritems():
-            if item in message.text:
+            if item in message.text.split(' '):
                 replace_word = random.choice(replace.split('/'))
-                message.text = re.sub(C2B_REGEXP.format(item),
-                                      r'\1{}\3'.format(replace_word),
-                                      message.text, flags=re.UNICODE)
+                message.text = message.text.replace(item, replace_word)
         return message
 
     def _conf_settings(self, *args, **kwargs):

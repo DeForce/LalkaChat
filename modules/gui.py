@@ -1,14 +1,18 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import collections
+import shutil
 
-import sys
+import threading
 
-from modules.helper.functions import find_by_type, parse_keys_to_string, deep_get, get_config_item_path, get_unicode
+import requests
+
+from modules.helper.functions import find_by_type, deep_get, get_config_item_path, get_unicode
+from modules.helper.updater import UPDATE_FOLDER, do_update, UPDATE_FILE, prepare_update
 from modules.interface.controls import KeyListBox, MainMenuToolBar
 
 import modules.interface.elements
-from modules.interface.events import StatusChangeEvent, EVT_STATUS_CHANGE
-from modules.interface.frames import OAuthBrowser, StatusFrame
+from modules.interface.events import EVT_STATUS_CHANGE
+from modules.interface.frames import OAuthBrowser, StatusFrame, UpdateDialog
 from modules.interface.types import *
 
 try:
@@ -38,6 +42,7 @@ SKIP_BUTTONS = ['list_add', 'list_remove', 'apply_button', 'cancel_button', 'ok_
 ITEM_SPACING_VERT = 6
 ITEM_SPACING_HORZ = 30
 TRANSPARENCY_MULTIPLIER = 2.55
+CHUNK_SIZE = 1024 ** 2
 
 
 def check_duplicate(item, window):
@@ -706,7 +711,7 @@ class SettingsWindow(wx.Frame):
                 deep_config[item_name].value = change['value']
                 self.apply_custom_gui_settings(item, change['value'])
             if 'class' in module_settings:
-                module_settings['class'].apply_settings()
+                module_settings['class'].apply_settings(changes=changed_items)
         return non_dynamic_check
 
     def select_cell(self, event):
@@ -856,13 +861,53 @@ class ChatGui(wx.Frame):
         self.Show(True)
         # Show update dialog if new version found
         if self.main_config['update']:
-            dialog = wx.MessageDialog(self, message="There is new version, do you want to update?",
-                                      caption="New Update Available",
-                                      style=wx.YES_NO | wx.YES_DEFAULT,
-                                      pos=wx.DefaultPosition)
-            response = dialog.ShowModal()
-            if response == wx.ID_YES:
-                webbrowser.open(self.main_config['update_url'])
+            self.check_update()
+
+    def check_update(self):
+        # Do updates only on Windows, and if it's frozen. Duh.
+        if WINDOWS:  # and hasattr(sys, 'frozen'):
+            with wx.MessageDialog(
+                    self, message="There is new version, do you want to update?",
+                    caption="New Update Available",
+                    style=wx.YES_NO | wx.YES_DEFAULT,
+                    pos=wx.DefaultPosition) as dialog:
+                response = dialog.ShowModal()
+                if response == wx.ID_YES:
+                    self.do_update(self.main_config['update_url'])
+                    self.on_close('exiting')
+                dialog.Destroy()
+
+    def download_update(self, url, filename, dialog):
+        # NOTE the stream=True parameter
+        r = requests.get(url, stream=True)
+        size = r.headers.get('content-length')
+
+        wx.CallAfter(dialog.gauge.SetRange, int(size))
+        with open(os.path.join(UPDATE_FOLDER, filename), 'wb') as f:
+            for chunk in r.iter_content(chunk_size=CHUNK_SIZE):
+                if chunk:
+                    f.write(chunk)
+                    wx.CallAfter(dialog.update_progress, CHUNK_SIZE)
+
+        wx.CallAfter(dialog.update_text.SetLabel, "Unpacking update...")
+        prepare_update()
+        wx.CallAfter(dialog.update_text.SetLabel, "Update is ready, do you want to proceed?")
+        wx.CallAfter(dialog.button_sizer.AffirmativeButton.Enable)
+
+    def do_update(self, url):
+        if os.path.exists(os.path.join(UPDATE_FOLDER)):
+            shutil.rmtree(os.path.join(UPDATE_FOLDER))
+        os.mkdir(UPDATE_FOLDER)
+
+        with UpdateDialog(self) as dlg:
+            download_thread = threading.Thread(target=self.download_update, args=[url, UPDATE_FILE, dlg])
+            download_thread.start()
+            response = dlg.ShowModal()
+            if response == wx.ID_OK:
+                do_update()
+                self.loaded_modules['main']['config']['system']['current_version'] = self.loaded_modules['main']['update_version']
+                self.loaded_modules['main']['class'].apply_settings()
+        return True
 
     def activate(self, event):
         if not self.first_readjust and not self.gui_settings['show_browser']:

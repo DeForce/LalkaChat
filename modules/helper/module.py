@@ -113,10 +113,10 @@ class BaseModule(object):
     def gui_button_press(self, *args):
         pass
 
-    def apply_settings(self, **kwargs):
+    def apply_settings(self, system_exit=False, changes=None):
         """
-        :param kwargs:
-            system_exit - param provided if system is exiting
+        :param changes: dictionary of keys that were changed
+        :param system_exit: are we exiting finally
         :return:
         """
         save_settings(self.conf_params(),

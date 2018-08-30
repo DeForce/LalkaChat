@@ -6,6 +6,7 @@ env.WINDOWS_BINARIES_PATH = "http://repo.intra.czt.lv/lalkachat/"
 env.BUILDER_CONTAINER = "deforce/lc-ubuntu-builder"
 
 def UploadPath = "jenkins@czt.lv:/usr/local/nginx/html/czt.lv/lalkachat/"
+def doRunTests = false
 
 def stage = { String stageName, Closure body ->
     // It's stage that prints its name
@@ -78,6 +79,7 @@ static def mapToList(depmap) {
 
 node('docker-host') {
     stage('Checkout') {
+        cleanWs()
         checkout scm
         sh 'mkdir -p results'
         sh 'rsync -avz src/jenkins/root/ ./'
@@ -127,46 +129,48 @@ node('docker-host') {
         }
         stage('Testing') {
             def lintRun = false
-            for (container in containersToBuild) {
-                stage(container) {
-                    echo "Running Build for ${container}"
-                    def docker_image = docker.image(container)
-                    docker_image.inside {
-                        try {
-                            stage('Run Chat') {
-                                sh '/bin/sh src/jenkins/run_chat.sh'
-                            }
-                            stage('Run Tests') {
-                                stage('Chat Tests') {
-                                    runTests('src/jenkins/chat_tests', 'chat', false)
-                                }
-                                stage('Module Tests') {
-                                    echo 'Module Tests'
-                                }
-                            }
-                            stage('Lint Tests') {
-                                try {
-                                    if(!lintRun) {
-                                        runTests('src/jenkins/lint_tests', 'lint', true)
-                                        lintRun = true
-                                    }
-                                } catch(exc) {
-                                    stable = false
-                                }
-                            }
-                        } catch(exc) {
-                            echo "${exc}"
-                            throw(exc)
-                        }
-                        finally {
-                            echo "Chat logs"
-                            sh 'cat chat.log'
+            if(doRunTests) {
+                for (container in containersToBuild) {
+                    stage(container) {
+                        echo "Running Build for ${container}"
+                        def docker_image = docker.image(container)
+                        docker_image.inside {
                             try {
-                                sh "python src/jenkins/tests_to_xml.py ${container}"
-                                junit 'results/chat_tests.xml'
-                                archive 'results/**'
-                            } catch (exc) {
-                                echo "Got Exception, skipping"
+                                stage('Run Chat') {
+                                    sh '/bin/sh src/jenkins/run_chat.sh'
+                                }
+                                stage('Run Tests') {
+                                    stage('Chat Tests') {
+                                        runTests('src/jenkins/chat_tests', 'chat', false)
+                                    }
+                                    stage('Module Tests') {
+                                        echo 'Module Tests'
+                                    }
+                                }
+                                stage('Lint Tests') {
+                                    try {
+                                        if(!lintRun) {
+                                            runTests('src/jenkins/lint_tests', 'lint', true)
+                                            lintRun = true
+                                        }
+                                    } catch(exc) {
+                                        stable = false
+                                    }
+                                }
+                            } catch(exc) {
+                                echo "${exc}"
+                                throw(exc)
+                            }
+                            finally {
+                                echo "Chat logs"
+                                sh 'cat chat.log'
+                                try {
+                                    sh "python src/jenkins/tests_to_xml.py ${container}"
+                                    junit 'results/chat_tests.xml'
+                                    archive 'results/**'
+                                } catch (exc) {
+                                    echo "Got Exception, skipping"
+                                }
                             }
                         }
                     }
@@ -190,7 +194,6 @@ node('docker-host') {
             sh 'rm -rf dist/'
             sh 'docker rm $(docker ps -aq) || true'
             sh 'docker rmi -f $(docker images -a | grep \'^<none>\' | awk \'{print \$3}\') || true'
-            deleteDir()
         }
     }
 }
