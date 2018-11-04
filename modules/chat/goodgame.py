@@ -18,7 +18,7 @@ from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Emote, RemoveMessageByIDs
 from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_PENDING, CHANNEL_OFFLINE
 from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
-from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText, LCGridSingle
+from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText
 
 logging.getLogger('requests').setLevel(logging.ERROR)
 logging.getLogger('urllib3').setLevel(logging.ERROR)

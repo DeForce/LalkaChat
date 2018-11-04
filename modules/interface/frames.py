@@ -6,7 +6,6 @@ import wx
 
 from modules.helper.module import ConfigModule, CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING
 from modules.helper.system import WINDOWS
-from modules.interface.controls import id_renew
 
 try:
     from cefpython3.wx import chromectrl as browser

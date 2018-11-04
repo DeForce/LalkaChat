@@ -1,12 +1,13 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import collections
+import logging
 
 import os
 
 import rtyaml
 from ConfigParser import RawConfigParser
 
-from modules.interface.types import *
+from modules.interface.types import LCPanel, LCStaticBox, LCDict, LCObject
 
 DICT_MAPPING = {
     LCPanel: dict,
@@ -87,7 +88,7 @@ def get_config(conf_file):
 
 
 def convert_to_dict(source, ignored_keys=(), ordered=True):
-    output = OrderedDict() if ordered else {}
+    output = collections.OrderedDict() if ordered else {}
     if not source:
         return output
 

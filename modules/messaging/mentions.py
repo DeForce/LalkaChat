@@ -1,9 +1,6 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import re
-from collections import OrderedDict
-
 from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
 from modules.interface.types import LCGridSingle, LCPanel

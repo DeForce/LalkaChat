@@ -47,10 +47,11 @@ class Message(threading.Thread):
         conf_file = os.path.join(main_config['conf_folder'], "messaging_modules.cfg")
         conf_dict = LCPanel()
         conf_dict['gui_information'] = {'category': 'messaging'}
-        conf_dict['messaging'] = LCChooseMultiple(['webchat'],
-                                                  available_list=get_modules_in_folder('messaging'),
-                                                  description=True,
-                                                  hidden=HIDDEN_MODULES)
+        conf_dict['messaging'] = LCChooseMultiple(
+            ['webchat'],
+            available_list=get_modules_in_folder('messaging'),
+            description=True,
+            hidden=HIDDEN_MODULES)
 
         conf_gui = {
             'non_dynamic': ['messaging.messaging']

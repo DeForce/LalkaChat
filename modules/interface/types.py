@@ -1,12 +1,43 @@
+import collections
+
+import wx
+import wx.grid
 from collections import OrderedDict
 
 import logging
+
+from modules.helper.functions import get_config_item_path
+from modules.helper.system import translate_key, MODULE_KEY
+from modules.interface.controls import KeyChoice, id_renew, CustomColourPickerCtrl, KeyListBox, \
+    KeyCheckListBox, get_id_from_name
+
 log = logging.getLogger('interface/types')
+LEFT_BORDER = 5
+TEXT_BORDER = 20
+
+
+def get_unicode(string):
+    if isinstance(string, str):
+        return string.decode('utf8')
+    return string
+
+
+def dict_instance(d):
+    return isinstance(d, (collections.Mapping, LCDict))
+
+
+def deep_get(dictionary, *keys):
+    return reduce(lambda d, key: d.get(key, None) if dict_instance(d) else None, keys, dictionary)
 
 
 class LCObject(object):
     def __init__(self, value=None, *args, **kwargs):
         self._value = value
+
+        self.key = None
+        self.parent = None
+
+        self.wx_controls = {}
 
     def __len__(self):
         return len(self._value)
@@ -22,10 +53,23 @@ class LCObject(object):
     def value(self, value):
         self._value = value
 
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        raise NotImplementedError('create_ui is not implemented in {}'.format(type(self)))
+
+    def create_ui(self, **kwargs):
+        data = self._create_ui(**kwargs)
+        self.wx_controls = data
+        self.key = MODULE_KEY.join(kwargs.get('key'))
+        self.parent = kwargs.get('parent')
+        return data
+
+    def bind(self, event):
+        raise NotImplementedError('bind is not implemented in {}'.format(type(self)))
+
 
 class LCDict(LCObject):
     def __init__(self, *args, **kwargs):
-        super(LCDict, self).__init__(*args, **kwargs)
+        LCObject.__init__(self, *args, **kwargs)
         self._value = OrderedDict()
 
     def __setitem__(self, key, value):
@@ -49,10 +93,56 @@ class LCPanel(LCDict):
         super(LCPanel, self).__init__(*args, **kwargs)
         self.icon = icon
 
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        return wx.BoxSizer(wx.VERTICAL)
+
 
 class LCStaticBox(LCDict):
     def __init__(self, *args, **kwargs):
         super(LCStaticBox, self).__init__(*args, **kwargs)
+
+    def bind(self, event):
+        return 'HelloWorld'
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        static_box = wx.StaticBox(panel, label=translate_key(MODULE_KEY.join(key)))
+        static_sizer = wx.StaticBoxSizer(static_box, wx.VERTICAL)
+        instatic_sizer = wx.BoxSizer(wx.VERTICAL)
+        spacer_size = 7
+
+        max_text_size = 0
+        text_ctrls = []
+        log.debug("Working on {0}".format(MODULE_KEY.join(key)))
+        spacer = False
+        hidden_items = kwargs['gui'].get('hidden', [])
+
+        # Create elements that are child of static-box
+        for item, value in self._value.items():
+            if item in hidden_items and not kwargs.get('show_hidden'):
+                continue
+
+            item_dict = value.create_ui(panel=static_box, key=key+[item], from_sb=True,
+                                        **kwargs)
+
+            if 'text_size' in item_dict:
+                if max_text_size < item_dict.get('text_size'):
+                    max_text_size = item_dict['text_size']
+
+                text_ctrls.append(item_dict['text_ctrl'])
+            spacer = True if not spacer else instatic_sizer.AddSpacer(spacer_size)
+            instatic_sizer.Add(item_dict['item'], 0, wx.EXPAND, 5)
+
+        if max_text_size:
+            for ctrl in text_ctrls:
+                ctrl.SetMinSize((max_text_size, ctrl.GetSize()[1]))
+
+        item_count = instatic_sizer.GetItemCount()
+        if not item_count:
+            static_sizer.Destroy()
+            return wx.BoxSizer(wx.VERTICAL)
+
+        static_sizer.Add(instatic_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        return static_sizer
 
 
 class LCText(LCObject):
@@ -90,6 +180,22 @@ class LCText(LCObject):
     def format(self, *args):
         return self._value.format(*args)
 
+    def bind(self, event):
+        text_ctrl = self.wx_controls['control']
+        self.parent.on_change(self.key, get_unicode(text_ctrl.GetValue()))
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        item_name = MODULE_KEY.join(key)
+        item_box = wx.TextCtrl(panel, id=id_renew(item_name, update=True),
+                               value=unicode(self._value))
+        item_box.Bind(wx.EVT_TEXT, self.bind)
+        item_text = wx.StaticText(panel, label=translate_key(item_name))
+        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER | wx.RIGHT, TEXT_BORDER)
+        item_sizer.Add(item_box, 1, wx.RIGHT, border=LEFT_BORDER)
+        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text,
+                'control': item_box}
+
 
 class LCColour(LCObject):
     def __init__(self, *args, **kwargs):
@@ -107,6 +213,21 @@ class LCColour(LCObject):
     def startswith(self, value):
         return str(self._value).startswith(value)
 
+    def bind(self, event):
+        self.parent.on_change(self.key, event['hex'])
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        item_name = MODULE_KEY.join(key)
+        colour_picker = CustomColourPickerCtrl()
+        item_box = colour_picker.create(panel, value=self._value, event=self.bind, key=key)
+
+        item_text = wx.StaticText(panel, label=translate_key(item_name))
+        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER | wx.RIGHT, TEXT_BORDER)
+        item_sizer.Add(item_box, 1, wx.EXPAND)
+        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text}
+
 
 class LCBool(LCObject):
     def __init__(self, value, *args, **kwargs):
@@ -121,10 +242,29 @@ class LCBool(LCObject):
     def simple(self):
         return bool(self)
 
+    def bind(self, event):
+        control = self.wx_controls['control']
+        self.parent.on_change(self.key, control.IsChecked())
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        style = wx.ALIGN_CENTER_VERTICAL
+        item_key = MODULE_KEY.join(key)
+        item_box = wx.CheckBox(panel, id=id_renew(item_key, update=True),
+                               label=translate_key(item_key), style=style)
+        item_box.SetValue(bool(self._value))
+        item_box.Bind(wx.EVT_CHECKBOX, self.bind)
+        item_sizer.Add(item_box, 0, wx.ALIGN_LEFT)
+        return {'item': item_sizer, 'control': item_box}
+
 
 class LCList(LCObject):
-    def __init__(self, value=(), *args, **kwargs):
+    def __init__(self, value=(), addable=True, *args, **kwargs):
         super(LCList, self).__init__(value, *args, **kwargs)
+
+        self.selected = None
+        self.addable = addable
+        self.bind_map = {}
 
     def __iter__(self):
         return self.value.__iter__()
@@ -132,10 +272,139 @@ class LCList(LCObject):
     def simple(self):
         return list(self._value)
 
+    def update_ui(self, rows, list_box, elements):
+        max_rows = 7
+        if rows <= max_rows:
+            list_box.SetMinSize((-1, -1))
+            self.parent.content_page.GetSizer().Layout()
+        else:
+            scroll_size = wx.SystemSettings_GetMetric(wx.SYS_VSCROLL_X)
+            max_size = self.parent.list_map.get(self.key)
+            if max_size:
+                list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
+                list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
+            else:
+                max_size = (list_box.GetBestSize()[0], list_box.GetDefaultRowSize()*max_rows)
+                list_box.SetMinSize((max_size[0], max_size[1]))
+                list_box.SetSize((max_size[0], max_size[1]))
+            self.parent.content_page.GetSizer().Layout()
+        if rows == max_rows:
+            self.parent.list_map[self.key] = list_box.GetBestSize()
+        self.parent.on_change(self.key, elements, item_type='gridbox')
+
+    def bind_add(self, event):
+        list_box = self.wx_controls['control']
+        list_input = self.wx_controls['input']
+        list_input_value = list_input.GetValue().strip()
+
+        row_count = list_box.GetNumberRows()
+        row_values = [list_box.GetCellValue(f_row, 0).lower() for f_row in range(0, row_count)]
+        if list_input_value.lower() not in row_values:
+            list_box.AppendRows(1)
+            list_box.SetCellValue(row_count, 0, list_input_value)
+
+        list_input.SetValue('')
+
+        rows = list_box.GetNumberRows()
+        grid_elements = OrderedDict.fromkeys([list_box.GetCellValue(row, 0) for row in range(rows)]).keys()
+        self.update_ui(rows, list_box, grid_elements)
+
+    def bind_remove(self, event):
+        list_box = self.wx_controls['control']
+        top = list_box.GetSelectionBlockTopLeft()
+        bot = list_box.GetSelectionBlockBottomRight()
+        if top and bot:
+            top = top[0][0]
+            bot = bot[0][0] + 1
+            del_rows = range(top, bot) if top < bot else range(bot, top)
+        else:
+            del_rows = [self.selected[0]]
+
+        if list_box.GetNumberRows():
+            ids_deleted = 0
+            for select in del_rows:
+                list_box.DeleteRows(select - ids_deleted)
+                ids_deleted += 1
+
+        rows = list_box.GetNumberRows()
+        grid_elements = OrderedDict.fromkeys([list_box.GetCellValue(row, 0) for row in range(rows)]).keys()
+        self.update_ui(rows, list_box, grid_elements)
+
+    def bind_select(self, event):
+        self.selected = (event.GetRow(), event.GetCol())
+
+    def bind_edit(self, event):
+        list_box = self.wx_controls['control']
+        rows = list_box.GetNumberRows()
+        grid_elements = OrderedDict.fromkeys([list_box.GetCellValue(row, 0) for row in range(rows)]).keys()
+        self.update_ui(rows, list_box, grid_elements)
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        style = wx.ALIGN_CENTER_VERTICAL
+        border_sizer = wx.BoxSizer(wx.VERTICAL)
+        item_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        static_label = MODULE_KEY.join(key)
+        static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
+        item_sizer.Add(static_text)
+
+        input = None
+        addable_sizer = wx.BoxSizer(wx.HORIZONTAL) if self.addable else None
+        if addable_sizer:
+            item_input_key = MODULE_KEY.join(key + ['list_input'])
+            item_input = wx.TextCtrl(panel, id=id_renew(item_input_key, update=True))
+            input = item_input
+            addable_sizer.Add(item_input, 0, style)
+
+            item_apply_key = MODULE_KEY.join(key + ['list_add'])
+            item_apply_id = id_renew(item_apply_key, update=True)
+            item_apply = wx.Button(panel, id=item_apply_id, label=translate_key(item_apply_key))
+            addable_sizer.Add(item_apply, 0, style)
+            item_apply.Bind(wx.EVT_BUTTON, self.bind_add, id=item_apply_id)
+
+            item_remove_key = MODULE_KEY.join(key + ['list_remove'])
+            item_remove_id = id_renew(item_remove_key, update=True)
+            item_remove = wx.Button(panel, id=item_remove_id, label=translate_key(item_remove_key))
+            addable_sizer.Add(item_remove, 0, style)
+            item_remove.Bind(wx.EVT_BUTTON, self.bind_remove, id=item_remove_id)
+
+            item_sizer.Add(addable_sizer, 0, wx.EXPAND)
+
+        list_box = wx.grid.Grid(panel, id=id_renew(MODULE_KEY.join(key + ['list_box']), update=True))
+        list_box.CreateGrid(0, 1)
+        list_box.DisableDragColSize()
+        list_box.DisableDragRowSize()
+        list_box.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.bind_select)
+        list_box.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.bind_edit)
+
+        for index, item in enumerate(self._value):
+            list_box.AppendRows(1)
+            list_box.SetCellValue(index, 0, item)
+
+        list_box.SetColLabelSize(1)
+        list_box.SetRowLabelSize(1)
+
+        max_rows = 7
+        if addable_sizer:
+            col_size = addable_sizer.GetMinSize()[0] - 2
+            list_box.SetDefaultColSize(col_size, resizeExistingCols=True)
+            if list_box.GetNumberRows() > max_rows:
+                scroll_size = wx.SystemSettings_GetMetric(wx.SYS_VSCROLL_X)
+                max_size = wx.Size(list_box.GetBestSize()[0], list_box.GetDefaultRowSize() * max_rows)
+                list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
+                list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
+        else:
+            list_box.AutoSize()
+
+        item_sizer.Add(list_box)
+
+        border_sizer.Add(item_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        return {'item': border_sizer, 'control': list_box, 'input': input}
+
 
 class LCButton(LCObject):
     def __init__(self, fnc=None, *args, **kwargs):
-        self.function = fnc if fnc else None
+        self.function = fnc if fnc else self.pass_function
         super(LCButton, self).__init__(value=str(fnc), *args, **kwargs)
 
     def __repr__(self):
@@ -143,6 +412,26 @@ class LCButton(LCObject):
 
     def pass_function(self):
         pass
+
+    def _create_ui(self, panel=None, key=None, parent=None, enabled=True,
+                  **kwargs):
+        item_sizer = wx.BoxSizer(wx.VERTICAL)
+        item_name = MODULE_KEY.join(key)
+        button_id = id_renew(item_name, update=True)
+        c_button = wx.Button(panel, id=button_id, label=translate_key(item_name))
+        if not enabled:
+            c_button.Disable()
+
+        if item_name in parent.buttons:
+            parent.buttons[item_name].append(c_button)
+        else:
+            parent.buttons[item_name] = [c_button]
+
+        # TODO: Implement button function pressing
+        c_button.Bind(wx.EVT_BUTTON, self.function, id=button_id)
+
+        item_sizer.Add(c_button)
+        return {'item': item_sizer}
 
 
 class LCSpin(LCObject):
@@ -163,6 +452,25 @@ class LCSpin(LCObject):
     def simple(self):
         return int(self.value)
 
+    def bind(self, event):
+        spin_ctrl = self.wx_controls['control']
+        self.parent.on_change(self.key, spin_ctrl.GetValue())
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        item_name = MODULE_KEY.join(key)
+        style = wx.ALIGN_LEFT
+        item_box = wx.SpinCtrl(panel, id=id_renew(item_name, update=True),
+                               min=self.min, max=self.max,
+                               initial=self._value, style=style)
+        item_text = wx.StaticText(panel, label=translate_key(item_name))
+        item_box.Bind(wx.EVT_SPINCTRL, self.bind)
+        item_box.Bind(wx.EVT_TEXT, self.bind)
+        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER | wx.RIGHT, TEXT_BORDER)
+        item_sizer.Add(item_box)
+        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text,
+                'control': item_box}
+
 
 class LCSlider(LCObject):
     def __init__(self, value, min_v=0, max_v=100, *args, **kwargs):
@@ -182,6 +490,26 @@ class LCSlider(LCObject):
     def simple(self):
         return int(self._value)
 
+    def bind(self, event):
+        spin_ctrl = event.EventObject
+        self.parent.on_change(self.key, spin_ctrl.GetValue())
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        item_name = MODULE_KEY.join(key)
+        style = wx.SL_VALUE_LABEL | wx.SL_AUTOTICKS
+        item_box = wx.Slider(panel, id=id_renew(item_name, update=True),
+                             minValue=self.min, maxValue=self.max,
+                             value=self._value, style=style)
+        freq = (self.max - self.min) / 5
+        item_box.SetTickFreq(freq)
+        item_box.SetLineSize(4)
+        item_box.Bind(wx.EVT_SCROLL, self.bind)
+        item_text = wx.StaticText(panel, label=translate_key(item_name))
+        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER | wx.RIGHT, TEXT_BORDER)
+        item_sizer.Add(item_box, 1, wx.EXPAND | wx.RIGHT, border=LEFT_BORDER)
+        return {'item': item_sizer, 'control': item_box}
+
 
 class LCDropdown(LCObject):
     def __init__(self, value, available_list=()):
@@ -194,24 +522,215 @@ class LCDropdown(LCObject):
     def simple(self):
         return str(self._value)
 
+    def bind(self, event):
+        control = self.wx_controls['control']
+        self.parent.on_change(
+            self.key,
+            control.get_key_from_index(control.GetCurrentSelection()))
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        choices = self.list
+        translated_choices = [translate_key(item) for item in choices]
+        item_name = MODULE_KEY.join(key)
+        item_text = wx.StaticText(panel, label=translate_key(item_name))
+        item_box = KeyChoice(panel, id=id_renew(item_name, update=True),
+                             keys=choices, choices=translated_choices)
+        item_box.Bind(wx.EVT_CHOICE, self.bind)
+        if str(self._value) in choices:
+            item_box.SetSelection(choices.index(str(self._value)))
+        else:
+            item_box.SetSelection(0)
+
+        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER | wx.RIGHT, TEXT_BORDER)
+        item_sizer.Add(item_box)
+        return {'item': item_sizer, 'text_size': item_text.GetSize()[0], 'text_ctrl': item_text,
+                'control': item_box}
+
 
 class LCGridDual(LCDict):
-    def __init__(self, value=OrderedDict(), *args, **kwargs):
+    def __init__(self, value=None, addable=True, *args, **kwargs):
+        if value is None:
+            value = OrderedDict()
         super(LCGridDual, self).__init__(value, *args, **kwargs)
+        self.addable = addable
+        self.selected = None
 
     def simple(self):
         return self._value
 
+    def update_ui(self, rows, list_box, elements):
+        max_rows = 7
+        if rows <= max_rows:
+            list_box.SetMinSize((-1, -1))
+            self.parent.content_page.GetSizer().Layout()
+        else:
+            scroll_size = wx.SystemSettings_GetMetric(wx.SYS_VSCROLL_X)
+            max_size = self.parent.list_map.get(self.key)
+            if max_size:
+                list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
+                list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
+            else:
+                max_size = (list_box.GetBestSize()[0], list_box.GetDefaultRowSize()*max_rows)
+                list_box.SetMinSize((max_size[0], max_size[1]))
+                list_box.SetSize((max_size[0], max_size[1]))
+            self.parent.content_page.GetSizer().Layout()
+        if rows == max_rows:
+            self.parent.list_map[self.key] = list_box.GetBestSize()
+        self.parent.on_change(self.key, elements, item_type='gridbox')
 
-class LCGridSingle(LCObject):
+    def bind_add(self, event):
+        list_box = self.wx_controls['control']
+        list_input = self.wx_controls['input1']
+        list_input_value = list_input.GetValue().strip()
+
+        row_count = list_box.GetNumberRows()
+        row_values = [list_box.GetCellValue(f_row, 0).lower() for f_row in range(0, row_count)]
+        if list_input_value.lower() not in row_values:
+            list_box.AppendRows(1)
+            list_box.SetCellValue(row_count, 0, list_input_value)
+
+        list_input2 = self.wx_controls['input2']
+        list_input2_value = list_input2.GetValue().strip()
+        row_values = [list_box.GetCellValue(f_row, 1).lower() for f_row in range(0, row_count)]
+        if list_input2_value.lower() not in row_values:
+            list_box.SetCellValue(row_count, 1, list_input2_value)
+
+        list_input.SetValue('')
+        list_input2.SetValue('')
+
+        rows = list_box.GetNumberRows()
+        cols = list_box.GetNumberCols()
+        list_box_item = [[list_box.GetCellValue(row, col).strip()
+                          for col in range(cols)]
+                         for row in range(rows)]
+        grid_elements = OrderedDict()
+        for (item, value) in list_box_item:
+            grid_elements[item] = value
+
+        self.update_ui(rows, list_box, grid_elements)
+
+    def bind_remove(self, event):
+        list_box = self.wx_controls['control']
+        top = list_box.GetSelectionBlockTopLeft()
+        bot = list_box.GetSelectionBlockBottomRight()
+        if top and bot:
+            top = top[0][0]
+            bot = bot[0][0] + 1
+            del_rows = range(top, bot) if top < bot else range(bot, top)
+        else:
+            del_rows = [self.selected[0]]
+
+        if list_box.GetNumberRows():
+            ids_deleted = 0
+            for select in del_rows:
+                list_box.DeleteRows(select - ids_deleted)
+                ids_deleted += 1
+
+        rows = list_box.GetNumberRows()
+        cols = list_box.GetNumberCols()
+        list_box_item = [
+            [list_box.GetCellValue(row, col).strip() for col in range(cols)]
+            for row in range(rows)]
+        grid_elements = OrderedDict()
+        for (item, value) in list_box_item:
+            grid_elements[item] = value
+
+        self.update_ui(rows, list_box, grid_elements)
+
+    def bind_edit(self, event):
+        list_box = self.wx_controls['control']
+
+        rows = list_box.GetNumberRows()
+        cols = list_box.GetNumberCols()
+        list_box_item = [
+            [list_box.GetCellValue(row, col).strip() for col in range(cols)]
+            for row in range(rows)]
+        grid_elements = OrderedDict()
+        for (item, value) in list_box_item:
+            grid_elements[item] = value
+
+        self.update_ui(rows, list_box, grid_elements)
+
+    def bind_select(self, event):
+        self.selected = (event.GetRow(), event.GetCol())
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        style = wx.ALIGN_CENTER_VERTICAL
+        border_sizer = wx.BoxSizer(wx.VERTICAL)
+        item_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        static_label = MODULE_KEY.join(key)
+        static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
+        item_sizer.Add(static_text)
+
+        inputs = {}
+        addable_sizer = wx.BoxSizer(wx.HORIZONTAL) if self.addable else None
+        if addable_sizer:
+            item_input_key = MODULE_KEY.join(key + ['list_input'])
+            item_input = wx.TextCtrl(panel, id=id_renew(item_input_key, update=True))
+            inputs['input1'] = item_input
+            addable_sizer.Add(item_input, 0, style)
+
+            item_input2_key = MODULE_KEY.join(key + ['list_input2'])
+            item_input2 = wx.TextCtrl(panel, id=id_renew(item_input2_key, update=True))
+            inputs['input2'] = item_input2
+            addable_sizer.Add(item_input2, 0, style)
+
+            item_apply_key = MODULE_KEY.join(key + ['list_add'])
+            item_apply_id = id_renew(item_apply_key, update=True)
+            item_apply = wx.Button(panel, id=item_apply_id, label=translate_key(item_apply_key))
+            addable_sizer.Add(item_apply, 0, style)
+            item_apply.Bind(wx.EVT_BUTTON, self.bind_add, id=item_apply_id)
+
+            item_remove_key = MODULE_KEY.join(key + ['list_remove'])
+            item_remove_id = id_renew(item_remove_key, update=True)
+            item_remove = wx.Button(panel, id=item_remove_id, label=translate_key(item_remove_key))
+            addable_sizer.Add(item_remove, 0, style)
+            item_remove.Bind(wx.EVT_BUTTON, self.bind_remove, id=item_remove_id)
+
+            item_sizer.Add(addable_sizer, 0, wx.EXPAND)
+
+        list_box = wx.grid.Grid(panel, id=id_renew(MODULE_KEY.join(key + ['list_box']), update=True))
+        list_box.CreateGrid(0, 2)
+        list_box.DisableDragColSize()
+        list_box.DisableDragRowSize()
+        list_box.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.bind_select)
+        list_box.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.bind_edit)
+
+        for index, (item, item_value) in enumerate(self._value.items()):
+            list_box.AppendRows(1)
+            list_box.SetCellValue(index, 0, item)
+            list_box.SetCellValue(index, 1, item_value)
+
+        list_box.SetColLabelSize(1)
+        list_box.SetRowLabelSize(1)
+
+        max_rows = 7
+        if addable_sizer:
+            col_size = addable_sizer.GetMinSize()[0] - 2
+            first_col_size = list_box.GetColSize(0)
+            second_col_size = col_size - first_col_size if first_col_size < col_size else -1
+            list_box.SetColSize(1, second_col_size)
+            if list_box.GetNumberRows() > max_rows:
+                scroll_size = wx.SystemSettings_GetMetric(wx.SYS_VSCROLL_X)
+                max_size = wx.Size(list_box.GetBestSize()[0], list_box.GetDefaultRowSize() * max_rows)
+                list_box.SetMinSize((max_size[0] + scroll_size, max_size[1]))
+                list_box.SetSize((max_size[0] + scroll_size, max_size[1]))
+        else:
+            list_box.AutoSize()
+
+        item_sizer.Add(list_box)
+
+        border_sizer.Add(item_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        return_item = {'item': border_sizer, 'control': list_box}
+        return_item.update(inputs)
+        return return_item
+
+
+class LCGridSingle(LCList):
     def __init__(self, value=(), *args, **kwargs):
         super(LCGridSingle, self).__init__(value, *args, **kwargs)
-
-    def __iter__(self):
-        return self._value.__iter__()
-
-    def simple(self):
-        return list(self._value)
 
 
 class LCChooseSingle(LCObject):
@@ -223,6 +742,7 @@ class LCChooseSingle(LCObject):
         self.description = kwargs.get('description')
         self.empty_label = empty_label
         self._skip = {item: True if item == value else False for item in hidden}
+        self.bind_map = {}
 
     @property
     def skip(self):
@@ -237,6 +757,79 @@ class LCChooseSingle(LCObject):
 
     def __repr__(self):
         return str(self.value)
+
+    def bind_check(self, event):
+        item_object = self.wx_controls['control']
+        selection = item_object.get_key_from_index(item_object.GetSelection())
+        description = translate_key(MODULE_KEY.join([selection, 'description']))
+
+        item_key = self.key.split(MODULE_KEY)
+        config_item_path = get_config_item_path(item_key[:-1])
+        show_description = self.description
+
+        if isinstance(item_object, KeyListBox):
+            self.parent.on_change(self.key, selection, item_type='listbox', section=True)
+
+        if show_description:
+            descr_static_text = self.wx_controls['description']
+            descr_static_text.SetLabel(description)
+            descr_static_text.Wrap(descr_static_text.GetSize()[0])
+
+    def bind_check_change(self, event):
+        item = self.wx_controls['control']
+        item_ids = item.GetChecked()
+        items_values = [item.get_key_from_index(item_id) for item_id in item_ids]
+        self.parent.on_change(self.key, items_values, item_type='listbox_check', section=True)
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        active_item = self._value
+        available_items = [item for item in self.list if item not in self.skip]
+        translated_items = [translate_key(item) for item in available_items]
+
+        style = wx.LB_SINGLE
+        border_sizer = wx.BoxSizer(wx.VERTICAL)
+        item_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        static_label = MODULE_KEY.join(key)
+        if not self.empty_label:
+            static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
+            item_sizer.Add(static_text)
+
+        item_key = MODULE_KEY.join(key + ['list_box'])
+        label_text = translate_key(item_key)
+        if label_text:
+            item_sizer.Add(wx.StaticText(panel, label=label_text, style=wx.ALIGN_RIGHT))
+
+        item_list_box = KeyListBox(panel, id=id_renew(item_key, update=True), keys=available_items,
+                                   choices=translated_items if translated_items else available_items, style=style)
+        item_list_box.Bind(wx.EVT_LISTBOX, self.bind_check)
+
+        if active_item not in item_list_box.GetItems():
+            if item_list_box.GetItems():
+                item_list_box.SetSelection(0)
+        else:
+            item_list_box.SetSelection(available_items.index(active_item))
+
+        descr_text = None
+        if self.description:
+            adv_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            adv_sizer.Add(item_list_box, 0, wx.EXPAND)
+
+            descr_key = MODULE_KEY.join(key + ['descr_explain'])
+            descr_text = wx.StaticText(panel, id=id_renew(descr_key, update=True),
+                                       label=translate_key(descr_key), style=wx.ST_NO_AUTORESIZE)
+            adv_sizer.Add(descr_text, 0, wx.EXPAND | wx.LEFT, 10)
+
+            sizes = descr_text.GetSize()
+            sizes[0] -= 20
+            descr_text.SetMinSize(sizes)
+            descr_text.Fit()
+            item_sizer.Add(adv_sizer)
+        else:
+            item_sizer.Add(item_list_box)
+        border_sizer.Add(item_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        return {'item': border_sizer, 'control': item_list_box,
+                'description': descr_text}
 
 
 class LCChooseMultiple(LCChooseSingle):
@@ -258,6 +851,54 @@ class LCChooseMultiple(LCChooseSingle):
 
     def simple(self):
         return list(self.value)
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        active_items = self._value
+        available_items = [item for item in self.list if item not in self.skip]
+        translated_items = [translate_key(item) for item in available_items]
+
+        border_sizer = wx.BoxSizer(wx.VERTICAL)
+        item_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        static_label = MODULE_KEY.join(key)
+        if not self.empty_label:
+            static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
+            item_sizer.Add(static_text)
+
+        item_key = MODULE_KEY.join(key + ['list_box'])
+        label_text = translate_key(item_key)
+        if label_text:
+            item_sizer.Add(wx.StaticText(panel, label=label_text, style=wx.ALIGN_RIGHT))
+
+        item_list_box = KeyCheckListBox(panel, id=id_renew(item_key, update=True), keys=available_items,
+                                        choices=translated_items if translated_items else available_items)
+        item_list_box.Bind(wx.EVT_CHECKLISTBOX, self.bind_check_change)
+        item_list_box.Bind(wx.EVT_LISTBOX, self.bind_check)
+
+        section_for = active_items
+        check_items = [available_items.index(item) for item in section_for if item in available_items]
+        item_list_box.SetChecked(check_items)
+
+        descr_text = None
+        if self.description:
+            adv_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            adv_sizer.Add(item_list_box, 0, wx.EXPAND)
+
+            descr_key = MODULE_KEY.join(key + ['descr_explain'])
+            descr_text = wx.StaticText(panel, id=id_renew(descr_key, update=True),
+                                       label=translate_key(descr_key), style=wx.ST_NO_AUTORESIZE)
+            adv_sizer.Add(descr_text, 0, wx.EXPAND | wx.LEFT, 10)
+
+            sizes = descr_text.GetSize()
+            sizes[0] -= 20
+            descr_text.SetMinSize(sizes)
+            descr_text.Fit()
+            item_sizer.Add(adv_sizer)
+        else:
+            item_sizer.Add(item_list_box)
+        border_sizer.Add(item_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        return {'item': border_sizer, 'control': item_list_box,
+                'description': descr_text}
 
 
 TYPE_TO_LC = {
