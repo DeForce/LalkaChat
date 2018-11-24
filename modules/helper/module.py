@@ -244,10 +244,10 @@ class ChatModule(BaseModule):
     def get_remove_text(self):
         remove_dict = {}
         st_settings = self._loaded_modules['webchat']['style_settings']
-        if st_settings['gui']['keys'].get('remove_message'):
-            remove_dict['gui'] = st_settings['gui']['keys'].get('remove_text')
-        if st_settings['chat']['keys'].get('remove_message'):
-            remove_dict['chat'] = st_settings['chat']['keys'].get('remove_text')
+        if st_settings['gui_chat']['keys'].get('remove_message'):
+            remove_dict['gui_chat'] = st_settings['gui_chat']['keys'].get('remove_text')
+        if st_settings['server_chat']['keys'].get('remove_message'):
+            remove_dict['server_chat'] = st_settings['server_chat']['keys'].get('remove_text')
         return remove_dict
 
 
