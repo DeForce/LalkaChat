@@ -7,7 +7,6 @@ import re
 import string
 import threading
 import time
-from collections import OrderedDict
 
 import requests
 from ws4py.client.threadedclient import WebSocketClient
@@ -34,7 +33,7 @@ PING_DELAY = 10
 CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['show_pm'] = LCBool(True)
-CONF_DICT['config']['socket'] = LCText('wss://peka2.tv/socket.io/')
+CONF_DICT['config']['socket'] = LCText('wss://chat.peka2.tv/')
 CONF_DICT['config']['show_channel_names'] = LCBool(True)
 
 CONF_GUI = {
@@ -198,7 +197,7 @@ class FsChat(WebSocketClient):
                 else:
                     log.error("Unable to get channel ID. No message available")
                     self.closed(4000, 'INV_CH_ID')
-        except requests.ConnectionError:
+        except:
             log.info("Unable to get information from api")
         return None
 

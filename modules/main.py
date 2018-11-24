@@ -13,7 +13,7 @@ from modules.helper.functions import get_class_from_iname, get_modules_in_folder
 from modules.helper.module import ConfigModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
-    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_update, ModuleLoadException, \
+    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, ModuleLoadException, \
     get_languages
 from modules.helper.updater import get_available_versions
 from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSlider, LCChooseMultiple, \
@@ -24,7 +24,9 @@ VERSION = '0.4.0'
 SEM_VERSION = semantic_version.Version(VERSION)
 LOG_FILES_COUNT = 5
 HIDDEN_CHATS = ['hitbox', 'beampro']
-DEFAULT_BRANCH = 'develop'
+
+with open('default_branch') as branch_file:
+    DEFAULT_BRANCH = branch_file.read().strip()
 
 
 class MainModule(ConfigModule):
@@ -89,7 +91,7 @@ def main(root_logger):
     main_config_dict['gui_information']['pos_x'] = LCText('10')
     main_config_dict['gui_information']['pos_y'] = LCText('10')
     main_config_dict['system'] = LCStaticBox()
-    main_config_dict['system']['log_level'] = LCText('INFO')
+    main_config_dict['system']['log_level'] = LCDropdown('INFO', available_list=['DEBUG', 'INFO', 'ERROR'])
     main_config_dict['system']['testing_mode'] = LCBool(False)
     main_config_dict['system']['check_updates'] = LCBool(True)
     main_config_dict['system']['current_version'] = LCText(0)
@@ -154,11 +156,12 @@ def main(root_logger):
                 loaded_modules['main']['update'] = True
                 loaded_modules['main']['update_url'] = versions[channel][unicode(latest_version)]['url']
                 loaded_modules['main']['update_version'] = latest_version
-            else:
-                loaded_modules['main']['update'] = False
 
     if loaded_modules['main'].get('update'):
         log.info("There is new update, please update!")
+    else:
+        loaded_modules['main']['update'] = False
+
     logging.info('Current Version: %s', main_config_dict['system']['current_version'])
 
     # Main GUI Settings

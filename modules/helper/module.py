@@ -1,12 +1,10 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import collections
 import logging
 import os
 
-from modules.helper.functions import deep_get
 from modules.helper import parser
 from modules.helper.message import TextMessage, Message
-from modules.interface.types import LCPanel, LCStaticBox, LCBool, LCList
+from modules.interface.types import LCPanel, LCStaticBox, LCBool, LCList, deep_get
 from parser import save_settings, load_from_config_file
 from system import RestApiException, CONF_FOLDER
 
@@ -113,7 +111,7 @@ class BaseModule(object):
     def gui_button_press(self, *args):
         pass
 
-    def apply_settings(self, system_exit=False, changes=None):
+    def apply_settings(self, system_exit=False, changes=None, **kwargs):
         """
         :param changes: dictionary of keys that were changed
         :param system_exit: are we exiting finally

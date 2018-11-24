@@ -83,6 +83,7 @@ node('docker-host') {
         checkout scm
         sh 'mkdir -p results'
         sh 'rsync -avz src/jenkins/root/ ./'
+        sh 'echo ${BRANCH} > default_branch'
 
         // This comment is needed until I refactor Jenkinsfile to support proper error throwing
         // def deps = 'asdas/asdasddas/asdasda/asdasd'.split('/').last().split("\\.").first()

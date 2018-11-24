@@ -17,18 +17,17 @@ from scss.types import Color, Boolean, String, Number
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
-from modules.gui import MODULE_KEY
 from modules.helper.functions import get_themes
 from modules.helper.html_template import HTML_TEMPLATE
 from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByIDs
 from modules.helper.module import MessagingModule
-from modules.helper.parser import save_settings, convert_to_dict, update, lc_replace
-from modules.helper.system import THREADS, PYTHON_FOLDER, CONF_FOLDER, EMOTE_FORMAT, HTTP_FOLDER
+from modules.helper.parser import save_settings, convert_to_dict, update
+from modules.helper.system import THREADS, CONF_FOLDER, EMOTE_FORMAT, HTTP_FOLDER
 from modules.interface.types import *
 
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 DEFAULT_STYLE = 'default'
-DEFAULT_GUI_STYLE = 'default_gui'
+DEFAULT_GUI_STYLE = 'default'
 HISTORY_SIZE = 50
 s_queue = Queue.Queue()
 log = logging.getLogger('webchat')

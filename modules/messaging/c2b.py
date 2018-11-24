@@ -3,7 +3,6 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import logging
 import random
-import re
 
 from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule

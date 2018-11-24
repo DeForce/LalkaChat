@@ -1,7 +1,7 @@
 requests
-cherrypy
+cherrypy<18.0.0
 ws4py>=0.4.2
-irc
+irc<17.0
 semantic_version
 jinja2
 pyScss

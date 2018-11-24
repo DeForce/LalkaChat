@@ -9,6 +9,7 @@ levels.db*
 /dl
 *.log
 govno_rutony.py
+default_branch
 /node_modules/
 /http
 **/dist

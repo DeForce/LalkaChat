@@ -7,7 +7,7 @@ import datetime
 from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.module import MessagingModule
 from modules.helper.system import CONF_FOLDER
-from modules.interface.types import *
+from modules.interface.types import LCPanel, LCStaticBox, LCBool, LCText
 
 CONF_DICT = LCPanel()
 CONF_DICT['config'] = LCStaticBox()

@@ -5,7 +5,6 @@ import imp
 import os
 
 from modules.helper.system import PYTHON_FOLDER
-from modules.interface.types import LCDict
 
 
 def find_by_type(data, type_to_find):
@@ -30,20 +29,6 @@ def parse_keys_to_string(data):
             if keys_from_dict:
                 keys.extend(['.'.join([name] + [item]) for item in keys_from_dict])
     return keys
-
-
-def dict_instance(d):
-    return isinstance(d, (collections.Mapping, LCDict))
-
-
-def deep_get(dictionary, *keys):
-    return reduce(lambda d, key: d.get(key, None) if dict_instance(d) else None, keys, dictionary)
-
-
-def get_unicode(string):
-    if isinstance(string, str):
-        return string.decode('utf8')
-    return string
 
 
 def get_config_item_path(*keys):
