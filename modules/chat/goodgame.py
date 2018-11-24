@@ -33,7 +33,7 @@ API = 'http://api2.goodgame.ru/{}'
 CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['show_pm'] = LCBool(True)
-CONF_DICT['config']['socket'] = LCText('ws://chat.goodgame.ru:8081/chat/websocket')
+CONF_DICT['config']['socket'] = LCText('wss://chat.goodgame.ru/chat/websocket')
 CONF_DICT['config']['show_channel_names'] = LCBool(True)
 CONF_DICT['config']['use_channel_id'] = LCBool(False)
 CONF_DICT['config']['check_viewers'] = LCBool(True)
@@ -70,40 +70,42 @@ class GoodgameTextMessage(TextMessage):
 
     def process_smiles(self, smiles, rights, premium, prems, payments):
         emotes = {}
-        smiles_array = re.findall(SMILE_REGEXP, self._text)
+        smiles_array = [item[1:-1] for item in self._text.split() if re.match(SMILE_REGEXP, item)]
         for smile in smiles_array:
-            if smile in smiles:
-                smile_info = smiles.get(smile)
-                allow = False
-                gif = False
-                if rights >= 40:
-                    allow = True
-                elif rights >= 20 \
-                        and (smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603'):
-                    allow = True
-                elif smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603':
-                    if not smile_info['is_premium']:
-                        if smile_info['donate_lvl'] == 0:
-                            allow = True
-                        elif smile_info['donate_lvl'] <= int(payments):
-                            allow = True
+            if smile not in smiles:
+                continue
+
+            smile_info = smiles.get(smile)
+            allow = False
+            gif = False
+            if rights >= 40:
+                allow = True
+            elif rights >= 20 \
+                    and (smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603'):
+                allow = True
+            elif smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603':
+                if not smile_info['is_premium']:
+                    if smile_info['donate_lvl'] == 0:
+                        allow = True
+                    elif smile_info['donate_lvl'] <= int(payments):
+                        allow = True
+                else:
+                    if premium:
+                        allow = True
+
+            for premium_item in prems:
+                if smile_info['channel_id'] == str(premium_item):
+                    if smile_info['is_premium']:
+                        allow = True
+                        gif = True
+
+            if allow:
+                self._text = self._text.replace(SMILE_FORMAT.format(smile), EMOTE_FORMAT.format(smile))
+                if smile not in emotes:
+                    if gif and smile_info['urls']['gif']:
+                        emotes[smile] = {'emote_url': smile_info['urls']['gif']}
                     else:
-                        if premium:
-                            allow = True
-
-                for premium_item in prems:
-                    if smile_info['channel_id'] == str(premium_item):
-                        if smile_info['is_premium']:
-                            allow = True
-                            gif = True
-
-                if allow:
-                    self.text = self.text.replace(SMILE_FORMAT.format(smile), EMOTE_FORMAT.format(smile))
-                    if smile not in emotes:
-                        if gif and smile_info['urls']['gif']:
-                            emotes[smile] = {'emote_url': smile_info['urls']['gif']}
-                        else:
-                            emotes[smile] = {'emote_url': smile_info['urls']['big']}
+                        emotes[smile] = {'emote_url': smile_info['urls']['big']}
         self._emotes = [Emote(emote, data['emote_url']) for emote, data in emotes.items()]
 
 
@@ -311,25 +313,6 @@ class GGChannel(threading.Thread, Channel):
             return False
 
         try:
-            self.kwargs['smiles'] = {}
-            smile_request = requests.get(API.format('smiles'))
-            next_page = smile_request.json()['_links']['first']['href']
-            while True:
-                req_smile = requests.get(next_page)
-                if req_smile.status_code == 200:
-                    req_smile_answer = req_smile.json()
-
-                    for smile in req_smile_answer['_embedded']['smiles']:
-                        self.kwargs['smiles'][smile['key']] = smile
-
-                    if 'next' in req_smile_answer['_links']:
-                        next_page = req_smile_answer['_links']['next']['href']
-                    else:
-                        break
-        except Exception as exc:
-            log.error("Unable to download smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))
-
-        try:
             if self.ch_id:
                 request = requests.get(API.format('streams/{}').format(self.ch_id))
                 if request.status_code == 200:
@@ -342,6 +325,40 @@ class GGChannel(threading.Thread, Channel):
                     self.ch_id = request.json()['channel']['id']
         except Exception as exc:
             log.warning("Unable to get channel name, error {0}\nArgs: {1}".format(exc.message, exc.args))
+
+        try:
+            self.kwargs['smiles'] = {}
+            smile_request = requests.get(API.format('smiles'))
+
+            if not smile_request.ok:
+                raise IndexError('URL Error {}'.format(smile_request.reason))
+
+            req_json = smile_request.json()
+            page_count = req_json['page_count']
+
+            for page_index in range(0, page_count):
+                page_number = page_index+1
+
+                page = requests.get(API.format('smiles?page={}'.format(page_number)))
+                logging.info('Processing page {}'.format(page_number))
+                if not page.ok:
+                    raise IndexError('URL Error at index {}, {}'.format(page_number, smile_request.reason))
+
+                for smile in page.json()['_embedded']['smiles']:
+                    smile_key = smile['key'].lower()
+
+                    if smile_key in self.kwargs['smiles']:
+                        logging.error('Smile {} already exists at page {}'.format(
+                            smile_key,
+                            self.kwargs['smiles'][smile_key]['page']))
+                        smile_key = '{}-dup'.format(smile_key)
+                    smile['page'] = page_number
+                    self.kwargs['smiles'][smile_key] = smile
+            with open('gg_smiles.json', 'w') as gg_smiles:
+                json.dump(self.kwargs['smiles'], gg_smiles, indent=2)
+
+        except Exception as exc:
+            log.error("Unable to download smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
         return True
 
