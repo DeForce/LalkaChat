@@ -13,6 +13,7 @@ data = [
     ('libs/windows/locales', 'locales'),
     ('libs/windows/icudt.dll', ''),
     ('libs/windows/subprocess.exe', ''),
+    ('default_branch', ''),
 ]
 
 a = Analysis(['main.py'],
