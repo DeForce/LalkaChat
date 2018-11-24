@@ -14,7 +14,6 @@ CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['logging'] = LCBool(True)
 CONF_DICT['config']['file_format'] = LCText('%Y-%m-%d')
 CONF_DICT['config']['message_date_format'] = LCText('%Y-%m-%d %H:%M:%S')
-CONF_DICT['config']['rotation'] = LCText('daily')
 
 CONF_GUI = {'non_dynamic': ['config.*']}
 
@@ -27,7 +26,6 @@ class Logger(MessagingModule):
         self.format = CONF_DICT['config']['file_format']
         self.ts_format = str(CONF_DICT['config']['message_date_format'])
         self.logging = CONF_DICT['config']['logging']
-        self.rotation = CONF_DICT['config']['rotation']
 
         self.folder = 'logs'
 
@@ -46,9 +44,10 @@ class Logger(MessagingModule):
     def process_message(self, message, **kwargs):
         with open('{0}.txt'.format(
                 os.path.join(self.destination, datetime.datetime.now().strftime(str(self.format)))), 'a') as f:
-            f.write('[{3}] [{0}] {1}: {2}\n'.format(
+            f.write('[{}] [{}] [{}] {}: {}\n'.format(
+                datetime.datetime.now().strftime(self.ts_format).encode('utf-8'),
                 message.platform.id.encode('utf-8'),
+                message.channel_name,
                 message.user.encode('utf-8'),
-                message.text.encode('utf-8'),
-                datetime.datetime.now().strftime(self.ts_format).encode('utf-8')))
+                message.text.encode('utf-8')))
         return message
