@@ -340,22 +340,14 @@ class GGChannel(threading.Thread, Channel):
                 page_number = page_index+1
 
                 page = requests.get(API.format('smiles?page={}'.format(page_number)))
-                logging.info('Processing page {}'.format(page_number))
                 if not page.ok:
                     raise IndexError('URL Error at index {}, {}'.format(page_number, smile_request.reason))
 
                 for smile in page.json()['_embedded']['smiles']:
                     smile_key = smile['key'].lower()
 
-                    if smile_key in self.kwargs['smiles']:
-                        logging.error('Smile {} already exists at page {}'.format(
-                            smile_key,
-                            self.kwargs['smiles'][smile_key]['page']))
-                        smile_key = '{}-dup'.format(smile_key)
                     smile['page'] = page_number
                     self.kwargs['smiles'][smile_key] = smile
-            with open('gg_smiles.json', 'w') as gg_smiles:
-                json.dump(self.kwargs['smiles'], gg_smiles, indent=2)
 
         except Exception as exc:
             log.error("Unable to download smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))

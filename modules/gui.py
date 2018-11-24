@@ -136,8 +136,7 @@ class SettingsWindow(wx.Frame):
 
     def on_change(self, key, value, item_type=None, section=False):
         def enable_button():
-            for button in self.buttons[MODULE_KEY.join(['settings', 'apply_button'])]:
-                button.Enable()
+            self.buttons['apply'].Enable()
 
         def compare_2d_lists(list1, list2):
             return not set(map(tuple, list1)) ^ set(map(tuple, list2))
