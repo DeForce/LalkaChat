@@ -1,4 +1,4 @@
-    # Copyright (C) 2016   CzT/Vladislav Ivanov
+# Copyright (C) 2016   CzT/Vladislav Ivanov
 import shutil
 import sys
 

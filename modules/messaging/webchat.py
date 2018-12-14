@@ -148,9 +148,6 @@ class MessagingThread(threading.Thread):
             add_to_history(message)
             process_command(message)
 
-            if isinstance(message, SystemMessage) and not self.settings['server_chat']['keys'].get('show_system_msg', True):
-                continue
-
             if not message.only_gui:
                 self.send_message(message, 'server_chat')
             self.send_message(message, 'gui_chat')
@@ -160,6 +157,10 @@ class MessagingThread(threading.Thread):
         self.running = False
 
     def send_message(self, message, chat_type):
+        show_sys_msg = self.settings[chat_type]['keys']['show_system_msg']
+        if not show_sys_msg:
+            return
+
         send_message = prepare_message(message.json(), self.settings[chat_type], type(message))
         ws_list = cherrypy.engine.publish('get-clients', chat_type)[0]
         for ws in ws_list:

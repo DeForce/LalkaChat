@@ -28,7 +28,7 @@ SMILE_REGEXP = r':(\w+|\d+):'
 SMILE_FORMAT = ':{}:'
 API_URL = 'https://peka2.tv/api{}'
 
-PING_DELAY = 10
+PING_DELAY = 20
 
 CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['config'] = LCStaticBox()
@@ -56,16 +56,6 @@ CHANNEL_JOIN_SUCCESS = translate_key(MODULE_KEY.join(['sc2tv', 'join_success']))
 
 class Peka2TVAPIError(Exception):
     pass
-
-
-def get_channel_name(channel_name):
-    payload = {
-        'slug': channel_name
-    }
-    channel_req = requests.post(API_URL.format('/stream'), timeout=5, data=payload)
-    if channel_req.ok:
-        return channel_req.json()['owner']['name']
-    return channel_name
 
 
 def allow_smile(smile, subscriptions, allow=False):
@@ -118,7 +108,6 @@ class FsChat(WebSocketClient):
         self.source = SOURCE
         self.queue = queue
         self.channel_name = channel_name
-        self.glob = kwargs.get('glob')
 
         self.main_thread = kwargs.get('main_thread')  # type: FsChannel
         self.chat_module = kwargs.get('chat_module')  # type: SC2TV
@@ -150,18 +139,18 @@ class FsChat(WebSocketClient):
         self.main_thread.status = CHANNEL_OFFLINE
         if code in [4000, 4001]:
             self.crit_error = True
-            self.fs_system_message(CONNECTION_CLOSED.format(self.glob),
+            self.fs_system_message(CONNECTION_CLOSED.format(self.channel_name),
                                    category='connection')
         else:
             log.info("Websocket Connection Closed Down with error %s, %s", code, reason)
             self.fs_system_message(
-                CONNECTION_DIED.format(self.glob),
+                CONNECTION_DIED.format(self.channel_name),
                 category='connection')
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
     def fs_system_message(self, message, category='system'):
-        self.queue.put(FsSystemMessage(message, category=category, channel_name=self.glob))
+        self.queue.put(FsSystemMessage(message, category=category, channel_name=self.channel_name))
 
     def received_message(self, mes):
         log.debug('received message {}'.format(mes))
@@ -181,12 +170,10 @@ class FsChat(WebSocketClient):
     def fs_get_id(self):
         # We get ID from POST request to funstream API, and it hopefuly
         #  answers us the correct ID of the channel we need to connect to
-        payload = {
-            'name': self.channel_name
-        }
+        payload = {'name': self.channel_name}
         try:
             request = requests.post(API_URL.format("/user"), data=payload, timeout=5)
-            if request.status_code == 200:
+            if request.ok:
                 channel_id = json.loads(re.findall('{.*}', request.text)[0])['id']
                 return channel_id
             else:
@@ -206,16 +193,11 @@ class FsChat(WebSocketClient):
         #  hope it joins us
         logging.debug("Joining Channel {}".format(str(self.channel_id)))
         if self.channel_id:
-            payload = [
-                '/chat/join',
-                {
-                    'channel': 'stream/{0}'.format(str(self.channel_id))
-                }
-            ]
+            payload = ['/chat/join', {'channel': 'stream/{0}'.format(str(self.channel_id))}]
             self.fs_send(payload)
 
             msg_joining = CONNECTION_JOINING
-            self.fs_system_message(msg_joining.format(self.glob), category='connection')
+            self.fs_system_message(msg_joining.format(self.channel_name), category='connection')
             log.debug(msg_joining.format(self.channel_id))
 
     def fs_send(self, payload):
@@ -278,14 +260,14 @@ class FsChat(WebSocketClient):
 
     def _process_joined(self):
         self.main_thread.status = CHANNEL_ONLINE
-        self.fs_system_message(CHANNEL_JOIN_SUCCESS.format(self.glob), category='connection')
+        self.fs_system_message(CHANNEL_JOIN_SUCCESS.format(self.channel_name), category='connection')
 
     def _process_channel_list(self, message):
         self.main_thread.viewers = message['result']['amount']
 
     def _post_process_multiple_channels(self, message):
         if self.chat_module.conf_params()['config']['config']['show_channel_names']:
-            message.channel_name = self.glob
+            message.channel_name = self.channel_name
 
     def _send_message(self, comp):
         self._post_process_multiple_channels(comp)
@@ -309,8 +291,8 @@ class FsPingThread(threading.Thread):
 
 class FsChannel(threading.Thread, Channel):
     def __init__(self, queue, socket, channel_name, **kwargs):
-        threading.Thread.__init__(self)
         Channel.__init__(self)
+        threading.Thread.__init__(self)
 
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -318,12 +300,13 @@ class FsChannel(threading.Thread, Channel):
         self.daemon = "True"
         self.queue = queue
         self.socket = str(socket)
-        self.channel_name = get_channel_name(channel_name)
-        self.glob = channel_name
         self.chat_module = kwargs.get('chat_module')
         self.smiles = []
-        self.ws = None
         self.kwargs = kwargs
+
+        self.slug = channel_name
+        self.channel_name = self.get_channel_name()
+        self.ws = None
 
     def run(self):
         self.connect()
@@ -335,7 +318,7 @@ class FsChannel(threading.Thread, Channel):
             try_count += 1
             log.info("Connecting, try {0}".format(try_count))
             self._get_info()
-            self.ws = FsChat(self.socket, self.queue, self.channel_name, glob=self.glob,
+            self.ws = FsChat(self.socket, self.queue, self.channel_name,
                              protocols=['websocket'], smiles=self.smiles,
                              main_thread=self, **self.kwargs)
             if self.ws.crit_error:
@@ -347,31 +330,28 @@ class FsChannel(threading.Thread, Channel):
                 break
             time.sleep(5)
 
+    def get_channel_name(self):
+        payload = {'slug': self.slug}
+        channel_req = requests.post(API_URL.format('/stream'), timeout=5, data=payload)
+        if channel_req.ok:
+            r_json = channel_req.json()
+            return r_json['owner']['name']
+
     def stop(self):
         self.ws.send("11")
         self.ws.close(4000, reason="CLOSE_OK")
 
     def get_viewers(self):
-        user_data = {'name': self.glob}
-        status_data = {'slug': self.glob}
+        status_data = {'slug': self.slug}
         request = ['/chat/channel/list', {'channel': 'stream/{0}'.format(str(self.ws.channel_id))}]
-
         try:
-            user_request = requests.post(API_URL.format('/user'), timeout=5, data=user_data)
-            if user_request.status_code == 200:
-                status_data['slug'] = user_request.json()['slug']
-        except requests.ConnectionError:
-            log.error("Unable to get user slug")
-
-        try:
-            status_request = requests.post(API_URL.format('/stream'), timeout=5, data=status_data)
-            if status_request.status_code == 200:
+            status_request = requests.post(API_URL.format('/stream'), timeout=10, data=status_data)
+            if status_request.ok:
                 if status_request.json()['online']:
-                    self.status = CHANNEL_ONLINE
+                    self._status = CHANNEL_ONLINE
                     self.ws.fs_send(request)
                 else:
-                    self.viewers = CHANNEL_NO_VIEWERS
-
+                    self._viewers = CHANNEL_NO_VIEWERS
         except requests.ConnectionError:
             log.error("Unable to get viewers")
 
@@ -379,9 +359,8 @@ class FsChannel(threading.Thread, Channel):
         if not self.smiles:
             try:
                 smiles = requests.post(API_URL.format('/smile'), timeout=5)
-                if smiles.status_code == 200:
-                    smiles_answer = smiles.json()
-                    for smile in smiles_answer:
+                if smiles.ok:
+                    for smile in smiles.json():
                         self.smiles.append(smile)
             except requests.ConnectionError:
                 log.error("Unable to get smiles")
