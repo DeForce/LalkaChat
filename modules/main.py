@@ -6,6 +6,7 @@ import logging
 import logging.config
 import logging.handlers
 import os
+import sys
 from collections import OrderedDict
 from time import sleep
 import semantic_version
@@ -19,6 +20,26 @@ from modules.helper.updater import get_available_versions
 from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSlider, LCChooseMultiple, \
     LCDropdown
 from modules.message_handler import Message
+
+if sys.platform.lower().startswith('win'):
+    import ctypes
+
+    def hide_console():
+        """
+        Hides the console window in GUI mode. Necessary for frozen application, because
+        this application support both, command line processing AND GUI mode and theirfor
+        cannot be run via pythonw.exe.
+        """
+
+        whnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if whnd != 0:
+            ctypes.windll.user32.ShowWindow(whnd, 0)
+
+    def show_console():
+        """Unhides console window"""
+        whnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if whnd != 0:
+            ctypes.windll.user32.ShowWindow(whnd, 1)
 
 VERSION = '0.4.0'
 SEM_VERSION = semantic_version.Version(VERSION)
@@ -105,6 +126,7 @@ def main(root_logger):
     main_config_dict['gui']['on_top'] = LCBool(True)
     main_config_dict['gui']['show_browser'] = LCBool(True)
     main_config_dict['gui']['show_counters'] = LCBool(True)
+    main_config_dict['gui']['show_console'] = LCBool(False)
     main_config_dict['gui']['transparency'] = LCSlider(0, min_v=0, max_v=90)
     main_config_dict['gui']['borderless'] = LCBool(False)
     main_config_dict['gui']['reload'] = LCButton(button_test)
@@ -142,6 +164,11 @@ def main(root_logger):
     loaded_modules['main'] = main_class.conf_params()
     main_config = main_class.conf_params()['config']
     root_logger.setLevel(level=logging.getLevelName(str(main_config['system'].get('log_level', 'INFO'))))
+
+    if sys.platform.lower().startswith('win'):
+        if getattr(sys, 'frozen', False):
+            if not main_config['gui']['show_console']:
+                hide_console()
 
     # Checking for updates
     log.info("Checking for updates")

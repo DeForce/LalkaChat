@@ -5,10 +5,11 @@ wget -r --cut-dirs=1 -nH -np --reject index.html $WINDOWS_BINARIES_PATH
 docker run -v "$(pwd):/src/" ${BUILDER_CONTAINER}
 
 cp -r http/ dist/windows/main/http/
-# Because windows
-chmod a+x -R dist/windows/main/
 # Rename to chat name
 mv dist/windows/main dist/windows/LalkaChat
+
+# Because windows
+chmod a+x -R dist/windows/LalkaChat/
 
 cd dist/windows
 zip -r ${ZIP_NAME}.zip LalkaChat

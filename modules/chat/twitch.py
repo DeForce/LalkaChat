@@ -13,7 +13,7 @@ import requests
 from modules.helper.parser import update
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUsers
-from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_OFFLINE
+from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING
 from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE, register_iodc
 from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool, LCButton
 
@@ -43,6 +43,7 @@ CONF_DICT['config']['host'] = LCText('irc.twitch.tv')
 CONF_DICT['config']['port'] = LCText(6667)
 CONF_DICT['config']['show_pm'] = LCBool(True)
 CONF_DICT['config']['bttv'] = LCBool(True)
+CONF_DICT['config']['frankerz'] = LCBool(True)
 CONF_DICT['config']['show_channel_names'] = LCBool(True)
 CONF_DICT['config']['show_nickname_colors'] = LCBool(False)
 CONF_DICT['config']['register_oidc'] = LCButton(register_iodc)
@@ -81,7 +82,7 @@ class TwitchAPIError(Exception):
 
 class TwitchTextMessage(TextMessage):
     def __init__(self, user, text, me):
-        self.bttv_emotes = {}
+        self.custom_emotes = {}
         self.bits = {}
         TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
                              user=user, text=text, me=me)
@@ -109,8 +110,8 @@ class TwitchMessageHandler(threading.Thread):
 
         self.irc_class = kwargs.get('irc_class')  # type: IRC
         self.nick = kwargs.get('nick')
-        self.bttv = kwargs.get('bttv_smiles_dict', {})
         self.badges = kwargs.get('badges')
+        self.custom_smiles = kwargs.get('custom_smiles', {})
         self.custom_badges = kwargs.get('custom_badges')
         self.bits = self._reformat_bits(kwargs.get('bits'))
 
@@ -174,14 +175,13 @@ class TwitchMessageHandler(threading.Thread):
                             emote_pos_diap.split(','))
             )
 
-    def _handle_bttv_smiles(self, message):
+    def _handle_custom_smiles(self, message):
         for word in message.text.split():
-            if word in self.bttv:
-                bttv_smile = self.bttv.get(word)
-                message.bttv_emotes[bttv_smile['regex']] = Emote(
-                    bttv_smile['regex'],
-                    'https:{0}'.format(bttv_smile['url'])
-                )
+            if word in self.custom_smiles:
+                custom_smile = self.custom_smiles.get(word)
+                message.custom_emotes[custom_smile['key']] = Emote(
+                    custom_smile['key'],
+                    custom_smile['url'])
 
     def _handle_pm(self, message):
         if re.match('^@?{0}[ ,]?'.format(self.nick), message.text.lower()):
@@ -224,7 +224,7 @@ class TwitchMessageHandler(threading.Thread):
             elif tag_key == 'color' and tag_value:
                 self._handle_viewer_color(message, tag_value)
 
-        self._handle_bttv_smiles(message)
+        self._handle_custom_smiles(message)
         self._handle_pm(message)
 
         if sub_message:
@@ -293,7 +293,7 @@ class TwitchMessageHandler(threading.Thread):
 
     @staticmethod
     def _post_process_bttv_emotes(message):
-        for emote, data in message.bttv_emotes.iteritems():
+        for emote, data in message.custom_emotes.iteritems():
             message.text = message.text.replace(emote, EMOTE_FORMAT.format(emote))
             message.emotes.append(data)
 
@@ -423,7 +423,7 @@ class IRC(irc.client.SimpleIRCClient):
 
 
 class TWChannel(threading.Thread, Channel):
-    def __init__(self, queue, host, port, channel, bttv_smiles, anon=True, **kwargs):
+    def __init__(self, queue, host, port, channel, anon=True, **kwargs):
         threading.Thread.__init__(self)
         Channel.__init__(self)
 
@@ -436,15 +436,16 @@ class TWChannel(threading.Thread, Channel):
         self.host = host
         self.port = port
         self.channel = channel
-        self.bttv_smiles = bttv_smiles
+        self.custom_smiles = {}
+
+        self.bttv = kwargs.get('bttv')
+        self.frankerz = kwargs.get('frankerz')
+
         self.kwargs = kwargs
         self.chat_module = kwargs.get('chat_module')
         self.display_name = None
         self.channel_id = None
         self.irc = None
-
-        if bttv_smiles:
-            self.kwargs['bttv_smiles_dict'] = {}
 
         # For anonymous log in Twitch wants username in special format:
         #
@@ -465,8 +466,11 @@ class TWChannel(threading.Thread, Channel):
             try_count += 1
             log.info("Connecting, try {0}".format(try_count))
             try:
+                self.status = CHANNEL_PENDING
                 if self.load_config():
-                    self.irc = IRC(self.queue, self.channel, main_class=self, **self.kwargs)
+                    self.irc = IRC(
+                        self.queue, self.channel, main_class=self, custom_smiles=self.custom_smiles,
+                        **self.kwargs)
                     self.irc.connect(self.host, self.port, self.nickname)
                     self.status = CHANNEL_ONLINE
                     self.irc.start()
@@ -515,15 +519,37 @@ class TWChannel(threading.Thread, Channel):
 
         try:
             # Getting Better Twitch TV smiles
-            if self.bttv_smiles:
+            if self.bttv:
                 request = requests.get("https://api.betterttv.net/emotes", timeout=10)
                 if request.status_code == 200:
                     for smile in request.json()['emotes']:
-                        self.kwargs['bttv_smiles_dict'][smile.get('regex')] = smile
+                        self.custom_smiles[smile['regex']] = {
+                            'key': smile['regex'],
+                            'url': 'https:{}'.format(smile['url'])
+                        }
                 else:
                     raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:
             log.warning("Unable to get BTTV smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))
+
+        try:
+            # Getting FrankerZ smiles
+            if self.frankerz:
+                request = requests.get("https://api.frankerfacez.com/v1/room/id/{}".format(self.channel_id), timeout=10)
+                if request.status_code == 200:
+                    req_json = request.json()
+                    for set_name, s_set in req_json['sets'].items():
+                        for smile in s_set['emoticons']:
+                            urls = smile['urls']
+                            url = urls.get('4', urls.get('2', urls.get('1')))
+                            self.custom_smiles[smile['name']] = {
+                                'key': smile['name'],
+                                'url': 'https:{}'.format(url)
+                            }
+                else:
+                    raise Exception("Not successful status code: {0}".format(request.status_code))
+        except Exception as exc:
+            log.warning("Unable to get FrankerZ smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
         try:
             # Getting standard twitch badges
@@ -643,6 +669,7 @@ class Twitch(ChatModule):
         self.host = CONF_DICT['config']['host']
         self.port = int(CONF_DICT['config']['port'])
         self.bttv = CONF_DICT['config']['bttv']
+        self.frankerz = CONF_DICT['config']['frankerz']
         self.access_code = self._conf_params['config'].get('access_code')
         if self.access_code:
             headers['Authorization'] = 'OAuth {}'.format(self.access_code)
@@ -666,7 +693,7 @@ class Twitch(ChatModule):
         self._conf_params['settings']['remove_text'] = self.get_remove_text()
 
     def _add_channel(self, chat):
-        self.channels[chat] = TWChannel(self.queue, self.host, self.port, chat, self.bttv,
+        self.channels[chat] = TWChannel(self.queue, self.host, self.port, chat, bttv=self.bttv, frankerz=self.frankerz,
                                         settings=self._conf_params['settings'], chat_module=self)
         self.channels[chat].start()
 
