@@ -68,6 +68,10 @@ CHANNEL_JOIN_SUCCESS = translate_key(MODULE_KEY.join(['twitch', 'join_success'])
 CHANNEL_JOINING = translate_key(MODULE_KEY.join(['twitch', 'joining']))
 
 
+def _parse_msg(msg):
+    return TwitchMessage(msg)
+
+
 class TwitchUserError(Exception):
     """Exception for twitch user error"""
 
@@ -80,24 +84,27 @@ class TwitchAPIError(Exception):
     """Exception of API"""
 
 
+class TwitchMessage(object):
+    def __init__(self, msg):
+        self.arguments = msg.arguments
+        self.source = msg.source
+        self.tags = {tag['key']: tag['value'] for tag in msg.tags if tag['value']}
+        self.type = msg.type
+
+
 class TwitchTextMessage(TextMessage):
-    def __init__(self, user, text, me):
-        self.custom_emotes = {}
+    def __init__(self, msg, me, sub_message):
+        self.tags = msg.tags
         self.bits = {}
+        user = msg.tags['display-name'] if 'display-name' in msg.tags else msg.source.split('!')[0]
         TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
-                             user=user, text=text, me=me)
+                             user=user, text=msg.arguments.pop(), me=me, sub_message=sub_message)
 
 
 class TwitchSystemMessage(SystemMessage):
     def __init__(self, text, category='system', **kwargs):
         SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
                                user=SYSTEM_USER, category=category, **kwargs)
-
-
-class TwitchEmote(Emote):
-    def __init__(self, emote_id, emote_url, positions):
-        Emote.__init__(self, emote_id=emote_id, emote_url=emote_url)
-        self.positions = positions
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -118,37 +125,51 @@ class TwitchMessageHandler(threading.Thread):
         self.chat_module = kwargs.get('chat_module')
         self.kwargs = kwargs
 
+        self.message_functions = {
+            'pubmsg': self._handle_message,
+            'action': self._handle_action,
+            'clearchat': self._handle_clearchat,
+            'usernotice': self._handle_usernotice
+        }
+        self.usernotice_functions = {
+            'sub': self._handle_sub,
+            'resub': self._handle_sub,
+            'subgift': self._handle_subgift,
+            'anonsubgift': self._handle_subgift,
+            'raid': self._handle_raid,
+            'ritual': self._handle_ritual
+        }
+
     def run(self):
         while True:
             self.process_message(self.twitch_queue.get())
 
-    def process_message(self, msg):
+    def process_message(self, recv_msg):
         # After we receive the message we have to process the tags
         # There are multiple things that are available, but
         #  for now we use only display-name, which is case-able.
         # Also, there is slight problem with some users, they don't have
         #  the display-name tag, so we have to check their "real" username
         #  and capitalize it because twitch does so, so we do the same.
-        if msg.type in ['pubmsg']:
-            self._handle_message(msg)
-        elif msg.type in ['action']:
-            self._handle_message(msg, me=True)
-        elif msg.type in ['clearchat']:
-            self._handle_clearchat(msg)
-        elif msg.type in ['usernotice']:
-            self._handle_usernotice(msg)
+        msg = _parse_msg(recv_msg)
+        if msg.type in self.message_functions:
+            self.message_functions[msg.type](msg)
 
-    def _handle_badges(self, message, badges):
-        for badge in badges.split(','):
+    def _handle_action(self, msg):
+        self._handle_message(msg, me=True)
+
+    def _handle_badges(self, message):
+        for badge in message.tags['badges'].split(','):
             badge_tag, badge_size = badge.split('/')
             # Fix some of the names
             badge_tag = badge_tag.replace('moderator', 'mod')
 
             if badge_tag in self.custom_badges:
                 badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
-                url = badge_info.get('image_url_4x',
-                                     badge_info.get('image_url_2x',
-                                                    badge_info.get('image_url_1x')))
+                for key in ['image_url_4x', 'image_url_2x', 'image_url_1x']:
+                    if key in badge_info:
+                        break
+                url = badge_info.get(key)
             elif badge_tag in self.badges:
                 badge_info = self.badges.get(badge_tag)
                 if 'svg' in badge_info:
@@ -159,29 +180,35 @@ class TwitchMessageHandler(threading.Thread):
                     url = 'none'
             else:
                 url = NOT_FOUND
-            message.badges.append(Badge(badge_tag, url))
+            message.add_badge(badge_tag, url)
 
     @staticmethod
-    def _handle_display_name(message, name):
-        message.user = name if name else message.user
-
-    @staticmethod
-    def _handle_emotes(message, tag_value):
-        for emote in tag_value.split('/'):
+    def _handle_emotes(message):
+        conveyor_emotes = []
+        for emote in message.tags['emotes'].split('/'):
             emote_id, emote_pos_diap = emote.split(':')
-            message.emotes.append(
-                TwitchEmote(emote_id,
-                            EMOTE_SMILE_URL.format(id=emote_id),
-                            emote_pos_diap.split(','))
-            )
 
-    def _handle_custom_smiles(self, message):
-        for word in message.text.split():
+            for position in emote_pos_diap.split(','):
+                start, end = position.split('-')
+                conveyor_emotes.append({'emote_id': emote_id,
+                                        'start': int(start),
+                                        'end': int(end)})
+        conveyor_emotes = sorted(conveyor_emotes, key=lambda k: k['start'], reverse=True)
+
+        for emote in conveyor_emotes:
+            message.text = u'{start}{emote}{end}'.format(start=message.text[:emote['start']],
+                                                         end=message.text[emote['end'] + 1:],
+                                                         emote=EMOTE_FORMAT.format(emote['emote_id']))
+            message.add_emote(emote['emote_id'], EMOTE_SMILE_URL.format(id=emote['emote_id']))
+
+    def _handle_custom_emotes(self, message):
+        words = message.text.split()
+        for index, word in enumerate(words):
             if word in self.custom_smiles:
-                custom_smile = self.custom_smiles.get(word)
-                message.custom_emotes[custom_smile['key']] = Emote(
-                    custom_smile['key'],
-                    custom_smile['url'])
+                custom_smile = self.custom_smiles[word]
+                message.add_emote(custom_smile['key'], custom_smile['url'])
+                words[index] = EMOTE_FORMAT.format(custom_smile['key'])
+        message.text = ' '.join(words)
 
     def _handle_pm(self, message):
         if re.match('^@?{0}[ ,]?'.format(self.nick), message.text.lower()):
@@ -196,47 +223,54 @@ class TwitchMessageHandler(threading.Thread):
                                  text=text,
                                  platform=SOURCE))
 
-    def _handle_usernotice(self, msg):
-        for tag in msg.tags:
-            tag_value, tag_key = tag.values()
-            if tag_key == 'system-msg':
-                msg_text = tag_value
-                self.irc_class.system_message(msg_text, category='chat')
-                break
+    def _handle_sub(self, msg):
+        if 'system-msg' in msg.tags:
+            msg_text = msg.tags['system-msg']
+            self.irc_class.system_message(msg_text, category='chat', sub_message=True)
         if msg.arguments:
             self._handle_message(msg, sub_message=True)
 
+    def _handle_subgift(self, msg):
+        self._handle_sub(msg)
+
+    def _handle_raid(self, msg):
+        channel_image = msg.tags['msg-param-profileImageURL']
+        display_name = msg.tags['msg-param-displayName']
+        viewer_count = msg.tags['msg-param-viewerCount']
+        translate_text = translate_key('twitch.raid').format(display_name, viewer_count)
+        self.irc_class.system_message(translate_text, category='chat', sub_message=True,
+                                      badges=[Badge('raid', channel_image)])
+
+    def _handle_ritual(self, msg):
+        pass
+
+    def _handle_usernotice(self, msg):
+        if msg.tags['msg-id'] in self.usernotice_functions:
+            self.usernotice_functions[msg.tags['msg-id']](msg)
+
     def _handle_message(self, msg, sub_message=False, me=False):
-        message = TwitchTextMessage(msg.source.split('!')[0], msg.arguments.pop(), me)
+        message = TwitchTextMessage(msg, me, sub_message)
         if message.user == 'twitchnotify':
             self.irc_class.queue.put(TwitchSystemMessage(message.text, category='chat'))
 
-        for tag in msg.tags:
-            tag_value, tag_key = tag.values()
-            if tag_key == 'display-name':
-                self._handle_display_name(message, tag_value)
-            elif tag_key == 'badges' and tag_value:
-                self._handle_badges(message, tag_value)
-            elif tag_key == 'emotes' and tag_value:
-                self._handle_emotes(message, tag_value)
-            elif tag_key == 'bits' and tag_value:
-                self._handle_bits(message, int(tag_value))
-            elif tag_key == 'color' and tag_value:
-                self._handle_viewer_color(message, tag_value)
+        if 'badges' in msg.tags:
+            self._handle_badges(message)
+        if 'emotes' in msg.tags:
+            self._handle_emotes(message)
+        if 'bits' in msg.tags:
+            self._handle_bits(message)
+        if 'color' in msg.tags:
+            self._handle_viewer_color(message)
 
-        self._handle_custom_smiles(message)
+        self._handle_custom_emotes(message)
         self._handle_pm(message)
-
-        if sub_message:
-            self._handle_sub_message(message)
-
         self._send_message(message)
 
-    def _handle_viewer_color(self, message, value):
+    def _handle_viewer_color(self, message):
         if self.irc_class.chat_module.conf_params()['config']['config']['show_nickname_colors']:
-            message.nick_colour = value
+            message.nick_colour = message.tags['color']
 
-    def _handle_bits(self, message, total_amount):
+    def _handle_bits(self, message):
         for word in message.text.split():
             reg = re.match(BITS_REGEXP, word)
             if not reg:
@@ -259,43 +293,17 @@ class TwitchMessageHandler(threading.Thread):
         message.jsonable += ['sub_message']
 
     def _send_message(self, message):
-        self._post_process_emotes(message)
-        self._post_process_bttv_emotes(message)
         self._post_process_multiple_channels(message)
         self._post_process_bits(message)
         self.message_queue.put(message)
 
-    def _post_process_bits(self, message):
+    @staticmethod
+    def _post_process_bits(message):
         if not message.bits:
             return
         for emote_key, bit in message.bits.items():
             emote = emote_key.split('-')[0]
-            message.emotes.append(Emote(
-                emote,
-                bit['images'][BITS_THEME][BITS_TYPE][BITS_SCALE]
-            ))
-
-    @staticmethod
-    def _post_process_emotes(message):
-        conveyor_emotes = []
-        for emote in message.emotes:
-            for position in emote.positions:
-                start, end = position.split('-')
-                conveyor_emotes.append({'emote_id': emote.id,
-                                        'start': int(start),
-                                        'end': int(end)})
-        conveyor_emotes = sorted(conveyor_emotes, key=lambda k: k['start'], reverse=True)
-
-        for emote in conveyor_emotes:
-            message.text = u'{start}{emote}{end}'.format(start=message.text[:emote['start']],
-                                                         end=message.text[emote['end'] + 1:],
-                                                         emote=EMOTE_FORMAT.format(emote['emote_id']))
-
-    @staticmethod
-    def _post_process_bttv_emotes(message):
-        for emote, data in message.custom_emotes.iteritems():
-            message.text = message.text.replace(emote, EMOTE_FORMAT.format(emote))
-            message.emotes.append(data)
+            message.add_emote(emote, bit['images'][BITS_THEME][BITS_TYPE][BITS_SCALE])
 
     def _post_process_multiple_channels(self, message):
         channel_class = self.irc_class.main_class
@@ -349,8 +357,8 @@ class IRC(irc.client.SimpleIRCClient):
                                                 **kwargs)
         self.msg_handler.start()
 
-    def system_message(self, message, category='system'):
-        self.queue.put(TwitchSystemMessage(message, category=category, channel_name=self.nick))
+    def system_message(self, message, category='system', **kwargs):
+        self.queue.put(TwitchSystemMessage(message, category=category, channel_name=self.nick, **kwargs))
 
     def on_disconnect(self, connection, event):
         if 'CLOSE_OK' in event.arguments:
@@ -466,23 +474,23 @@ class TWChannel(threading.Thread, Channel):
             try_count += 1
             log.info("Connecting, try {0}".format(try_count))
             try:
-                self.status = CHANNEL_PENDING
+                self._status = CHANNEL_PENDING
                 if self.load_config():
                     self.irc = IRC(
                         self.queue, self.channel, main_class=self, custom_smiles=self.custom_smiles,
                         **self.kwargs)
                     self.irc.connect(self.host, self.port, self.nickname)
-                    self.status = CHANNEL_ONLINE
+                    self._status = CHANNEL_ONLINE
                     self.irc.start()
                     log.info("Connection closed")
                     break
             except TwitchUserError:
                 log.critical("Unable to find twitch user, please fix")
-                self.status = CHANNEL_OFFLINE
+                self._status = CHANNEL_OFFLINE
                 break
             except TwitchNormalDisconnect:
                 log.info("Twitch closing")
-                self.status = CHANNEL_OFFLINE
+                self._status = CHANNEL_OFFLINE
                 break
             except Exception as exc:
                 log.exception(exc)
@@ -618,22 +626,6 @@ class TWChannel(threading.Thread, Channel):
             log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
 
-class TwitchMessage(object):
-    def __init__(self, source, text, emotes=False, bits=False):
-        self.type = 'pubmsg'
-        self.source = '{0}!{0}@{0}.tmi.twitch.tv'.format(source)
-        self.arguments = [text]
-        self.tags = [
-            {'key': u'badges', 'value': u'broadcaster/1'},
-            {'key': u'color', 'value': u'#FFFFFF'},
-            {'key': u'display-name', 'value': u'{}'.format(source)},
-        ]
-        if emotes:
-            self.tags.append({'key': u'emotes', 'value': u'25:0-4'})
-        if bits:
-            self.tags.append({'key': u'bits', 'value': u'20'})
-
-
 class TestTwitch(threading.Thread):
     def __init__(self, main_class):
         super(TestTwitch, self).__init__()
@@ -658,7 +650,7 @@ class TestTwitch(threading.Thread):
         nickname = kwargs.get('nickname', 'super_tester')
         text = kwargs.get('text', 'Kappa 123')
 
-        self.tw_queue.put(TwitchMessage(nickname, text, emotes, bits))
+        self.tw_queue.put({})
 
 
 class Twitch(ChatModule):

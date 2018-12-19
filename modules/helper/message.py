@@ -137,8 +137,8 @@ class RemoveMessageByIDs(CommandMessage):
 
 class TextMessage(Message):
     def __init__(self, platform_id, icon, user, text,
-                 emotes=None, badges=None, pm=False,
-                 nick_colour=None, mid=None, me=False, channel_name=None, **kwargs):
+                 emotes=None, badges=None, pm=False, nick_colour=None, mid=None,
+                 me=False, channel_name=None, sub_message=False, **kwargs):
         """
             Text message used by main chat logic
         :param badges: Badges to display
@@ -164,10 +164,11 @@ class TextMessage(Message):
         self._nick_colour = nick_colour
         self._channel_name = channel_name
         self._id = str(mid) if mid else str(uuid.uuid1())
+        self._sub_message = sub_message
 
         self._jsonable += ['user', 'text', 'emotes', 'badges',
                            'id', 'platform', 'pm', 'nick_colour',
-                           'channel_name', 'me']
+                           'channel_name', 'me', 'sub_message']
 
     @staticmethod
     def _to_utf8(text):
@@ -201,10 +202,6 @@ class TextMessage(Message):
     @property
     def emotes(self):
         return self._emotes
-
-    @emotes.setter
-    def emotes(self, value):
-        self._emotes = value
 
     @property
     def badges(self):
@@ -249,6 +246,16 @@ class TextMessage(Message):
     @me.setter
     def me(self, value):
         self._me = value
+
+    @property
+    def sub_message(self):
+        return self._sub_message
+
+    def add_badge(self, badge_id, url):
+        self._badges.append(Badge(badge_id, url))
+
+    def add_emote(self, emote_id, url):
+        self._emotes.append(Emote(emote_id, url))
 
 
 class SystemMessage(TextMessage):

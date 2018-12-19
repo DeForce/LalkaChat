@@ -29,6 +29,7 @@ FILE_ICON = os.path.join('img', 'gg.png')
 SYSTEM_USER = 'GoodGame'
 ID_PREFIX = 'gg_{0}'
 API = 'http://api2.goodgame.ru/{}'
+SMILE_API = 'https://goodgame.ru/api/4/smiles'
 
 CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['config'] = LCStaticBox()
@@ -69,8 +70,7 @@ class GoodgameTextMessage(TextMessage):
                              user=user, text=text, mid=mid)
 
     def process_smiles(self, smiles, rights, premium, prems, payments):
-        emotes = {}
-        smiles_array = [item[1:-1] for item in self._text.split() if re.match(SMILE_REGEXP, item)]
+        smiles_array = set([item[1:-1] for item in self._text.split() if re.match(SMILE_REGEXP, item)])
         for smile in smiles_array:
             if smile not in smiles:
                 continue
@@ -81,9 +81,9 @@ class GoodgameTextMessage(TextMessage):
             if rights >= 40:
                 allow = True
             elif rights >= 20 \
-                    and (smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603'):
+                    and (smile_info['channel_id'] == 0 or smile_info['channel_id'] == 10603):
                 allow = True
-            elif smile_info['channel_id'] == '0' or smile_info['channel_id'] == '10603':
+            elif smile_info['channel_id'] == 0 or smile_info['channel_id'] == 10603:
                 if not smile_info['is_premium']:
                     if smile_info['donate_lvl'] == 0:
                         allow = True
@@ -94,19 +94,17 @@ class GoodgameTextMessage(TextMessage):
                         allow = True
 
             for premium_item in prems:
-                if smile_info['channel_id'] == str(premium_item):
+                if smile_info['channel_id'] == premium_item:
                     if smile_info['is_premium']:
                         allow = True
                         gif = True
 
             if allow:
                 self._text = self._text.replace(SMILE_FORMAT.format(smile), EMOTE_FORMAT.format(smile))
-                if smile not in emotes:
-                    if gif and smile_info['urls']['gif']:
-                        emotes[smile] = {'emote_url': smile_info['urls']['gif']}
-                    else:
-                        emotes[smile] = {'emote_url': smile_info['urls']['big']}
-        self._emotes = [Emote(emote, data['emote_url']) for emote, data in emotes.items()]
+                url = smile_info['images']['big']
+                if gif and smile_info['images']['gif']:
+                    url = smile_info['images']['gif']
+                self.add_emote(smile, url)
 
 
 class GoodgameSystemMessage(SystemMessage):
@@ -305,6 +303,8 @@ class GGChannel(threading.Thread, Channel):
         self.kwargs = kwargs
         self.ws = None
 
+        self.smiles = {}
+
     def load_config(self):
         try:
             requests.get(API.format(''), timeout=5)
@@ -327,28 +327,13 @@ class GGChannel(threading.Thread, Channel):
             log.warning("Unable to get channel name, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
         try:
-            self.kwargs['smiles'] = {}
-            smile_request = requests.get(API.format('smiles'))
-
+            smile_request = requests.get(SMILE_API)
             if not smile_request.ok:
                 raise IndexError('URL Error {}'.format(smile_request.reason))
 
             req_json = smile_request.json()
-            page_count = req_json['page_count']
-
-            for page_index in range(0, page_count):
-                page_number = page_index+1
-
-                page = requests.get(API.format('smiles?page={}'.format(page_number)))
-                if not page.ok:
-                    raise IndexError('URL Error at index {}, {}'.format(page_number, smile_request.reason))
-
-                for smile in page.json()['_embedded']['smiles']:
-                    smile_key = smile['key'].lower()
-
-                    smile['page'] = page_number
-                    self.kwargs['smiles'][smile_key] = smile
-
+            for smile in req_json:
+                self.smiles[smile['key']] = smile
         except Exception as exc:
             log.error("Unable to download smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
@@ -360,7 +345,7 @@ class GGChannel(threading.Thread, Channel):
         streams_url = API.format('streams/{0}'.format(self.nick))
         try:
             request = requests.get(streams_url)
-            if request.status_code == 200:
+            if request.ok:
                 json_data = request.json()
                 if json_data['status'] == 'Live':
                     return request.json().get('player_viewers')
@@ -380,11 +365,11 @@ class GGChannel(threading.Thread, Channel):
             try_count += 1
             log.info("Connecting, try {0}".format(try_count))
 
-            self.status = CHANNEL_PENDING
+            self._status = CHANNEL_PENDING
             if self.load_config():
                 # Connecting to goodgame websocket
                 self.ws = GGChat(self.address, protocols=['websocket'], queue=self.queue,
-                                 ch_id=self.ch_id, nick=self.nick,
+                                 ch_id=self.ch_id, nick=self.nick, smiles=self.smiles,
                                  heartbeat_freq=30, main_thread=self, **self.kwargs)
                 try:
                     self.ws.connect()
