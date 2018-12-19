@@ -48,7 +48,7 @@ class Message(threading.Thread):
         conf_dict = LCPanel()
         conf_dict['gui_information'] = {'category': 'messaging'}
         conf_dict['messaging'] = LCChooseMultiple(
-            ['webchat'],
+            get_modules_in_folder('messaging'),
             available_list=get_modules_in_folder('messaging'),
             description=True,
             hidden=HIDDEN_MODULES)

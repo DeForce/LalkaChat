@@ -162,7 +162,11 @@ class MessagingThread(threading.Thread):
             return
 
         send_message = prepare_message(message.json(), self.settings[chat_type], type(message))
-        ws_list = cherrypy.engine.publish('get-clients', chat_type)[0]
+        c_req = cherrypy.engine.publish('get-clients', chat_type)
+        if not c_req:
+            return
+
+        ws_list = c_req[0]
         for ws in ws_list:
             try:
                 ws.send(json.dumps(send_message))
@@ -186,7 +190,7 @@ class FireFirstMessages(threading.Thread):
                 if isinstance(item, SystemMessage) and not show_system_msg:
                     continue
                 timedelta = datetime.datetime.now() - item.timestamp
-                timer = self.settings['keys'].get('timer').simple()
+                timer = self.settings['keys'].get('clear_timer', LCSpin(-1)).simple()
                 if timer > 0:
                     if timedelta > datetime.timedelta(seconds=timer):
                         continue
@@ -322,8 +326,6 @@ class WebChatPlugin(WebSocketPlugin):
                     self.history[index]['text'] = REMOVED_TRIGGER
                     if 'emotes' in self.history[index]:
                         del self.history[index]['emotes']
-                    if 'bttv_emotes' in self.history[index]:
-                        del self.history[index]['bttv_emotes']
 
     def _replace_by_user(self, users):
         for item in users:
@@ -332,8 +334,6 @@ class WebChatPlugin(WebSocketPlugin):
                     self.history[index]['text'] = REMOVED_TRIGGER
                     if 'emotes' in self.history[index]:
                         del self.history[index]['emotes']
-                    if 'bttv_emotes' in self.history[index]:
-                        del self.history[index]['bttv_emotes']
 
 
 class RestRoot(object):
@@ -428,7 +428,7 @@ class CssRoot(object):
         cherrypy.response.headers['Content-Type'] = 'text/css'
         with open(os.path.join(self.settings['location'], *path), 'r') as css:
             css_content = css.read()
-            compiler = Compiler(namespace=css_namespace, output_style='nested')
+            compiler = Compiler(namespace=css_namespace)
             # Something wrong with PyScss,
             #  Syntax error: Found u'100%' but expected one of ADD.
             # Doesn't happen on next attempt, so we are doing bad thing
@@ -440,7 +440,7 @@ class CssRoot(object):
                     return ret_string
                 except Exception as exc:
                     if attempts == 100:
-                        log.debug(exc)
+                        log.info(exc)
 
 
 class HttpRoot(object):

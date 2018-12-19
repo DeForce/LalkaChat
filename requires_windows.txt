@@ -6,5 +6,5 @@ semantic_version
 jinja2
 pyScss
 rtyaml
-cefpython3==31.2
+cefpython3
 html_sanitizer

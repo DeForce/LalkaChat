@@ -1,6 +1,6 @@
-const Vue = require('vue');
-const DOMPurify = require('dompurify');
-const twemoji = require('twemoji');
+var Vue = require('vue');
+var DOMPurify = require('dompurify');
+var twemoji = require('twemoji');
 
 (function (WebSocket, Vue, Sanitizer) {
     'use strict';
@@ -18,7 +18,8 @@ const twemoji = require('twemoji');
                 socket: socket,
                 attempts: 0,
                 socketInterval: null,
-                messagesInterval: -1,
+                messagesClearInterval: -1,
+                messagesDecayInterval: -1,
                 messagesLimit: 30
             }
         },
@@ -35,12 +36,18 @@ const twemoji = require('twemoji');
             }
 
             self.get('http://' + window.location.host + '/rest/webchat/style/' + style_get, function (err, response) {
-                if (!err) {
-                    self.messagesInterval = response.timer * 1000 || -1;
+                if (err) {
+                    console.log('Error: Bad response from server')
                 }
 
-                if (self.messagesInterval > 0) {
+                self.messagesClearInterval = response.clear_timer * 1000 || -1;
+                if (self.messagesClearInterval > 0) {
                     setInterval(self.clear, 500);
+                }
+
+                self.messagesDecayInterval = response.decay_timer * 1000 || -1;
+                if (self.messagesDecayInterval > 0) {
+                    setInterval(self.decay, 500);
                 }
             });
         },
@@ -56,29 +63,38 @@ const twemoji = require('twemoji');
                 var time = new Date();
 
                 this.messages = this.messages.filter(function (message) {
-                    return Math.abs(time - message.time) < that.messagesInterval;
+                    return Math.abs(time - message.time) < that.messagesClearInterval;
+                });
+            },
+            decay: function () {
+                var that = this;
+                var time = new Date();
+
+                this.messages = this.messages.filter(function (message) {
+                    if(message.old) return message;
+                    if(Math.abs(time - message.time) > that.messagesDecayInterval) {
+                        message.old = true
+                    }
+                    return message;
                 });
             },
             remove: function (message) {
                 var index = this.messages.indexOf(message);
                 if (index >= 0) {
-                    this.del('http://' + window.location.host + '/rest/webchat/chat/' + message.id, function(err, ok) {});
+//                    this.del('http://' + window.location.host + '/rest/webchat/chat/' + message.id, function(err, ok) {});
                     this.messages.splice(index, 1);
                 }
             },
             sanitize: function (message) {
-                var sanitized = Sanitizer.sanitize(message.text, { ALLOWED_TAGS: [] });
-                var clean = this.replaceEmotions(sanitized, message.emotes);
-
+                var clean = this.replaceEmotions(message.text, message.emotes);
                 if (!clean) this.remove(message);
-
                 return clean;
             },
             replaceEmotions: function (message, emotes) {
-                var tw_message = twemoji.parse(message)
+                var tw_message = twemoji.parse(message);
                 return emotes.reduce(function (m, emote) {
-                    var regex = new RegExp(emote.id, 'g')
-                    return m.replace(regex, '<img class="smile" src="' + emote.url + '" />')
+                        var regex = new RegExp(emote.id, 'g');
+                        return m.replace(regex, '<img class="smile" src="' + emote.url + '"  alt=""/>')
                     },
                     tw_message);
             },
@@ -98,7 +114,7 @@ const twemoji = require('twemoji');
                 });
             },
             replaceByUsernames: function (usernames, text) {
-                var usernames_lc = usernames.map(function(value) {
+                var usernames_lc = usernames.map(function (value) {
                     return value.toLowerCase();
                 });
 
@@ -109,7 +125,6 @@ const twemoji = require('twemoji');
                     if (index >= 0) {
                         message.text = text;
                         message.emotes = [];
-                        message.bttv_emotes = {};
                     }
 
                     return message;
@@ -122,7 +137,6 @@ const twemoji = require('twemoji');
                     if (index >= 0) {
                         message.text = text;
                         delete message.emotes;
-                        delete message.bttv_emotes;
                     }
                     return message;
                 });
@@ -160,6 +174,8 @@ const twemoji = require('twemoji');
                     default:
                         message.payload.time = new Date();
                         message.payload.deleteButton = false;
+                        message.payload.old = false;
+
                         this.messages.push(message.payload);
                         if (this.messages.length > this.messagesLimit) {
                             this.remove(this.messages[0]);
@@ -186,14 +202,14 @@ const twemoji = require('twemoji');
                 xhr.onload = function () {
                     if (xhr.responseText) {
                         var obj = JSON.parse(xhr.responseText);
+                        callback(null, obj);
                     }
-                    callback(null, obj);
                 };
                 xhr.onerror = function () {
                     if (xhr.responseText) {
                         var obj = JSON.parse(xhr.responseText);
+                        callback(obj);
                     }
-                    callback(obj);
                 };
 
                 xhr.open(method, url);

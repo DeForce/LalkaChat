@@ -98,7 +98,7 @@ class StatusFrame(wx.Panel):
 
             wx.CallAfter(self.Layout)
             wx.CallAfter(self.Refresh)
-            time.sleep(1)
+            time.sleep(10)
 
     def _create_sizer(self):
         border_sizer = wx.BoxSizer(wx.HORIZONTAL)

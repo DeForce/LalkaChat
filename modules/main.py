@@ -178,11 +178,13 @@ def main(root_logger):
             main_class.conf_params()['config']['system']['release_channel'].list = versions.keys()
             channel = main_class.conf_params()['config']['system']['release_channel'].simple()
             current_version = main_class.conf_params()['config']['system']['current_version']
-            latest_version = max(map(int, versions[channel].keys()))
-            if latest_version > int(current_version):
-                loaded_modules['main']['update'] = True
-                loaded_modules['main']['update_url'] = versions[channel][unicode(latest_version)]['url']
-                loaded_modules['main']['update_version'] = latest_version
+            channel_versions = versions.get(channel, {})
+            if channel_versions:
+                latest_version = max(map(int, channel_versions.keys()))
+                if latest_version > int(current_version):
+                    loaded_modules['main']['update'] = True
+                    loaded_modules['main']['update_url'] = versions[channel][unicode(latest_version)]['url']
+                    loaded_modules['main']['update_version'] = latest_version
 
     if loaded_modules['main'].get('update'):
         log.info("There is new update, please update!")
@@ -226,7 +228,8 @@ def main(root_logger):
     chat_modules_file = os.path.join(CONF_FOLDER, "chat_modules.cfg")
     chat_location = os.path.join(MODULE_FOLDER, "chat")
     chat_conf_dict = OrderedDict()
-    chat_conf_dict['chats'] = LCChooseMultiple([], available_list=get_modules_in_folder('chat'))
+    chat_conf_dict['chats'] = LCChooseMultiple(get_modules_in_folder('chat'),
+                                               available_list=get_modules_in_folder('chat'))
 
     chat_conf_gui = {
         'non_dynamic': ['chat.chats']

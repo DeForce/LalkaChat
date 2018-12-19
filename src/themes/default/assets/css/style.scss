@@ -1,3 +1,26 @@
+.message-leave-active {
+  transition: all 1s;
+}
+.message-leave-to {
+  opacity: 0;
+}
+@-webkit-keyframes HideWithDelay {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+@keyframes HideWithDelay {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
 body {
     background-color: $background-colour;
     height: 100%;
@@ -12,23 +35,33 @@ body {
     width: 100%;
 }
 
-.message {
-    background-color: rgba(35, 35, 37, ($message-opacity / 100));
+%message_shared {
     word-wrap: break-word;
     text-shadow: 0 1px 1px black;
     font-family: 'Consolas', serif;
     font-size: 0;
     padding-top: 2px;
     color: #FFF;
+    div {
+        display: inline;
+        font-size: #{$font-size}pt;
+    }
 }
-
-.message > div {
-    display: inline;
-    font-size: #{$font-size}pt;
+.message {
+    @extend %message_shared;
+    background-color: rgba(35, 35, 37, ($message-opacity / 100));
 }
-
-.message.sub-message {
-    background-color: rgba(255, 0, 128, 0.62)
+.message_sub {
+    @extend %message_shared;
+    background-color: rgba(255, 0, 128, ($message-opacity / 100))
+}
+.message_old {
+    -webkit-animation-name: HideWithDelay;
+    -webkit-animation-duration: 2s;
+    -webkit-animation-fill-mode: forwards;
+    animation-name: HideWithDelay;
+    animation-duration: 2s;
+    animation-fill-mode: forwards;
 }
 
 .message-remove,
