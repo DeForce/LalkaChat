@@ -14,7 +14,7 @@ from modules.helper.parser import update
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUsers
 from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING
-from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE, register_iodc
+from modules.helper.system import translate_key, EMOTE_FORMAT, NO_VIEWERS, register_iodc
 from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool, LCButton
 
 logging.getLogger('irc').setLevel(logging.ERROR)
@@ -433,7 +433,7 @@ class IRC(irc.client.SimpleIRCClient):
 class TWChannel(threading.Thread, Channel):
     def __init__(self, queue, host, port, channel, anon=True, **kwargs):
         threading.Thread.__init__(self)
-        Channel.__init__(self)
+        Channel.__init__(self, channel)
 
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -443,7 +443,6 @@ class TWChannel(threading.Thread, Channel):
 
         self.host = host
         self.port = port
-        self.channel = channel
         self.custom_smiles = {}
 
         self.bttv = kwargs.get('bttv')
@@ -609,7 +608,10 @@ class TWChannel(threading.Thread, Channel):
         return True
 
     def stop(self):
-        self.irc.tw_connection.disconnect("CLOSE_OK")
+        try:
+            self.irc.tw_connection.disconnect("CLOSE_OK")
+        except TwitchNormalDisconnect:
+            pass
 
     def get_viewers(self):
         streams_url = 'https://api.twitch.tv/kraken/streams/{0}'.format(self.channel)
@@ -618,8 +620,8 @@ class TWChannel(threading.Thread, Channel):
             if request.status_code == 200:
                 json_data = request.json()
                 if json_data['stream']:
-                    return request.json()['stream'].get('viewers', NA_MESSAGE)
-                return NA_MESSAGE
+                    return request.json()['stream'].get('viewers', NO_VIEWERS)
+                return NO_VIEWERS
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:

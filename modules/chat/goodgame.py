@@ -17,7 +17,7 @@ from ws4py.client.threadedclient import WebSocketClient
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Emote, RemoveMessageByIDs
 from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_PENDING, CHANNEL_OFFLINE
-from modules.helper.system import translate_key, EMOTE_FORMAT, NA_MESSAGE
+from modules.helper.system import translate_key, EMOTE_FORMAT, NO_VIEWERS
 from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText
 
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -285,7 +285,7 @@ class GGChat(WebSocketClient):
 class GGChannel(threading.Thread, Channel):
     def __init__(self, queue, address, nick, use_chid, **kwargs):
         threading.Thread.__init__(self)
-        Channel.__init__(self)
+        Channel.__init__(self, nick)
 
         # Basic value setting.
         # Daemon is needed so when main programm exits
@@ -341,7 +341,7 @@ class GGChannel(threading.Thread, Channel):
 
     def get_viewers(self):
         if not self.chat_module.conf_params()['config']['config']['check_viewers']:
-            return NA_MESSAGE
+            return NO_VIEWERS
         streams_url = API.format('streams/{0}'.format(self.nick))
         try:
             request = requests.get(streams_url)
@@ -350,7 +350,7 @@ class GGChannel(threading.Thread, Channel):
                 if json_data['status'] == 'Live':
                     return request.json().get('player_viewers')
                 else:
-                    return NA_MESSAGE
+                    return NO_VIEWERS
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:

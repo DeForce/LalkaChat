@@ -37,7 +37,7 @@ SOURCE = 'sy'
 SOURCE_USER = 'System'
 SOURCE_ICON = '/img/sources/lalka_cup.png'
 
-NA_MESSAGE = 'N/A'
+NO_VIEWERS = 'N/A'
 
 IGNORED_TYPES = ['command', 'system_message']
 TRANSLATIONS = {}

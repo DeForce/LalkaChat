@@ -291,7 +291,7 @@ class FsPingThread(threading.Thread):
 
 class FsChannel(threading.Thread, Channel):
     def __init__(self, queue, socket, channel_name, **kwargs):
-        Channel.__init__(self)
+        Channel.__init__(self, channel_name)
         threading.Thread.__init__(self)
 
         # Basic value setting.
@@ -305,11 +305,9 @@ class FsChannel(threading.Thread, Channel):
         self.kwargs = kwargs
 
         self.slug = channel_name
-        self.channel_name = None
         self.ws = None
 
     def run(self):
-        self.channel_name = self.get_channel_name()
         self.connect()
 
     def connect(self):
@@ -319,7 +317,7 @@ class FsChannel(threading.Thread, Channel):
             try_count += 1
             log.info("Connecting, try {0}".format(try_count))
             self._get_info()
-            self.ws = FsChat(self.socket, self.queue, self.channel_name,
+            self.ws = FsChat(self.socket, self.queue, self.get_channel_name(),
                              protocols=['websocket'], smiles=self.smiles,
                              main_thread=self, **self.kwargs)
             if self.ws.crit_error:

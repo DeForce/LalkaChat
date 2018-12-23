@@ -88,10 +88,14 @@ class BaseModule(object):
     def category(self):
         return self._category
 
+    @property
+    def config(self):
+        return self._conf_params.get('config', {})
+
     def _conf_settings(self, *args, **kwargs):
         """
             Override this method
-        :rtype: object
+        :rtype: LCPanel
         """
         return self.__conf_settings
 
@@ -252,9 +256,14 @@ class ChatModule(BaseModule):
 
 
 class Channel(object):
-    def __init__(self):
+    def __init__(self, channel):
         self._viewers = None
         self._status = CHANNEL_OFFLINE
+        self._channel = channel
+
+    @property
+    def channel(self):
+        return self._channel
 
     @property
     def viewers(self):
