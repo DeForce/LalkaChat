@@ -14,14 +14,6 @@ import modules.interface.elements
 from modules.interface.events import EVT_STATUS_CHANGE
 from modules.interface.frames import OAuthBrowser, StatusFrame, UpdateDialog
 from modules.interface.types import *
-
-try:
-    from cefpython3.wx import chromectrl as browser
-    HAS_CHROME = True
-except ImportError:
-    from wx import html2 as browser
-    HAS_CHROME = False
-
 from collections import OrderedDict
 import os
 import logging
@@ -29,6 +21,13 @@ import wx
 from modules.helper.system import MODULE_KEY, translate_key, get_key, WINDOWS
 from modules.helper.parser import return_type
 from modules.helper.module import UIModule
+
+if WINDOWS:
+    from interface import chromium as browser
+    HAS_CHROME = True
+else:
+    from wx import html2 as browser
+    HAS_CHROME = False
 
 # ToDO: Support customization of borders/spacings
 
@@ -220,7 +219,7 @@ class SettingsWindow(wx.Frame):
         image_list = wx.ImageList(16, 16)
 
         tree_ctrl_id = modules.interface.controls.id_renew('settings.tree', update=True)
-        self.tree_ctrl = wx.TreeCtrl(self, id=tree_ctrl_id, style=style)
+        self.tree_ctrl = wx.TreeCtrl(self, id=tree_ctrl_id, style=style, size=wx.Size(230, -2))
         root_key = get_key('settings', 'tree', 'root')
         root_node = self.tree_ctrl.AddRoot(translate_key(root_key))
         for cat_name, category in self.categories.items():
@@ -257,7 +256,7 @@ class SettingsWindow(wx.Frame):
 
         self.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_tree_ctrl_changed, id=tree_ctrl_id)
 
-        self.main_grid.Add(self.tree_ctrl, 7, wx.EXPAND | wx.ALL, 7)
+        self.main_grid.Add(self.tree_ctrl, 0, wx.EXPAND | wx.ALL, 7)
 
         content_page_id = modules.interface.controls.id_renew(MODULE_KEY.join(['settings', 'content']))
         self.content_page = wx.Panel(self, id=content_page_id)
@@ -387,7 +386,7 @@ class SettingsWindow(wx.Frame):
         self.buttons['apply'] = apply_button
 
         cancel_button = wx.Button(panel, label=translate_key(MODULE_KEY.join(['settings', 'cancel_button'])))
-        cancel_button.Bind(wx.EVT_BUTTON, self.button_apply)
+        cancel_button.Bind(wx.EVT_BUTTON, self.button_cancel)
         self.buttons['cancel'] = cancel_button
 
         button_sizer.Add(ok_button, 0, wx.ALIGN_RIGHT)
@@ -602,16 +601,11 @@ class ChatGui(wx.Frame):
                 self.status_frame.Layout()
         if self.gui_settings['show_browser']:
             if HAS_CHROME:
-                browser_settings = {
-                    'application_cache_disabled': True
-                }
-                self.browser = browser.ChromeCtrl(self, useTimer=False, url=str(url), hasNavBar=False,
-                                                  browserSettings=browser_settings)
+                self.browser = browser.ChromeCtrl(self, useTimer=False, url=str(url), browserSettings={})
                 if self.main_config['config']['system']['testing_mode']:
                     self.browser2 = browser.ChromeCtrl(self, useTimer=False, url=str(url).replace('/gui', ''),
-                                                       hasNavBar=False, browserSettings=browser_settings)
+                                                       browserSettings={})
                     vbox.Add(self.browser2, 1, wx.EXPAND)
-
             else:
                 self.browser = browser.WebView.New(parent=self, url=url, name='LalkaWebViewGui')
                 if self.main_config['config']['system']['testing_mode']:
@@ -712,9 +706,10 @@ class ChatGui(wx.Frame):
         config['pos_y'] = self.Position.y
 
         for module_name, module_dict in self.loaded_modules.iteritems():
+            log.info('stopping %s', module_name)
             module_dict['class'].apply_settings(system_exit=True)
-
-        self.Destroy()
+        log.info('all done, exiting...')
+        event.Skip()
 
     @staticmethod
     def on_right_down(event):
@@ -796,14 +791,14 @@ class GuiThread(UIModule):
         app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
         self.gui = ChatGui(None, "LalkaChat", url, **self.kwargs)  # A Frame is a top-level window.
         app.MainLoop()
+        log.info('quit main loop')
+        del app
         self.quit()
 
     def apply_settings(self, **kwargs):
         pass
 
     def quit(self):
-        try:
-            self.gui.on_close('event')
-        except wx.PyDeadObjectError:
-            pass
+        if HAS_CHROME:
+            browser.Shutdown()
         os._exit(0)

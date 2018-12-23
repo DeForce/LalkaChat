@@ -1,7 +1,7 @@
 #!/bin/bash
 DIR_ROOT=$(pwd)
 THEME_ROOT=${DIR_ROOT}/src/themes
-[ ! -d ${DIR_ROOT}/http ] && mkdir ${DIR_ROOT}/http
+[[ ! -d ${DIR_ROOT}/http ]] && mkdir ${DIR_ROOT}/http
 
 if ! which npm; then
     sudo yum install npm -y

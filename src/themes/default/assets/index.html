@@ -10,7 +10,12 @@
 
     <body>
         <div id="chat-container">
-            <div class="message" v-for="message in messages" v-if="message" :class="{ 'sub-message': message && message.sub_message }" @mouseenter="mouseenter(message)" @mouseleave="mouseleave(message)">
+            <transition-group name="message">
+            <div v-for="message in messages"
+                 v-if="message"
+                 :class="[message.message_type, { message_old: message.old }]"
+                 :key="message.id"
+                 @mouseenter="mouseenter(message)" @mouseleave="mouseleave(message)">
                 <div class="message-remove" v-if="message && message.deleteButton">
                     <img class="delete" @click="remove(message)" :src="'img/gui/delete.png'" />
                 </div>
@@ -18,6 +23,10 @@
                 <div class="message-source">
                     <img class="platform" :src="message.platform.icon || './img/sources/' + message.platform.id + '.png'" />
                 </div>
+
+                <template v-if="message.channel_name">
+                    <div class="channel_name">[{{message.channel_name}}]</div>
+                </template>
 
                 <template v-if="message.levels">
                     <div class="message-level">
@@ -29,16 +38,13 @@
                     <img class="badge" :src="badge.url" :class="{ 'broadcaster': badge.badge == 'broadcaster', 'mod': badge.badge == 'mod', 'turbo': badge.badge == 'turbo', 'premium': badge.badge == 'premium' }" />
                 </div>
 
-                <template v-if="message.channel_name">
-                    <div class="channel_name">[{{message.channel_name}}]</div>
-                </template>
-
                 <div class="username" :style="{color: message.nick_colour}">{{message.display_name || message.user}}</div>
                 <template v-if="message.me == false">
                     <div>:</div>
                 </template>
                 <div class="text" v-html="sanitize(message)" :class="{ 'system': message.source === 'sy', 'private': message.pm, 'mention': message.mention }"></div>
             </div>
+            </transition-group>
         </div>
     </body>
 </html>

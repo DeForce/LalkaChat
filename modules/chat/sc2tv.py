@@ -305,10 +305,11 @@ class FsChannel(threading.Thread, Channel):
         self.kwargs = kwargs
 
         self.slug = channel_name
-        self.channel_name = self.get_channel_name()
+        self.channel_name = None
         self.ws = None
 
     def run(self):
+        self.channel_name = self.get_channel_name()
         self.connect()
 
     def connect(self):

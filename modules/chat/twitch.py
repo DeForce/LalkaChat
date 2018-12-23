@@ -45,7 +45,7 @@ CONF_DICT['config']['show_pm'] = LCBool(True)
 CONF_DICT['config']['bttv'] = LCBool(True)
 CONF_DICT['config']['frankerz'] = LCBool(True)
 CONF_DICT['config']['show_channel_names'] = LCBool(True)
-CONF_DICT['config']['show_nickname_colors'] = LCBool(False)
+CONF_DICT['config']['show_nickname_colors'] = LCBool(True)
 CONF_DICT['config']['register_oidc'] = LCButton(register_iodc)
 
 CONF_GUI = {

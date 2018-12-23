@@ -34,7 +34,7 @@ SMILE_API = 'https://goodgame.ru/api/4/smiles'
 CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['show_pm'] = LCBool(True)
-CONF_DICT['config']['socket'] = LCText('wss://chat.goodgame.ru/chat/websocket')
+CONF_DICT['config']['socket'] = LCText('wss://chat-1.goodgame.ru/chat2/')
 CONF_DICT['config']['show_channel_names'] = LCBool(True)
 CONF_DICT['config']['use_channel_id'] = LCBool(False)
 CONF_DICT['config']['check_viewers'] = LCBool(True)

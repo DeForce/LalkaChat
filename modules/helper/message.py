@@ -164,11 +164,11 @@ class TextMessage(Message):
         self._nick_colour = nick_colour
         self._channel_name = channel_name
         self._id = str(mid) if mid else str(uuid.uuid1())
-        self._sub_message = sub_message
+        self._message_type = 'message_sub' if sub_message else 'message'
 
         self._jsonable += ['user', 'text', 'emotes', 'badges',
                            'id', 'platform', 'pm', 'nick_colour',
-                           'channel_name', 'me', 'sub_message']
+                           'channel_name', 'me', 'message_type']
 
     @staticmethod
     def _to_utf8(text):
@@ -248,8 +248,8 @@ class TextMessage(Message):
         self._me = value
 
     @property
-    def sub_message(self):
-        return self._sub_message
+    def message_type(self):
+        return self._message_type
 
     def add_badge(self, badge_id, url):
         self._badges.append(Badge(badge_id, url))

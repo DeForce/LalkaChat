@@ -11,7 +11,7 @@ log = logging.getLogger('c2b')
 
 CONF_DICT = LCPanel()
 CONF_DICT['config'] = LCStaticBox()
-CONF_DICT['config']['enabled'] = LCBool(True)
+CONF_DICT['config']['enabled'] = LCBool(False)
 CONF_DICT['config']['only_gui'] = LCBool(True)
 CONF_DICT['config']['welcome_msg'] = LCText(u"{}, welcome to the stream!")
 
