@@ -15,7 +15,7 @@ from modules.helper.message import TextMessage, SystemMessage, RemoveMessageByUs
 from modules.helper.module import ChatModule, Channel
 from ws4py.client.threadedclient import WebSocketClient
 
-from modules.helper.system import NA_MESSAGE, translate_key
+from modules.helper.system import NO_VIEWERS, translate_key
 from modules.interface.types import LCStaticBox, LCBool, LCPanel
 
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -340,7 +340,7 @@ class beampro(ChatModule):
     def get_viewers(channel_id):
         viewers_req = requests.get(API_URL.format('/chats/{}/users'.format(channel_id)))
         if not viewers_req.ok:
-            return NA_MESSAGE
+            return NO_VIEWERS
         return viewers_req.headers['x-total-count']
 
     def _add_channel(self, chat):
