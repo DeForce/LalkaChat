@@ -10,9 +10,6 @@ data = [
     ('img', 'img'),
     ('scripts', 'scripts'),
     ('translations', 'translations'),
-    ('libs/windows/locales', 'locales'),
-    ('libs/windows/icudt.dll', ''),
-    ('libs/windows/subprocess.exe', ''),
     ('default_branch', ''),
 ]
 
@@ -40,12 +37,17 @@ a = Analysis(['main.py'],
                             'modules.messaging.logger',
                             'modules.messaging.mentions',
                             'modules.messaging.webchat'],
-             hookspath=[],
+             hookspath=['.'],
              runtime_hooks=[],
              excludes=['FixTk', 'tcl', 'tk', '_tkinter', 'tkinter', 'Tkinter'],
-             win_no_prefer_redirects=False,
-             win_private_assemblies=False,
+             win_no_prefer_redirects=True,
+             win_private_assemblies=True,
              cipher=block_cipher)
+
+if not os.environ.get("PYINSTALLER_CEFPYTHON3_HOOK_SUCCEEDED", None):
+    raise SystemExit("Error: Pyinstaller hook-cefpython3.py script was "
+                     "not executed or it failed")
+
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 exe = EXE(pyz,

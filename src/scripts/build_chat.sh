@@ -2,14 +2,14 @@
 VERSION="0.3.5"
 APP_NAME="LalkaChat"
 APP_STATE="-alpha"
-SPEC_DIR=/home/defor/python/LalkaChat
+SPEC_DIR=${PWD}
 
 cd ${SPEC_DIR}
 
 rm -rf dist/
 rm -rf build/
 
-cmd /c pyinstaller main.spec
+cmd /c pyinstaller --clean main.spec
 
 
 mkdir -p ${SPEC_DIR}/dist/main/http
