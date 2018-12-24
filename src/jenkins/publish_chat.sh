@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 cp requires_windows.txt requirements.txt
-wget -r --cut-dirs=1 -nH -np --reject index.html $WINDOWS_BINARIES_PATH
 
 docker run -v "$(pwd):/src/" ${BUILDER_CONTAINER}
 
