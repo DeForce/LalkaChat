@@ -44,7 +44,7 @@ CONF_DICT['config']['port'] = LCText(6667)
 CONF_DICT['config']['show_pm'] = LCBool(True)
 CONF_DICT['config']['bttv'] = LCBool(True)
 CONF_DICT['config']['frankerz'] = LCBool(True)
-CONF_DICT['config']['show_channel_names'] = LCBool(True)
+CONF_DICT['config']['show_channel_names'] = LCBool(False)
 CONF_DICT['config']['show_nickname_colors'] = LCBool(True)
 CONF_DICT['config']['register_oidc'] = LCButton(register_iodc)
 
@@ -119,7 +119,6 @@ class TwitchMessageHandler(threading.Thread):
         self.nick = kwargs.get('nick')
         self.badges = kwargs.get('badges')
         self.custom_smiles = kwargs.get('custom_smiles', {})
-        self.custom_badges = kwargs.get('custom_badges')
         self.bits = self._reformat_bits(kwargs.get('bits'))
 
         self.chat_module = kwargs.get('chat_module')
@@ -161,26 +160,11 @@ class TwitchMessageHandler(threading.Thread):
     def _handle_badges(self, message):
         for badge in message.tags['badges'].split(','):
             badge_tag, badge_size = badge.split('/')
-            # Fix some of the names
-            badge_tag = badge_tag.replace('moderator', 'mod')
 
-            if badge_tag in self.custom_badges:
-                badge_info = self.custom_badges.get(badge_tag)['versions'][badge_size]
-                for key in ['image_url_4x', 'image_url_2x', 'image_url_1x']:
-                    if key in badge_info:
-                        break
-                url = badge_info.get(key)
-            elif badge_tag in self.badges:
-                badge_info = self.badges.get(badge_tag)
-                if 'svg' in badge_info:
-                    url = badge_info.get('svg')
-                elif 'image' in badge_info:
-                    url = badge_info.get('image')
-                else:
-                    url = 'none'
-            else:
-                url = NOT_FOUND
-            message.add_badge(badge_tag, url)
+            if badge_tag in self.badges:
+                badge_info = self.badges.get(badge_tag)[badge_size]
+                url = badge_info.get('image')
+                message.add_badge(badge_tag, url)
 
     @staticmethod
     def _handle_emotes(message):
@@ -255,10 +239,10 @@ class TwitchMessageHandler(threading.Thread):
 
         if 'badges' in msg.tags:
             self._handle_badges(message)
-        if 'emotes' in msg.tags:
-            self._handle_emotes(message)
         if 'bits' in msg.tags:
             self._handle_bits(message)
+        if 'emotes' in msg.tags:
+            self._handle_emotes(message)
         if 'color' in msg.tags:
             self._handle_viewer_color(message)
 
@@ -277,6 +261,10 @@ class TwitchMessageHandler(threading.Thread):
                 continue
 
             emote, amount = reg.groups()
+            emote = emote.lower()
+            if emote not in self.bits:
+                log.info('key %s not in bits', emote)
+                continue
             tier = min([tier for tier in self.bits[emote]['tiers'].keys() if tier - int(amount) <= 0],
                        key=lambda x: (abs(x - int(amount)), x))
 
@@ -444,6 +432,8 @@ class TWChannel(threading.Thread, Channel):
         self.host = host
         self.port = port
         self.custom_smiles = {}
+        self.badges = {}
+        self.bits = {}
 
         self.bttv = kwargs.get('bttv')
         self.frankerz = kwargs.get('frankerz')
@@ -477,7 +467,7 @@ class TWChannel(threading.Thread, Channel):
                 if self.load_config():
                     self.irc = IRC(
                         self.queue, self.channel, main_class=self, custom_smiles=self.custom_smiles,
-                        **self.kwargs)
+                        badges=self.badges, bits=self.bits, **self.kwargs)
                     self.irc.connect(self.host, self.port, self.nickname)
                     self._status = CHANNEL_ONLINE
                     self.irc.start()
@@ -559,21 +549,16 @@ class TWChannel(threading.Thread, Channel):
             log.warning("Unable to get FrankerZ smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))
 
         try:
-            # Getting standard twitch badges
-            request = requests.get("https://api.twitch.tv/kraken/chat/{0}/badges".format(self.channel), headers=headers)
-            if request.status_code == 200:
-                self.kwargs['badges'] = request.json()
-            else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
-        except Exception as exc:
-            log.warning("Unable to get twitch badges, error {0}\nArgs: {1}".format(exc.message, exc.args))
-
-        try:
             # Warning, undocumented, can change a LOT
             # Getting CUSTOM twitch badges
             request = requests.get("https://badges.twitch.tv/v1/badges/global/display")
             if request.status_code == 200:
-                self.kwargs['custom_badges'] = request.json()['badge_sets']
+                for badge, badge_config in request.json()['badge_sets'].items():
+                    self.badges[badge] = {
+                        version: {
+                            'image': v.get('image_url_4x', v.get('image_url_2x', v.get('image_url_1x')))
+                        } for version, v in badge_config['versions'].items()
+                    }
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:
@@ -586,7 +571,12 @@ class TWChannel(threading.Thread, Channel):
             badges_url = "https://badges.twitch.tv/v1/badges/channels/{0}/display"
             request = requests.get(badges_url.format(self.channel_id))
             if request.status_code == 200:
-                update(self.kwargs['custom_badges'], request.json()['badge_sets'])
+                for badge, badge_config in request.json()['badge_sets'].items():
+                    self.badges[badge] = {
+                        version: {
+                            'image': v.get('image_url_4x', v.get('image_url_2x', v.get('image_url_1x')))
+                        } for version, v in badge_config['versions'].items()
+                    }
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:
@@ -598,7 +588,7 @@ class TWChannel(threading.Thread, Channel):
             request = requests.get(bits_url.format(self.channel_id), headers=headers_v5)
             if request.status_code == 200:
                 data = request.json()['actions']
-                self.kwargs['bits'] = {item['prefix'].lower(): item for item in data}
+                self.bits = {item['prefix'].lower(): item for item in data}
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:

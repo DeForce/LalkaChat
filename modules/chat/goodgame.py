@@ -34,8 +34,8 @@ SMILE_API = 'https://goodgame.ru/api/4/smiles'
 CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['show_pm'] = LCBool(True)
-CONF_DICT['config']['socket'] = LCText('wss://chat-1.goodgame.ru/chat2/')
-CONF_DICT['config']['show_channel_names'] = LCBool(True)
+CONF_DICT['config']['socket'] = LCText('wss://chat.goodgame.ru/chat/websocket')
+CONF_DICT['config']['show_channel_names'] = LCBool(False)
 CONF_DICT['config']['use_channel_id'] = LCBool(False)
 CONF_DICT['config']['check_viewers'] = LCBool(True)
 SMILE_REGEXP = r':(\w+|\d+):'
@@ -84,10 +84,10 @@ class GoodgameTextMessage(TextMessage):
                     and (smile_info['channel_id'] == 0 or smile_info['channel_id'] == 10603):
                 allow = True
             elif smile_info['channel_id'] == 0 or smile_info['channel_id'] == 10603:
-                if not smile_info['is_premium']:
-                    if smile_info['donate_lvl'] == 0:
+                if not smile_info['premium']:
+                    if smile_info['donat'] == 0:
                         allow = True
-                    elif smile_info['donate_lvl'] <= int(payments):
+                    elif smile_info['donat'] <= int(payments):
                         allow = True
                 else:
                     if premium:
@@ -95,7 +95,7 @@ class GoodgameTextMessage(TextMessage):
 
             for premium_item in prems:
                 if smile_info['channel_id'] == premium_item:
-                    if smile_info['is_premium']:
+                    if smile_info['premium']:
                         allow = True
                         gif = True
 

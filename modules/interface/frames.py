@@ -61,6 +61,7 @@ class StatusFrame(wx.Panel):
         self.changes = {}
 
         self._update_thread = None
+        self._running = True
 
         if WINDOWS:
             self.SetBackgroundColour('cream')
@@ -79,9 +80,15 @@ class StatusFrame(wx.Panel):
         self._update_thread.daemon = True
         self._update_thread.start()
 
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+
         self.Fit()
         self.Layout()
         self.Show(False)
+
+    def on_close(self, event):
+        self._running = False
+        event.Skip()
 
     @property
     def chat_count(self):
@@ -89,6 +96,8 @@ class StatusFrame(wx.Panel):
 
     def _frame_update(self):
         while True:
+            if not self._running:
+                break
             changes = []
             for chat_name, chat_settings in self.chat_modules.items():
                 if isinstance(chat_settings['class'], ConfigModule):
@@ -240,6 +249,8 @@ class StatusFrame(wx.Panel):
                 channel = '{}: '.format(ch_status.name) if show_names else ''
                 wx.CallAfter(self._update_channel_name,
                              self.chats[chat_name][name], channel)
+        wx.CallAfter(self.Layout)
+        wx.CallAfter(self.Refresh)
 
     def set_viewers(self, module_name, channel, viewers):
         if not viewers:

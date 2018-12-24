@@ -47,7 +47,7 @@ LOG_FILES_COUNT = 5
 HIDDEN_CHATS = ['hitbox', 'beampro']
 
 with open('default_branch') as branch_file:
-    DEFAULT_BRANCH = branch_file.read().strip()
+    DEFAULT_BRANCH, DEFAULT_VERSION = branch_file.read().strip().split(',')
 
 
 class MainModule(ConfigModule):
@@ -115,7 +115,7 @@ def main(root_logger):
     main_config_dict['system']['log_level'] = LCDropdown('INFO', available_list=['DEBUG', 'INFO', 'ERROR'])
     main_config_dict['system']['testing_mode'] = LCBool(False)
     main_config_dict['system']['check_updates'] = LCBool(True)
-    main_config_dict['system']['current_version'] = LCText(0)
+    main_config_dict['system']['current_version'] = LCText(DEFAULT_VERSION)
     main_config_dict['system']['release_channel'] = LCDropdown(DEFAULT_BRANCH)
     main_config_dict['gui'] = LCStaticBox()
     main_config_dict['gui']['language'] = LCDropdown(get_language(), get_languages())
