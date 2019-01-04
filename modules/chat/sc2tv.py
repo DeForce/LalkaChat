@@ -28,13 +28,13 @@ SMILE_REGEXP = r':(\w+|\d+):'
 SMILE_FORMAT = ':{}:'
 API_URL = 'https://peka2.tv/api{}'
 
-PING_DELAY = 20
+PING_DELAY = 25
 
 CONF_DICT = LCPanel(icon=FILE_ICON)
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['show_pm'] = LCBool(True)
 CONF_DICT['config']['socket'] = LCText('wss://chat.peka2.tv/')
-CONF_DICT['config']['show_channel_names'] = LCBool(True)
+CONF_DICT['config']['show_channel_names'] = LCBool(False)
 
 CONF_GUI = {
     'config': {
@@ -330,8 +330,16 @@ class FsChannel(threading.Thread, Channel):
             time.sleep(5)
 
     def get_channel_name(self):
-        payload = {'slug': self.slug}
-        channel_req = requests.post(API_URL.format('/stream'), timeout=5, data=payload)
+        user_payload = {'name': self.slug}
+        user_req = requests.post(API_URL.format('/user'), timeout=5, data=user_payload)
+        if not user_req.ok:
+            user_payload = {'slug': self.slug}
+            user_req = requests.post(API_URL.format('/user'), timeout=5, data=user_payload)
+            if not user_req.ok:
+                raise AttributeError('Unable to find user {}'.format(self.slug))
+
+        self.slug = user_req.json()['slug']
+        channel_req = requests.post(API_URL.format('/stream'), timeout=5, data={'slug': user_req.json()['slug']})
         if channel_req.ok:
             r_json = channel_req.json()
             return r_json['owner']['name']
@@ -351,8 +359,8 @@ class FsChannel(threading.Thread, Channel):
                     self.ws.fs_send(request)
                 else:
                     self._viewers = CHANNEL_NO_VIEWERS
-        except requests.ConnectionError:
-            log.error("Unable to get viewers")
+        except Exception as exc:
+            log.error("Unable to get viewers. Got error: %s", exc.message)
 
     def _get_info(self):
         if not self.smiles:

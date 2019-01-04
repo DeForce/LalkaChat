@@ -18,7 +18,7 @@ from collections import OrderedDict
 import os
 import logging
 import wx
-from modules.helper.system import MODULE_KEY, translate_key, get_key, WINDOWS
+from modules.helper.system import MODULE_KEY, translate_key, get_key, WINDOWS, LOG_FOLDER
 from modules.helper.parser import return_type
 from modules.helper.module import UIModule
 
@@ -709,7 +709,10 @@ class ChatGui(wx.Frame):
             log.info('stopping %s', module_name)
             module_dict['class'].apply_settings(system_exit=True)
         log.info('all done, exiting...')
-        event.Skip()
+        if isinstance(event, wx.Event):
+            event.Skip()
+        else:
+            self.Destroy()
 
     @staticmethod
     def on_right_down(event):
@@ -766,7 +769,6 @@ class ChatGui(wx.Frame):
         elif data['type'] == 'channel_state':
             data['item'].SetBackgroundColour(data['value'])
         self.Layout()
-        pass
 
 
 class GuiThread(UIModule):
@@ -788,7 +790,7 @@ class GuiThread(UIModule):
             browser.Initialize()
         url = ':'.join([self.url, str(self.port)])
         url += '/gui'
-        app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
+        app = wx.App(True, filename=os.path.join(LOG_FOLDER, 'main.log'))
         self.gui = ChatGui(None, "LalkaChat", url, **self.kwargs)  # A Frame is a top-level window.
         app.MainLoop()
         log.info('quit main loop')

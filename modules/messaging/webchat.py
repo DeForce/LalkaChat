@@ -158,7 +158,7 @@ class MessagingThread(threading.Thread):
 
     def send_message(self, message, chat_type):
         show_sys_msg = self.settings[chat_type]['keys']['show_system_msg']
-        if not show_sys_msg:
+        if isinstance(message, SystemMessage) and not show_sys_msg:
             return
 
         send_message = prepare_message(message.json(), self.settings[chat_type], type(message))
@@ -421,6 +421,8 @@ class CssRoot(object):
                 css_value = Boolean(value.simple())
             elif isinstance(value, LCSpin):
                 css_value = Number(value.simple())
+            elif isinstance(value, LCObject):
+                css_value = String(value.simple())
             else:
                 raise ValueError("Unable to find comparable values")
             css_namespace.set_variable('${}'.format(key), css_value)

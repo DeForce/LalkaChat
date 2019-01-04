@@ -512,8 +512,8 @@ class LCSlider(LCObject):
 
 
 class LCDropdown(LCObject):
-    def __init__(self, value, available_list=()):
-        super(LCDropdown, self).__init__(value)
+    def __init__(self, value, available_list=(), *args, **kwargs):
+        super(LCDropdown, self).__init__(value, *args, **kwargs)
         self.list = available_list
 
     def __repr__(self):
@@ -925,6 +925,7 @@ def alter_data_to_lc_style(data, gui):
         else:
             try:
                 new_data[item] = TYPE_TO_LC[item_type](value, **gui.get(item, {}))
-            except:
+            except Exception as exc:
+                log.info(exc)
                 new_data[item] = value
     return new_data
