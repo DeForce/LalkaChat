@@ -1,18 +1,14 @@
 import wx
 import wx.grid
 
-from modules.helper.system import MODULE_KEY, translate_key, log
-from modules.interface.controls import GuiCreationError, CustomColourPickerCtrl, KeyListBox, KeyCheckListBox, KeyChoice, \
-    id_renew
-from modules.interface.types import LCPanel
+from modules.helper.system import MODULE_KEY, translate_key
 
 
 def create_button(source_class=None, panel=None, key=None, value=None,
-                  bind=None, enabled=True, multiple=None, **kwargs):
+                  bind=None, enabled=True, **kwargs):
     item_sizer = wx.BoxSizer(wx.VERTICAL)
     item_name = MODULE_KEY.join(key)
-    button_id = id_renew(item_name, update=True, multiple=multiple)
-    c_button = wx.Button(panel, id=button_id, label=translate_key(item_name))
+    c_button = wx.Button(panel, label=translate_key(item_name))
     if not enabled:
         c_button.Disable()
 
@@ -24,9 +20,9 @@ def create_button(source_class=None, panel=None, key=None, value=None,
     if value:
         # TODO: Implement button function pressing
         if callable(value.value):
-            c_button.Bind(wx.EVT_BUTTON, value.value, id=button_id)
+            c_button.Bind(wx.EVT_BUTTON, value.value)
     else:
-        c_button.Bind(wx.EVT_BUTTON, bind, id=button_id)
+        c_button.Bind(wx.EVT_BUTTON, bind, id=c_button.Id)
 
     item_sizer.Add(c_button)
     return {'item': item_sizer}

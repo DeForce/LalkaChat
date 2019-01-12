@@ -166,7 +166,7 @@ class GoodgameMessageHandler(threading.Thread):
         )
 
         if re.match('^{0},'.format(self.nick).lower(), message.text.lower()):
-            if self.chat_module.conf_params()['config']['config'].get('show_pm'):
+            if self.chat_module.get_config('config', 'show_pm'):
                 message.pm = True
         self._send_message(message)
 
@@ -183,11 +183,9 @@ class GoodgameMessageHandler(threading.Thread):
         self.ws_class.system_message(MESSAGE_WARNING.format(
             msg['data']['moder_name'], msg['data']['user_name']), category='chat')
 
-    def _process_remove_message(self, msg, text=None):
-        if self.chat_module.conf_params()['config']['config']['show_channel_names']:
-            text = self.kwargs['settings'].get('remove_text')
+    def _process_remove_message(self, msg):
         remove_id = ID_PREFIX.format(msg['data']['message_id'])
-        self.message_queue.put(RemoveMessageByIDs(remove_id, text=text, platform=SOURCE))
+        self.message_queue.put(RemoveMessageByIDs(remove_id, platform=SOURCE))
 
     def _process_user_ban(self, msg):
         if msg['data']['duration']:
@@ -214,7 +212,7 @@ class GoodgameMessageHandler(threading.Thread):
             log.exception(exc)
 
     def _post_process_multiple_channels(self, message):
-        if self.chat_module.conf_params()['config']['config']['show_channel_names']:
+        if self.chat_module.get_config('config', 'show_channel_names'):
             message.channel_name = self.main_thread.nick
 
     def _send_message(self, comp):
@@ -307,12 +305,6 @@ class GGChannel(threading.Thread, Channel):
 
     def load_config(self):
         try:
-            requests.get(API.format(''), timeout=5)
-        except Exception as exc:
-            log.error('API is not working')
-            return False
-
-        try:
             if self.ch_id:
                 request = requests.get(API.format('streams/{}').format(self.ch_id))
                 if request.status_code == 200:
@@ -340,7 +332,7 @@ class GGChannel(threading.Thread, Channel):
         return True
 
     def get_viewers(self):
-        if not self.chat_module.conf_params()['config']['config']['check_viewers']:
+        if not self.chat_module.get_config('config', 'check_viewers'):
             return NO_VIEWERS
         streams_url = API.format('streams/{0}'.format(self.nick))
         try:
@@ -427,33 +419,19 @@ class TestGG(threading.Thread):
 class GoodGame(ChatModule):
     def __init__(self, *args, **kwargs):
         log.info("Initializing goodgame chat")
-        ChatModule.__init__(self, *args, **kwargs)
+        ChatModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
 
         self.host = CONF_DICT['config']['socket']
 
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
-        if 'webchat' in self._loaded_modules:
-            self._loaded_modules['webchat']['class'].add_depend('goodgame')
-        self._conf_params['settings']['remove_text'] = self.get_remove_text()
-
-    def _conf_settings(self, *args, **kwargs):
-        return CONF_DICT
-
-    def _gui_settings(self):
-        return CONF_GUI
 
     def _test_class(self):
         return TestGG(self)
 
     def _add_channel(self, chat):
         gg = GGChannel(self.queue, self.host, chat,
-                       self._conf_params['config']['config']['use_channel_id'],
+                       self.get_config('config', 'use_channel_id'),
                        settings=self._conf_params['settings'], chat_module=self)
         self.channels[chat] = gg
         gg.start()
-
-    def apply_settings(self, **kwargs):
-        if 'webchat' in kwargs.get('from_depend', []):
-            self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        ChatModule.apply_settings(self, **kwargs)

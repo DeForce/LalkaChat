@@ -121,20 +121,17 @@ class HitboxMessageHandler(threading.Thread):
 
         self._send_message(msg)
 
-    def _process_info_msg(self, message, text=None):
-        if self.main_class.conf_params()['config']['config']['show_channel_names']:
-            text = self.main_class.conf_params()['settings'].get('remove_text')
+    def _process_info_msg(self, message):
         user_to_delete = message['variables']['user']
         self.message_queue.put(
             RemoveMessageByUsers(
                 user_to_delete,
-                text=text,
                 platform=SOURCE
             )
         )
 
     def _show_color(self):
-        return self.main_class.conf_params()['config']['config']['show_nickname_colors']
+        return self.main_class.get_config('config', 'show_nickname_colors')
 
     def _post_process_emotes(self, message):
         for word in message.text.split():
@@ -145,7 +142,7 @@ class HitboxMessageHandler(threading.Thread):
                 message.emotes.append(Emote(word, CDN_URL.format(self.smiles[word])))
 
     def _post_process_multiple_channels(self, message):
-        if self.main_class.conf_params()['config']['config']['show_channel_names']:
+        if self.main_class.get_config('config', 'show_channel_names'):
             message.channel_name = self.channel
 
     def _send_message(self, message):

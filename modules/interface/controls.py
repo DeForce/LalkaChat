@@ -3,39 +3,6 @@ import wx.grid
 
 from modules.helper.system import translate_key, MODULE_KEY
 
-IDS = {}
-
-
-def get_list_of_ids_from_module_name(name, id_group=1, return_tuple=False):
-    split_key = MODULE_KEY
-
-    id_array = []
-    for item_key, item in IDS.items():
-        item_name = split_key.join(item.split(split_key)[:id_group])
-        if item_name == name:
-            if return_tuple:
-                id_array.append((item_key, item))
-            else:
-                id_array.append(item_key)
-    return id_array
-
-
-def get_id_from_name(name):
-    for item, item_id in IDS.iteritems():
-        if item_id == name:
-            return item
-    return None
-
-
-def id_renew(name, update=False, multiple=False):
-    module_id = get_id_from_name(name)
-    if not multiple and module_id:
-        del IDS[module_id]
-    new_id = wx.Window.NewControlId(1)
-    if update:
-        IDS[new_id] = name
-    return new_id
-
 
 class GuiCreationError(Exception):
     pass
@@ -68,7 +35,7 @@ class CustomColourPickerCtrl(object):
 
         button = wx.Button(panel, label=translate_key(MODULE_KEY.join(key + ['button'])))
         button.Bind(wx.EVT_BUTTON, self.on_button_press)
-        border_size = wx.SystemSettings_GetMetric(wx.SYS_BORDER_Y)
+        border_size = wx.SystemSettings.GetMetric(wx.SYS_BORDER_Y)
         button_size = button.GetSize()
         if button_size[0] > 150:
             button_size[0] = 150
@@ -130,7 +97,7 @@ class KeyChoice(wx.Choice):
 
 class MainMenuToolBar(wx.ToolBar):
     def __init__(self, *args, **kwargs):
-        self.main_class = kwargs['main_class']  # type: ChatGui
+        self.main_class = kwargs['main_class']
         kwargs.pop('main_class')
 
         kwargs["style"] = wx.TB_NOICONS | wx.TB_TEXT
@@ -139,17 +106,15 @@ class MainMenuToolBar(wx.ToolBar):
         self.SetToolBitmapSize((0, 0))
 
         self.create_tool('menu.settings', self.main_class.on_settings)
-        self.create_tool('menu.reload', self.main_class.on_toolbar_button)
+        self.create_tool('menu.reload', self.main_class.on_reload)
 
         self.Realize()
 
     def create_tool(self, name, binding=None, style=wx.ITEM_NORMAL, s_help="", l_help=""):
-        l_id = id_renew(name)
-        IDS[l_id] = name
-        label_text = translate_key(IDS[l_id])
-        button = self.AddLabelTool(l_id, label_text, wx.NullBitmap, wx.NullBitmap,
-                                   style, s_help, l_help)
+        label_text = translate_key(name)
+        button = self.AddTool(toolId=wx.ID_ANY, label=label_text, bitmap=wx.NullBitmap, bmpDisabled=wx.NullBitmap,
+                              kind=style, shortHelp=s_help, longHelp=l_help)
         if binding:
-            self.main_class.Bind(wx.EVT_TOOL, binding, id=l_id)
+            self.main_class.Bind(wx.EVT_TOOL, binding, id=button.Id)
         return button
 

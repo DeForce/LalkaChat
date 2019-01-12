@@ -11,7 +11,7 @@ try:
     from cefpython3.wx import chromectrl as browser
     HAS_CHROME = True
 except ImportError:
-    from wx import html2 as browser
+    from wx import html2 as browser, StdDialogButtonSizer
 
 log = logging.getLogger('chat_gui')
 
@@ -72,7 +72,7 @@ class StatusFrame(wx.Panel):
             if chat_name == 'chat':
                 continue
 
-            channels = chat_settings['class'].channels
+            channels = chat_settings.channels
             for channel_name, channel_class in channels.items():
                 wx.CallAfter(self.add_channel, chat_name, channel_class)
 
@@ -99,12 +99,11 @@ class StatusFrame(wx.Panel):
             if not self._running:
                 break
             changes = []
-            for chat_name, chat_settings in self.chat_modules.items():
-                if isinstance(chat_settings['class'], ConfigModule):
+            for chat_name, chat_class in self.chat_modules.items():
+                if isinstance(chat_class, ConfigModule):
                     continue
 
                 channels = self.chats.get(chat_name, {})
-                chat_class = chat_settings['class']
 
                 for channel_name, channel_settings in chat_class.channels.items():
                     if channel_name.lower() not in channels:
@@ -178,7 +177,7 @@ class StatusFrame(wx.Panel):
             multiple = config['config']['show_channel_names']
             self.chats[chat_name][channel.lower()] = self._create_item(channel_class.channel, icon, multiple)
 
-        if self.chats and self.parent.main_config['config']['gui']['show_counters']:
+        if self.chats and self.parent.main_module.get_config('gui', 'show_counters'):
             self.Show(True)
             self.parent.Layout()
 
@@ -244,7 +243,7 @@ class StatusFrame(wx.Panel):
 
     def refresh_labels(self):
         for chat_name, chat in self.chats.items():
-            show_names = self.chat_modules[chat_name]['config']['config']['show_channel_names']
+            show_names = self.chat_modules[chat_name].get_config('config', 'show_channel_names')
             for name, ch_status in self.chats[chat_name].items():
                 channel = '{}: '.format(ch_status.name) if show_names else ''
                 wx.CallAfter(self._update_channel_name,
@@ -285,7 +284,9 @@ class UpdateDialog(wx.Dialog):
         self.gauge = wx.Gauge(self, range=100)
         self.update_text = wx.StaticText(self, label='Downloading new version...')
         self.button_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
-        self.button_sizer.AffirmativeButton.Disable()
+        ok_button_id = self.GetAffirmativeId()
+        ok_button = self.FindWindowById(ok_button_id, self)
+        ok_button.Disable()
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.update_text, 0, wx.EXPAND)

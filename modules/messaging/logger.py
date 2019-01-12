@@ -20,12 +20,12 @@ CONF_GUI = {'non_dynamic': ['config.*']}
 
 class Logger(MessagingModule):
     def __init__(self, *args, **kwargs):
-        MessagingModule.__init__(self, *args, **kwargs)
+        MessagingModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
         self._load_priority = 20
         # Creating filter and replace strings.
-        self.format = CONF_DICT['config']['file_format']
-        self.ts_format = str(CONF_DICT['config']['message_date_format'])
-        self.logging = CONF_DICT['config']['logging']
+        self.format = self.get_config('config', 'file_format')
+        self.ts_format = str(self.get_config('config', 'message_date_format'))
+        self.logging = self.get_config('config', 'logging')
 
         self.folder = 'logs'
 
@@ -33,15 +33,9 @@ class Logger(MessagingModule):
         if not os.path.exists(self.destination):
             os.makedirs(self.destination)
 
-    def _conf_settings(self, *args, **kwargs):
-        return CONF_DICT
-
-    def _gui_settings(self, *args, **kwargs):
-        return CONF_GUI
-
     @process_text_messages
     @ignore_system_messages
-    def process_message(self, message, **kwargs):
+    def _process_message(self, message, **kwargs):
         with open('{0}.txt'.format(
                 os.path.join(self.destination, datetime.datetime.now().strftime(str(self.format)))), 'a') as f:
             f.write('[{}] [{}] [{}] {}: {}\n'.format(

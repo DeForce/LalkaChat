@@ -21,7 +21,7 @@ const production = {
             }
         }),
 
-        new UglifyJsPlugin()
+//        new UglifyJsPlugin()
     ]
 };
 

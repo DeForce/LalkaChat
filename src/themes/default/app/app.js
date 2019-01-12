@@ -136,7 +136,8 @@ var twemoji = require('twemoji');
 
                     if (index >= 0) {
                         message.text = text;
-                        delete message.emotes;
+                        message.emotes = [];
+                        message.pm = false;
                     }
                     return message;
                 });
@@ -150,13 +151,13 @@ var twemoji = require('twemoji');
                         this.removeByUsernames(message.users);
                         break;
                     case 'remove_by_ids':
-                        this.removeByIds(message.ids);
+                        this.removeByIds(message.messages);
                         break;
                     case 'replace_by_users':
                         this.replaceByUsernames(message.users, message.text);
                         break;
                     case 'replace_by_ids':
-                        this.replaceByIds(message.ids, message.text);
+                        this.replaceByIds(message.messages, message.text);
                         break;
                     default:
                         console.log('Got unknown command ', message.command);

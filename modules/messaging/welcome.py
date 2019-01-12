@@ -11,45 +11,30 @@ log = logging.getLogger('c2b')
 
 CONF_DICT = LCPanel()
 CONF_DICT['config'] = LCStaticBox()
-CONF_DICT['config']['enabled'] = LCBool(False)
 CONF_DICT['config']['only_gui'] = LCBool(True)
 CONF_DICT['config']['welcome_msg'] = LCText(u"{}, welcome to the stream!")
-
-CONF_GUI = {
-    'config': {}
-}
 
 
 class Welcome(MessagingModule):
     def __init__(self, *args, **kwargs):
-        MessagingModule.__init__(self, *args, **kwargs)
+        MessagingModule.__init__(self, config=CONF_DICT, *args, **kwargs)
         self.clients = []
 
     def welcome_message(self, user):
         user = user.encode('utf-8')
         self._msg_queue.put(SystemMessage(
-            self.get('config', 'welcome_msg').format(user),
+            self.get_config('config', 'welcome_msg').format(user),
             category='module',
-            only_gui=self.get('config', 'only_gui')
+            only_gui=self.get_config('config', 'only_gui')
         ))
-
-    @property
-    def enabled(self):
-        return self.get('config', 'enabled')
 
     @process_text_messages
     @ignore_system_messages
-    def process_message(self, message, **kwargs):
+    def _process_message(self, message, **kwargs):
         # Replacing the message if needed.
         # Please do the needful
-        if self.enabled and message.user not in self.clients:
+        if message.user not in self.clients:
             self.clients.append(message.user)
             self.welcome_message(message.user)
 
         return message
-
-    def _conf_settings(self, *args, **kwargs):
-        return CONF_DICT
-
-    def _gui_settings(self, *args, **kwargs):
-        return CONF_GUI

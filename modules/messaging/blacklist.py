@@ -19,51 +19,35 @@ CONF_DICT['words_hide'] = LCGridSingle()
 CONF_DICT['words_block'] = LCGridSingle()
 log = logging.getLogger('blacklist')
 
+GUI = {
+    'non_dynamic': ['main.*']
+}
+
 
 class Blacklist(MessagingModule):
     def __init__(self, *args, **kwargs):
-        MessagingModule.__init__(self, *args, **kwargs)
-
-    def _conf_settings(self, *args, **kwargs):
-        return CONF_DICT
-
-    def _gui_settings(self):
-        return {
-            'words_hide': {
-                'addable': True,
-                'view': 'list'},
-            'words_block': {
-                'addable': True,
-                'view': 'list'},
-            'users_hide': {
-                'view': 'list',
-                'addable': 'true'},
-            'users_block': {
-                'view': 'list',
-                'addable': 'true'},
-            'non_dynamic': ['main.*']
-        }
+        super(Blacklist, self).__init__(config=CONF_DICT, gui=GUI, *args, **kwargs)
 
     @process_text_messages
     @ignore_system_messages
-    def process_message(self, message, **kwargs):
+    def _process_message(self, message, **kwargs):
         self._blocked(message)
         if self._bl_hidden(message):
             message.hidden = True
         return message
 
     def _bl_hidden(self, message):
-        if message.user.lower() in self._conf_params['config']['users_hide']:
+        if message.user.lower() in self.get_config('users_hide'):
             return True
 
-        for word in self._conf_params['config']['words_hide']:
+        for word in self.get_config('words_hide'):
             if re.search(word, message.text.encode('utf-8')):
                 return True
 
     def _blocked(self, message):
-        if message.user.lower() in self._conf_params['config']['users_block']:
-            message.text = self._conf_params['config']['main']['message']
+        if message.user.lower() in self.get_config('users_block'):
+            message.text = self.get_config('main', 'message').simple()
 
-        for word in self._conf_params['config']['words_block']:
+        for word in self.get_config('words_block'):
             if re.search(word, message.text.encode('utf-8')):
-                message.text = self._conf_params['config']['main']['message']
+                message.text = self.get_config('main', 'message').simple()

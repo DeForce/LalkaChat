@@ -53,27 +53,26 @@ class Message(threading.Thread):
             description=True,
             hidden=HIDDEN_MODULES)
 
-        conf_gui = {
-            'non_dynamic': ['messaging.messaging']
-        }
+        conf_gui = {}
         config = load_from_config_file(conf_file, conf_dict)
         messaging_module = ConfigModule(
+            config=config,
+            gui=conf_gui,
             conf_params={
                 'folder': main_config['conf_folder'], 'file': conf_file,
                 'filename': ''.join(os.path.basename(conf_file).split('.')[:-1]),
-                'parser': config,
-                'config': conf_dict,
-                'gui': conf_gui},
-            conf_file_name='messaging_modules.cfg',
+                'parser': config},
+            conf_file='messaging_modules.cfg',
             category='messaging'
         )
 
-        modules_list['messaging'] = messaging_module.conf_params()
+        modules_list['messaging'] = messaging_module
 
         modules = collections.defaultdict(list)
         # Loading modules from cfg.
-        if conf_dict['messaging'].value:
-            for m_module_name in conf_dict['messaging'].value:
+        if conf_dict['messaging'].list:
+            enabled_list = []
+            for m_module_name in conf_dict['messaging'].list:
                 log.info("Loading %s" % m_module_name)
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
@@ -83,21 +82,21 @@ class Message(threading.Thread):
 
                 try:
                     class_init = get_class_from_iname(file_path, m_module_name)
-                    class_module = class_init(main_config['conf_folder'],
-                                              root_folder=main_config['root_folder'],
-                                              main_settings=settings,
+                    class_module = class_init(main_settings=settings,
                                               conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(m_module_name)),
                                               queue=self.queue)
 
-                    params = class_module.conf_params()
                     priority = class_module.load_priority
                     if m_module_name in HIDDEN_MODULES:
                         conf_dict['messaging'].skip[m_module_name] = True
+                    if class_module.enabled:
+                        enabled_list.append(m_module_name)
 
                     modules[int(priority)].append(class_module)
-                    modules_list[m_module_name.lower()] = params
+                    modules_list[m_module_name.lower()] = class_module
                 except ModuleLoadException:
                     log.error("Unable to load module {0}".format(m_module_name))
+            messaging_module.config['messaging'].value = enabled_list
         sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
         for sorted_priority, sorted_list in sorted_module:
             for sorted_list_item in sorted_list:
@@ -110,6 +109,7 @@ class Message(threading.Thread):
         # All modules should return the message with modified/not modified
         #  content so it can be passed to new module, or to pass to CLI
         for m_module in self.modules:  # type: MessagingModule
+            log.debug('{}'.format(m_module))
             message = m_module.process_message(message, queue=self.queue)
 
     def run(self):

@@ -153,12 +153,12 @@ class FsChat(WebSocketClient):
         self.queue.put(FsSystemMessage(message, category=category, channel_name=self.channel_name))
 
     def received_message(self, mes):
-        log.debug('received message {}'.format(mes))
         if mes.data == '40':
             return
         if mes.data in ['2', '3']:
             return
-        regex = re.match('(\d+)(.*)', mes.data)
+        log.debug('received message {}'.format(mes))
+        regex = re.match(r'(\d+)(.*)', mes.data)
         sio_iter, json_message = regex.groups()
         if sio_iter == '0':
             self._process_welcome()
@@ -251,7 +251,7 @@ class FsChat(WebSocketClient):
             msg.process_smiles(self.smiles)
             if message['to']:
                 msg.process_pm(message['to'].get('name'), self.channel_name,
-                               self.chat_module.conf_params()['config']['config'].get('show_pm'))
+                               self.chat_module.get_config('config', 'show_pm'))
 
             self.duplicates.append(message['id'])
             if len(self.duplicates) > self.bufferForDup:
@@ -266,7 +266,7 @@ class FsChat(WebSocketClient):
         self.main_thread.viewers = message['result']['amount']
 
     def _post_process_multiple_channels(self, message):
-        if self.chat_module.conf_params()['config']['config']['show_channel_names']:
+        if self.chat_module.get_config('config', 'show_channel_names'):
             message.channel_name = self.channel_name
 
     def _send_message(self, comp):
@@ -314,20 +314,23 @@ class FsChannel(threading.Thread, Channel):
         # Connecting to funstream websocket
         try_count = 0
         while True:
-            try_count += 1
-            log.info("Connecting, try {0}".format(try_count))
-            self._get_info()
-            self.ws = FsChat(self.socket, self.queue, self.get_channel_name(),
-                             protocols=['websocket'], smiles=self.smiles,
-                             main_thread=self, **self.kwargs)
-            if self.ws.crit_error:
-                log.critical("Got critical error, halting")
-                break
-            elif self.ws.channel_id and self.smiles:
-                self.ws.connect()
-                self.ws.run_forever()
-                break
-            time.sleep(5)
+            try:
+                try_count += 1
+                log.info("Connecting, try {0}".format(try_count))
+                self._get_info()
+                self.ws = FsChat(self.socket, self.queue, self.get_channel_name(),
+                                 protocols=['websocket'], smiles=self.smiles,
+                                 main_thread=self, **self.kwargs)
+                if self.ws.crit_error:
+                    log.critical("Got critical error, halting")
+                    break
+                elif self.ws.channel_id and self.smiles:
+                    self.ws.connect()
+                    self.ws.run_forever()
+                    break
+                time.sleep(5)
+            except Exception as exc:
+                log.error('Exception occured {}'.format(exc))
 
     def get_channel_name(self):
         user_payload = {'name': self.slug}
@@ -418,15 +421,9 @@ class TestSc2tv(threading.Thread):
 class SC2TV(ChatModule):
     def __init__(self, *args, **kwargs):
         log.info("Initializing funstream chat")
-        ChatModule.__init__(self, *args, **kwargs)
+        ChatModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
 
         self.socket = CONF_DICT['config']['socket']
-
-    def _conf_settings(self, *args, **kwargs):
-        return CONF_DICT
-
-    def _gui_settings(self, *args, **kwargs):
-        return CONF_GUI
 
     def _test_class(self):
         return TestSc2tv(self)

@@ -121,12 +121,8 @@ class RemoveMessageByUsers(CommandMessage):
 
 
 class RemoveMessageByIDs(CommandMessage):
-    def __init__(self, message_id, text=None, **kwargs):
-        if text:
-            CommandMessage.__init__(self, command='replace_by_ids', **kwargs)
-            self.text = text
-        else:
-            CommandMessage.__init__(self, command='remove_by_ids', **kwargs)
+    def __init__(self, message_id, **kwargs):
+        CommandMessage.__init__(self, command='remove_by_ids', **kwargs)
         self._messages = message_id if isinstance(message_id, list) else [message_id]
         self._jsonable += ['messages']
 

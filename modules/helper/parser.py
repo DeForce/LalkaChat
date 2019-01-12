@@ -7,7 +7,7 @@ import os
 import rtyaml
 from ConfigParser import RawConfigParser
 
-from modules.interface.types import LCPanel, LCStaticBox, LCDict, LCObject
+from modules.interface.types import LCPanel, LCStaticBox, LCDict, LCObject, LCGridDual
 
 DICT_MAPPING = {
     LCPanel: dict,
@@ -20,8 +20,8 @@ def update(dst, src, overwrite=True):
         has_key = k in dst
         dst_type = type(dst.get(k, v))
 
-        if isinstance(v, (LCDict, collections.Mapping)):
-            r = update(dst.get(k, {}), v, overwrite=overwrite)
+        if isinstance(v, (LCDict, collections.Mapping)) and not isinstance(dst.get(k), LCGridDual):
+            r = update(dst.get(k, type(v)()), v, overwrite=overwrite)
             dst[k] = r
         else:
             if has_key and not overwrite:
@@ -36,6 +36,8 @@ def update(dst, src, overwrite=True):
                         dst[k] = dst_type(v)
                 else:
                     dst[k] = v
+            elif isinstance(v, LCObject):
+                dst[k] = v
             else:
                 dst[k] = dst_type(v)
     return dst
