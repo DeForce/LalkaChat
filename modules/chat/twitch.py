@@ -196,16 +196,11 @@ class TwitchMessageHandler(threading.Thread):
 
     def _handle_pm(self, message):
         if re.match('^@?{0}[ ,]?'.format(self.nick), message.text.lower()):
-            if self.chat_module.conf_params()['config']['config'].get('show_pm'):
+            if self.chat_module.get_config()['config'].get('show_pm'):
                 message.pm = True
 
-    def _handle_clearchat(self, msg, text=None):
-        if self.chat_module.conf_params()['config']['config']['show_channel_names']:
-            text = self.kwargs['settings'].get('remove_text')
-        self.message_queue.put(
-            RemoveMessageByUsers(msg.arguments,
-                                 text=text,
-                                 platform=SOURCE))
+    def _handle_clearchat(self, msg):
+        self.message_queue.put(RemoveMessageByUsers(msg.arguments, platform=SOURCE))
 
     def _handle_sub(self, msg):
         if 'system-msg' in msg.tags:
@@ -251,7 +246,7 @@ class TwitchMessageHandler(threading.Thread):
         self._send_message(message)
 
     def _handle_viewer_color(self, message):
-        if self.irc_class.chat_module.conf_params()['config']['config']['show_nickname_colors']:
+        if self.irc_class.chat_module.get_config('config', 'show_nickname_colors'):
             message.nick_colour = message.tags['color']
 
     def _handle_bits(self, message):
@@ -295,7 +290,7 @@ class TwitchMessageHandler(threading.Thread):
 
     def _post_process_multiple_channels(self, message):
         channel_class = self.irc_class.main_class
-        if channel_class.chat_module.conf_params()['config']['config']['show_channel_names']:
+        if channel_class.chat_module.get_config('config', 'show_channel_names'):
             message.channel_name = channel_class.display_name
 
     @staticmethod
@@ -572,11 +567,16 @@ class TWChannel(threading.Thread, Channel):
             request = requests.get(badges_url.format(self.channel_id))
             if request.status_code == 200:
                 for badge, badge_config in request.json()['badge_sets'].items():
-                    self.badges[badge] = {
+                    processed_badge = {
                         version: {
                             'image': v.get('image_url_4x', v.get('image_url_2x', v.get('image_url_1x')))
                         } for version, v in badge_config['versions'].items()
                     }
+
+                    if badge in self.badges:
+                        self.badges[badge].update(processed_badge)
+                    else:
+                        self.badges[badge] = processed_badge
             else:
                 raise Exception("Not successful status code: {0}".format(request.status_code))
         except Exception as exc:
@@ -648,43 +648,26 @@ class TestTwitch(threading.Thread):
 class Twitch(ChatModule):
     def __init__(self, *args, **kwargs):
         log.info("Initializing twitch chat")
-        ChatModule.__init__(self, *args, **kwargs)
+        ChatModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
 
         self.host = CONF_DICT['config']['host']
         self.port = int(CONF_DICT['config']['port'])
         self.bttv = CONF_DICT['config']['bttv']
         self.frankerz = CONF_DICT['config']['frankerz']
-        self.access_code = self._conf_params['config'].get('access_code')
+        self.access_code = self.get_config('access_code')
         if self.access_code:
             headers['Authorization'] = 'OAuth {}'.format(self.access_code)
 
         self.rest_add('GET', 'oidc', self.parse_oidc_request)
         self.rest_add('POST', 'oidc', self.oidc_code)
 
-    def _conf_settings(self, *args, **kwargs):
-        return CONF_DICT
-
-    def _gui_settings(self, *args, **kwargs):
-        return CONF_GUI
-
     def _test_class(self):
         return TestTwitch(self)
-
-    def load_module(self, *args, **kwargs):
-        ChatModule.load_module(self, *args, **kwargs)
-        if 'webchat' in self._loaded_modules:
-            self._loaded_modules['webchat']['class'].add_depend('twitch')
-        self._conf_params['settings']['remove_text'] = self.get_remove_text()
 
     def _add_channel(self, chat):
         self.channels[chat] = TWChannel(self.queue, self.host, self.port, chat, bttv=self.bttv, frankerz=self.frankerz,
                                         settings=self._conf_params['settings'], chat_module=self)
         self.channels[chat].start()
-
-    def apply_settings(self, **kwargs):
-        if 'webchat' in kwargs.get('from_depend', []):
-            self._conf_params['settings']['remove_text'] = self.get_remove_text()
-        ChatModule.apply_settings(self, **kwargs)
 
     def parse_oidc_request(self, req):
         return '<script>' \

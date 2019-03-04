@@ -6,4 +6,3 @@ semantic_version
 jinja2
 pyScss
 rtyaml
-html_sanitizer

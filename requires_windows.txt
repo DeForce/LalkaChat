@@ -7,4 +7,4 @@ jinja2
 pyScss
 rtyaml
 cefpython3==57.1
-html_sanitizer
+more-itertools==5.0.0

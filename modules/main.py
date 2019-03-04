@@ -7,6 +7,7 @@ import logging.config
 import logging.handlers
 import os
 import sys
+import threading
 from collections import OrderedDict
 from time import sleep
 import semantic_version
@@ -14,8 +15,7 @@ from modules.helper.functions import get_class_from_iname, get_modules_in_folder
 from modules.helper.module import ConfigModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
-    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, ModuleLoadException, \
-    get_languages
+    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_languages
 from modules.helper.updater import get_available_versions
 from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSlider, LCChooseMultiple, \
     LCDropdown
@@ -46,17 +46,43 @@ SEM_VERSION = semantic_version.Version(VERSION)
 LOG_FILES_COUNT = 5
 HIDDEN_CHATS = ['hitbox', 'beampro']
 
+
+def load_modules(modules, base_config):
+    for module_name, f_module in modules.iteritems():
+        f_module.load_module(main_settings=base_config, loaded_modules=modules)
+        logging.debug('loaded module {}'.format(module_name))
+
+
 with open('default_branch') as branch_file:
     DEFAULT_BRANCH, DEFAULT_VERSION = branch_file.read().strip().split(',')
 
 
 class MainModule(ConfigModule):
+    def __init__(self, *args, **kwargs):
+        super(MainModule, self).__init__(*args, **kwargs)
+        self._update = False
+        self._update_config = {}
+
     def apply_settings(self, **kwargs):
         changes = kwargs.get('changes', {})
         if 'main.system.release_channel' in changes:
             self._conf_params['config']['system']['current_version'] = 0
 
         ConfigModule.apply_settings(self, **kwargs)
+
+    @property
+    def update(self):
+        return self._update
+
+    def set_update(self, url, version):
+        self._update_config = {'url': url, 'version': version}
+        self._update = True
+
+    def get_update_url(self):
+        return self._update_config['url']
+    
+    def get_version(self):
+        return self._update_config['version']
 
 
 def button_test(event):
@@ -158,40 +184,36 @@ def main(root_logger):
         },
         config=main_config_dict,
         gui=main_config_gui,
-        conf_file_name='config.cfg',
+        conf_file='config.cfg',
         category='main'
     )
-    loaded_modules['main'] = main_class.conf_params()
-    main_config = main_class.conf_params()['config']
+    loaded_modules['main'] = main_class
+    main_config = main_class.get_config()
     root_logger.setLevel(level=logging.getLevelName(str(main_config['system'].get('log_level', 'INFO'))))
 
     if sys.platform.lower().startswith('win'):
         if getattr(sys, 'frozen', False):
-            if not main_config['gui']['show_console']:
+            if not main_class.get_config('gui', 'show_console'):
                 hide_console()
 
     # Checking for updates
     log.info("Checking for updates")
-    if main_class.conf_params()['config']['system']['check_updates']:
+    if main_class.get_config('system', 'check_updates'):
         versions = get_available_versions()
         if versions:
-            main_class.conf_params()['config']['system']['release_channel'].list = versions.keys()
-            channel = main_class.conf_params()['config']['system']['release_channel'].simple()
-            current_version = main_class.conf_params()['config']['system']['current_version']
+            main_class.get_config('system', 'release_channel').list = versions.keys()
+            channel = main_class.get_config('system', 'release_channel').simple()
+            current_version = main_class.get_config('system', 'current_version')
             channel_versions = versions.get(channel, {})
             if channel_versions:
                 latest_version = max(map(int, channel_versions.keys()))
                 if latest_version > int(current_version):
-                    loaded_modules['main']['update'] = True
-                    loaded_modules['main']['update_url'] = versions[channel][unicode(latest_version)]['url']
-                    loaded_modules['main']['update_version'] = latest_version
+                    main_class.set_update(versions[channel][unicode(latest_version)]['url'], latest_version)
 
-    if loaded_modules['main'].get('update'):
+    if main_class.update:
         log.info("There is new update, please update!")
-    else:
-        loaded_modules['main']['update'] = False
 
-    logging.info('Current Version: %s', main_config_dict['system']['current_version'])
+    logging.info('Current Version: %s', main_class.get_config('system', 'current_version'))
 
     # Main GUI Settings
     gui_settings['gui'] = main_config[GUI_TAG].get('gui')
@@ -231,21 +253,17 @@ def main(root_logger):
     chat_conf_dict['chats'] = LCChooseMultiple(get_modules_in_folder('chat'),
                                                available_list=get_modules_in_folder('chat'))
 
-    chat_conf_gui = {
-        'non_dynamic': ['chat.chats']
-    }
+    chat_conf_gui = {'non_dynamic': ['chat.chats']}
 
     chat_init_module = ConfigModule(
-        conf_params={
-            'config': load_from_config_file(chat_modules_file, chat_conf_dict),
-            'gui': chat_conf_gui
-        },
-        conf_file_name='chat_modules.cfg',
+        config=load_from_config_file(chat_modules_file, chat_conf_dict),
+        gui=chat_conf_gui,
+        conf_file='chat_modules.cfg',
         category='chat'
     )
-    loaded_modules['chat'] = chat_init_module.conf_params()
+    loaded_modules['chat'] = chat_init_module
 
-    for chat_module_name in chat_conf_dict['chats'].simple():
+    for chat_module_name in chat_conf_dict['chats'].list:
         log.info("Loading chat module: {0}".format(chat_module_name))
         module_location = os.path.join(chat_location, chat_module_name + ".py")
         if os.path.isfile(module_location):
@@ -262,29 +280,25 @@ def main(root_logger):
                                      testing=main_config_dict['system']['testing_mode'])
             if chat_module_name in HIDDEN_CHATS:
                 chat_conf_dict['chats'].skip[chat_module_name] = True
-            loaded_modules[chat_module_name.lower()] = class_module.conf_params()
+            loaded_modules[chat_module_name.lower()] = class_module
         else:
             log.error("Unable to find {0} module")
 
-    # Actually loading modules
-    for f_module, f_config in loaded_modules.iteritems():
-        if 'class' in f_config:
-            try:
-                f_config['class'].load_module(main_settings=base_config, loaded_modules=loaded_modules)
-                log.debug('loaded module {}'.format(f_module))
-            except ModuleLoadException:
-                msg.modules.remove(loaded_modules[f_module]['class'])
-                loaded_modules.pop(f_module)
     log.info('LalkaChat loaded successfully')
 
     if gui_settings['gui']:
         from modules import gui
         log.info("Loading GUI Interface")
         window = gui.GuiThread(gui_settings=gui_settings,
-                               main_config=loaded_modules['main'],
+                               main_module=loaded_modules['main'],
                                loaded_modules=loaded_modules,
                                queue=queue)
-        loaded_modules['gui'] = window.conf_params()
+        loaded_modules['gui'] = window
+
+        module_load_thread = threading.Thread(target=load_modules, args=[loaded_modules, base_config])
+        module_load_thread.daemon = True
+        module_load_thread.start()
+
         window.run()
     else:
         if main_config_dict['gui']['cli']:

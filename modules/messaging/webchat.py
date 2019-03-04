@@ -1,5 +1,6 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
 import Queue
+import cgi
 import datetime
 import json
 
@@ -9,7 +10,6 @@ import socket
 import threading
 
 import cherrypy
-from html_sanitizer import Sanitizer
 from cherrypy.lib.static import serve_file
 from scss import Compiler
 from scss.namespace import Namespace
@@ -65,8 +65,6 @@ TYPE_DICT = {
     CommandMessage: 'command'
 }
 
-SANITIZER = Sanitizer()
-
 
 def class_replace(dst, src):
     for k, v in src.items():
@@ -100,8 +98,10 @@ def prepare_message(message, style_settings, msg_class):
                 payload['type'] = m_type
 
     if message['type'] == 'command':
-        if payload['command'].startswith('replace'):
-            payload['text'] = unicode(style_settings['keys']['remove_text'])
+        if payload['command'].startswith('remove'):
+            if not style_settings['keys']['replace_message']:
+                payload['text'] = cgi.escape(unicode(style_settings['keys']['replace_text']))
+                payload['command'] = payload['command'].replace('remove', 'replace')
         return message
 
     if 'levels' in payload:
@@ -117,7 +117,7 @@ def prepare_message(message, style_settings, msg_class):
     if 'platform' in payload:
         payload['platform'] = process_platform(payload['platform'])
 
-    payload['text'] = SANITIZER.sanitize(payload['text'])
+    payload['text'] = cgi.escape(payload['text'])
     return message
 
 
@@ -341,10 +341,9 @@ class RestRoot(object):
         self.settings = settings
         self._rest_modules = {}
 
-        for name, params in modules.iteritems():
-            module_class = params.get('class', None)
-            if module_class:
-                api = params['class'].rest_api()
+        for name, module in modules.iteritems():
+            if module:
+                api = module.rest_api()
                 if api:
                     self._rest_modules[name] = api
 
@@ -551,15 +550,11 @@ def socket_open(host, port):
 
 class Webchat(MessagingModule):
     def __init__(self, *args, **kwargs):
-        MessagingModule.__init__(self, hidden=True, *args, **kwargs)
+        MessagingModule.__init__(self, config=CONF_DICT, gui=self._gui_settings(), hidden=True, *args, **kwargs)
         self._load_priority = 9001
         self._category = 'main'
-        conf_params = self._conf_params['config']
 
         self._conf_params.update({
-            'host': str(conf_params['server']['host']),
-            'port': str(conf_params['server']['port']),
-
             'style_settings': {
                 'gui_chat': {
                     'style_name': None,
@@ -575,6 +570,8 @@ class Webchat(MessagingModule):
         })
         self.prepare_style_settings()
         self.style_settings = self._conf_params['style_settings']
+        self.host = self.get_config('server', 'host').simple()
+        self.port = self.get_config('server', 'port').simple()
 
         self.s_thread = None
         self.queue = kwargs.get('queue')
@@ -591,19 +588,17 @@ class Webchat(MessagingModule):
         self.start_webserver()
 
     def start_webserver(self):
-        host = self._conf_params['host']
-        port = self._conf_params['port']
-        if socket_open(host, port):
+        if socket_open(self.host, self.port):
             try:
-                self.s_thread = SocketThread(host, port, CONF_FOLDER,
-                                             style_settings=self._conf_params['style_settings'],
+                self.s_thread = SocketThread(self.host, self.port, CONF_FOLDER,
+                                             style_settings=self.style_settings,
                                              modules=self._loaded_modules)
                 self.s_thread.start()
             except:
-                log.error('Unable to bind at {}:{}'.format(host, port))
+                log.error('Unable to bind at {}:{}'.format(self.host, self.port))
 
             for thread in range(WS_THREADS):
-                self.message_threads.append(MessagingThread(self._conf_params['style_settings']))
+                self.message_threads.append(MessagingThread(self.style_settings))
                 self.message_threads[thread].start()
         else:
             log.error("Port is already used, please change webchat port")
@@ -625,10 +620,10 @@ class Webchat(MessagingModule):
         self.queue.put(CommandMessage('reload'))
 
     def apply_settings(self, **kwargs):
-        save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections', ()))
+        save_settings(self.conf_params, ignored_sections=self.conf_params['gui'].get('ignored_sections', ()))
         html_template = jinja2.Template(HTML_TEMPLATE)
         with open('{}/index.html'.format(HTTP_FOLDER), 'w') as template_file:
-            template_file.write(html_template.render(port=self._conf_params['port']))
+            template_file.write(html_template.render(port=self.port))
         if 'system_exit' in kwargs:
             return
 
@@ -636,30 +631,22 @@ class Webchat(MessagingModule):
         changed_chat_type = [item for item in changes if item in self._conf_params['style_settings']]
         if changed_chat_type:
             for chat in changed_chat_type:
-                style_name = self._conf_params['config'][chat]['style']
+                style_name = self.get_config(chat, 'style')
                 self._conf_params['style_settings'][chat]['style_name'] = style_name.value
                 self._conf_params['style_settings'][chat]['location'] = self.get_style_path(style_name.value)
 
         if changes:
             self.s_thread.update_settings()
             self.s_thread.mount_dirs()
-        chat_style = self._conf_params['config']['server_chat']['style'].value
-        gui_style = self._conf_params['config']['gui_chat']['style'].value
+        chat_style = self.get_config('server_chat', 'style').value
+        gui_style = self.get_config('gui_chat', 'style').value
         self.update_style_settings(chat_style, gui_style)
         self.reload_chat()
 
-        if self._conf_params['dependencies']:
-            for module in self._conf_params['dependencies']:
-                self._loaded_modules[module]['class'].apply_settings(from_depend='webchat')
+        for module in self._dependencies:
+            self._loaded_modules[module].apply_settings(from_depend='webchat')
 
-    def gui_button_press(self, gui_module, event, list_keys):
-        log.debug("Received button press for id {0}".format(event.GetId()))
-        keys = MODULE_KEY.join(list_keys)
-        if keys == 'menu.reload':
-            self.reload_chat()
-        event.Skip()
-
-    def process_message(self, message, **kwargs):
+    def _process_message(self, message, **kwargs):
         if not hasattr(message, 'hidden'):
             s_queue.put(message)
         return message
@@ -733,8 +720,8 @@ class Webchat(MessagingModule):
 
     def update_style_settings(self, chat_style, gui_style):
         params = self._conf_params['style_settings']
-        params['server_chat']['keys'] = self._conf_params['config']['server_chat']['style_settings']
-        params['gui_chat']['keys'] = self._conf_params['config']['gui_chat']['style_settings']
+        params['server_chat']['keys'] = self.get_config('server_chat', 'style_settings')
+        params['gui_chat']['keys'] = self.get_config('gui_chat', 'style_settings')
         self.write_style_to_file(chat_style, 'server_chat')
         self.write_style_to_file(gui_style, 'gui_chat')
 
@@ -742,8 +729,8 @@ class Webchat(MessagingModule):
         server_style_settings = self._conf_params['style_settings']['server_chat']
         gui_style_settings = self._conf_params['style_settings']['gui_chat']
 
-        server_style = self._conf_params['config']['server_chat']['style']
-        gui_style = self._conf_params['config']['gui_chat']['style']
+        server_style = self.get_config('server_chat', 'style')
+        gui_style = self.get_config('gui_chat', 'style')
 
         server_style_settings['style_name'] = server_style
         server_style_settings['location'] = self.get_style_path(server_style.value)
@@ -752,9 +739,6 @@ class Webchat(MessagingModule):
         gui_style_settings['style_name'] = gui_style
         gui_style_settings['location'] = self.get_style_path(gui_style.value)
         gui_style_settings['keys'] = self.load_style_settings(gui_style.value, 'gui_chat')
-
-    def _conf_settings(self, *args, **kwargs):
-        return CONF_DICT
 
     def _gui_settings(self):
         return {
@@ -779,6 +763,7 @@ class Webchat(MessagingModule):
                 }
             },
             'non_dynamic': ['server.*'],
+            'system': {'hidden': ['enabled']},
 
             'ignored_sections': ['gui_chat.style_settings', 'server_chat.style_settings'],
         }

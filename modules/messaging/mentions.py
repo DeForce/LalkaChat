@@ -9,30 +9,14 @@ CONF_DICT = LCPanel()
 CONF_DICT['mentions'] = LCGridSingle()
 CONF_DICT['address'] = LCGridSingle()
 
-CONF_GUI = {
-    'mentions': {
-        'addable': 'true',
-        'view': 'list'},
-    'address': {
-        'addable': 'true',
-        'view': 'list'}
-}
-
 
 class Mentions(MessagingModule):
     def __init__(self, *args, **kwargs):
-        MessagingModule.__init__(self, *args, **kwargs)
-        # Creating filter and replace strings.
-
-    def _conf_settings(self, *args, **kwargs):
-        return CONF_DICT
-
-    def _gui_settings(self, *args, **kwargs):
-        return CONF_GUI
+        MessagingModule.__init__(self, config=CONF_DICT, *args, **kwargs)
 
     @process_text_messages
     @ignore_system_messages
-    def process_message(self, message, **kwargs):
+    def _process_message(self, message, **kwargs):
         # Replacing the message if needed.
         # Please do the needful
         self._check_addressed(message)
@@ -41,14 +25,14 @@ class Mentions(MessagingModule):
         return message
 
     def _check_mentions(self, message):
-        for mention in self._conf_params['config']['mentions']:
+        for mention in self.get_config('mentions'):
             if mention in message.text.lower().split(' '):
                 message.mention = True
                 message.jsonable += ['mention']
                 break
 
     def _check_addressed(self, message):
-        for address in self._conf_params['config']['address']:
+        for address in self.get_config('address'):
             if address == message.text.lower().split(' ')[0]:
                 message.pm = True
                 break

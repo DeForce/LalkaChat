@@ -33,7 +33,6 @@ def parse_keys_to_string(data):
 
 def get_config_item_path(*keys):
     new_list = list(*keys)
-    new_list.insert(1, 'config')
     return new_list
 
 

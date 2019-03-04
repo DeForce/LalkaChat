@@ -1,7 +1,7 @@
 {
   "show_system_msg": true, 
-  "remove_message": true,
-  "remove_text": "<message removed>",
+  "replace_message": true,
+  "replace_text": "<message removed>",
   "clear_timer": -1,
   "decay_timer": -1,
   "message_opacity": 67,

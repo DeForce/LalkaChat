@@ -46,7 +46,7 @@ class Levels(MessagingModule):
             db.close()
 
     def __init__(self, *args, **kwargs):
-        MessagingModule.__init__(self, *args, **kwargs)
+        MessagingModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
 
         self.experience = None
         self.exp_for_level = None
@@ -58,20 +58,11 @@ class Levels(MessagingModule):
         self.decrease_window = None
         self.threshold_users = None
 
-    def _conf_settings(self, *args, **kwargs):
-        return CONF_DICT
-
-    def _gui_settings(self, *args, **kwargs):
-        return CONF_GUI
-
     def load_module(self, *args, **kwargs):
         MessagingModule.load_module(self, *args, **kwargs)
-        if 'webchat' not in self._loaded_modules:
-            raise ModuleLoadException("Unable to find webchat module that is needed for level module")
-        else:
-            self._loaded_modules['webchat']['class'].add_depend('levels')
+        self._loaded_modules['webchat'].add_depend('levels')
 
-        conf_dict = self._conf_params['config']
+        conf_dict = self.get_config()
 
         self.experience = None
         self.exp_for_level = None
@@ -84,7 +75,7 @@ class Levels(MessagingModule):
         self.threshold_users = {}
 
         # Load levels
-        webchat_location = self._loaded_modules['webchat']['style_settings']['gui_chat']['location']
+        webchat_location = self._loaded_modules['webchat'].style_settings['gui_chat']['location']
         if webchat_location and os.path.exists(webchat_location):
             self.level_file = os.path.join(webchat_location, 'levels.xml')
         else:
@@ -98,9 +89,9 @@ class Levels(MessagingModule):
         self.load_levels()
 
     def load_levels(self):
-        self.experience = str(self._conf_params['config']['config'].get('experience'))
-        self.exp_for_level = float(self._conf_params['config']['config'].get('exp_for_level'))
-        self.exp_for_message = float(self._conf_params['config']['config'].get('exp_for_message'))
+        self.experience = str(self.get_config('config').get('experience'))
+        self.exp_for_level = float(self.get_config('config').get('exp_for_level'))
+        self.exp_for_message = float(self.get_config('config').get('exp_for_message'))
 
         if self.levels:
             self.levels = []
@@ -110,7 +101,7 @@ class Levels(MessagingModule):
 
         self.level_file = os.path.abspath(
             os.path.join(
-                self._loaded_modules['webchat']['style_settings']['gui_chat']['location'], 'levels.xml'
+                self._loaded_modules['webchat'].style_settings['gui_chat']['location'], 'levels.xml'
             )
         )
         tree = ElementTree.parse(self.level_file)
@@ -130,7 +121,7 @@ class Levels(MessagingModule):
                 self.levels.append(level_data.attrib)
 
     def apply_settings(self, **kwargs):
-        save_settings(self.conf_params(), ignored_sections=self._conf_params['gui'].get('ignored_sections', ()))
+        save_settings(self.get_config(), ignored_sections=self.conf_params['gui'].get('ignored_sections', ()))
         self.load_levels()
 
     def set_level(self, user, queue):
@@ -169,7 +160,7 @@ class Levels(MessagingModule):
                 max_level += 1
             queue.put(
                 SystemMessage(
-                    self._conf_params['config']['config']['message'].decode('utf-8').format(
+                    self.get_config('config', 'message').decode('utf-8').format(
                         user,
                         self.levels[max_level]['name']),
                     category='module'
@@ -180,7 +171,7 @@ class Levels(MessagingModule):
 
     @process_text_messages
     @ignore_system_messages
-    def process_message(self, message, queue=None, **kwargs):
+    def _process_message(self, message, queue=None, **kwargs):
         if message.user in self.special_levels:
             level_info = self.special_levels[message.user]
             try:

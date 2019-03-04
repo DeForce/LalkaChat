@@ -101,21 +101,16 @@ class BeamProMessageHandler(threading.Thread):
         message_args = message['data']['message']['message']
         return ''.join([msg['text'] for msg in message_args])
 
-    def _process_delete_event(self, message, text=None):
-        if self.main_class.conf_params()['config']['config']['show_channel_names']:
-            text = self.main_class.conf_params()['settings'].get('remove_text')
+    def _process_delete_event(self, message):
         id_to_delete = ID_PREFIX.format(message['data']['id'])
         self.message_queue.put(
             RemoveMessageByIDs(
                 id_to_delete,
-                text=text,
                 platform=SOURCE
             )
         )
 
-    def _process_purge_event(self, message, text=None):
-        if self.main_class.conf_params()['config']['config']['show_channel_names']:
-            text = self.main_class.conf_params()['settings'].get('remove_text')
+    def _process_purge_event(self, message):
         user_id = message['data']['user_id']
         nickname_req = requests.get(API_URL.format('/channels/{}'.format(user_id)))
         if not nickname_req.ok:
@@ -124,13 +119,12 @@ class BeamProMessageHandler(threading.Thread):
         self._send_message(
             RemoveMessageByUsers(
                 nickname,
-                text=text,
                 platform=SOURCE
             )
         )
 
     def _post_process_multiple_channels(self, message):
-        if self.main_class.conf_params()['config']['config']['show_channel_names']:
+        if self.main_class.get_config('config', 'show_channel_names'):
             message.channel_name = self.channel_nick
 
     def _send_message(self, message):
@@ -334,7 +328,6 @@ class beampro(ChatModule):
         ChatModule.load_module(self, *args, **kwargs)
         if 'webchat' in self._loaded_modules:
             self._loaded_modules['webchat']['class'].add_depend('beampro')
-        self._conf_params['settings']['remove_text'] = self.get_remove_text()
 
     @staticmethod
     def get_viewers(channel_id):
@@ -353,6 +346,4 @@ class beampro(ChatModule):
         self.channels[chat].start()
 
     def apply_settings(self, **kwargs):
-        if 'webchat' in kwargs.get('from_depend', []):
-            self._conf_params['settings']['remove_text'] = self.get_remove_text()
         ChatModule.apply_settings(self, **kwargs)
