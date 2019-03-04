@@ -37,13 +37,13 @@ class DF(MessagingModule):
                 if user == line.split(',')[0]:
                     return
         with open(self.file, 'a') as a_file:
-            a_file.write("{0},{1}\n".format(user, role))
+            a_file.write(f"{user},{role}\n")
 
     @process_text_messages
     @ignore_system_messages
     def _process_message(self, message, **kwargs):
-        for role, regexp in self.get_config('prof').value.iteritems():
-            if re.search('{0}{1}'.format(self.get_config('grep', 'symbol'), regexp).decode('utf-8'),
+        for role, regexp in self.get_config('prof').value.items():
+            if re.search(f'{self.get_config("grep", "symbol")}{regexp}',
                          message.text):
                 self.write_to_file(message.user, role.capitalize())
                 break

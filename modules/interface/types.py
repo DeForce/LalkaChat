@@ -1,4 +1,5 @@
 import collections
+from functools import reduce
 
 import wx
 import wx.grid
@@ -12,12 +13,6 @@ from modules.interface.controls import KeyChoice, CustomColourPickerCtrl, KeyLis
 log = logging.getLogger('interface/types')
 LEFT_BORDER = 5
 TEXT_BORDER = 20
-
-
-def get_unicode(string):
-    if isinstance(string, str):
-        return string.decode('utf8')
-    return string
 
 
 def dict_instance(d):
@@ -47,8 +42,11 @@ class LCObject(object):
 
         self.properties = ['always_on']
 
+    def __bool__(self):
+        return self._value.__bool__()
+
     def __len__(self):
-        return len(self._value)
+        return self._value.__len__()
 
     def __contains__(self, item):
         return item in self._value
@@ -73,7 +71,7 @@ class LCObject(object):
         self._value = value
 
     def _create_ui(self, panel=None, key=None, **kwargs):
-        raise NotImplementedError('create_ui is not implemented in {}'.format(type(self)))
+        raise NotImplementedError(f'create_ui is not implemented in {type(self)}')
 
     def create_ui(self, **kwargs):
         self.module = kwargs.get('module')
@@ -109,10 +107,12 @@ class LCObject(object):
 
 
 class LCDict(LCObject):
-
     def __init__(self, *args, **kwargs):
         super(LCDict, self).__init__(*args, **kwargs)
         self._value = OrderedDict()
+
+    def __bool__(self):
+        return bool(self.__len__())
 
     def __setitem__(self, key, value):
         self._value[key] = value
@@ -143,9 +143,6 @@ class LCDict(LCObject):
 
     def items(self):
         return self._value.items()
-
-    def iteritems(self):
-        return self._value.iteritems()
 
     def _create_ui(self, panel=None, key=None, **kwargs):
         pass
@@ -192,7 +189,7 @@ class LCStaticBox(LCDict):
 
         max_text_size = 0
         text_ctrls = []
-        log.debug("Working on {0}".format(MODULE_KEY.join(key)))
+        log.debug("Working on %s", MODULE_KEY.join(key))
         spacer = False
         hidden_items = kwargs['gui'].get('hidden', [])
 
@@ -227,23 +224,21 @@ class LCStaticBox(LCDict):
 
 class LCText(LCObject):
     def __init__(self, value=None):
-        if isinstance(value, str):
-            value = value.decode('utf8')
-        elif isinstance(value, int):
-            value = unicode(value)
-        elif not isinstance(value, unicode) and not isinstance(value, LCText):
-            raise TypeError('LCText should be text, not {}'.format(type(value)))
+        if isinstance(value, int):
+            value = str(value)
+        elif not isinstance(value, str) and not isinstance(value, LCText):
+            raise TypeError(f'LCText should be text, not {type(value)}')
 
         LCObject.__init__(self, value)
 
     def simple(self):
-        return unicode(self._value)
+        return self._value
 
     def __repr__(self):
-        return unicode(self._value)
+        return self._value
 
     def __str__(self):
-        return unicode(self._value)
+        return self._value
 
     def __int__(self):
         return int(self._value)
@@ -251,19 +246,13 @@ class LCText(LCObject):
     def __float__(self):
         return float(self._value)
 
-    def decode(self, *args, **kwargs):
-        return self._value.decode(*args, **kwargs)
-
-    def encode(self, *args, **kwargs):
-        return self._value.encode(*args, **kwargs)
-
     def format(self, *args):
         return self._value.format(*args)
 
     def bind(self, event):
         log.debug(event)
         text_ctrl = self.wx_controls['control']
-        self.parent.on_change(self.key, get_unicode(text_ctrl.GetValue()))
+        self.parent.on_change(self.key, text_ctrl.GetValue())
 
     def _enable(self):
         self.wx_controls['control'].Enable()
@@ -276,7 +265,7 @@ class LCText(LCObject):
     def _create_ui(self, panel=None, key=None, **kwargs):
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
         item_name = MODULE_KEY.join(key)
-        item_box = wx.TextCtrl(panel, value=unicode(self._value))
+        item_box = wx.TextCtrl(panel, value=self._value)
         item_box.Bind(wx.EVT_TEXT, self.bind)
         item_text = wx.StaticText(panel, label=translate_key(item_name))
         item_sizer.Add(item_text, 0, wx.ALIGN_CENTER | wx.RIGHT, TEXT_BORDER)
@@ -296,7 +285,7 @@ class LCColour(LCObject):
         return str(self._value)[item]
 
     def simple(self):
-        return unicode(self._value)
+        return self._value
 
     def startswith(self, value):
         return str(self._value).startswith(value)
@@ -466,7 +455,7 @@ class LCList(LCObject):
         item_sizer = wx.BoxSizer(wx.VERTICAL)
 
         static_label = MODULE_KEY.join(key)
-        static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
+        static_text = wx.StaticText(panel, label=f'{translate_key(static_label)}:', style=wx.ALIGN_RIGHT)
         item_sizer.Add(static_text)
 
         input_ctrl = None
@@ -675,7 +664,7 @@ class LCDropdown(LCObject):
 
     def _create_ui(self, panel=None, key=None, **kwargs):
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        choices = self.list
+        choices = list(self.list)
         translated_choices = [translate_key(item) for item in choices]
         item_name = MODULE_KEY.join(key)
         item_text = wx.StaticText(panel, label=translate_key(item_name))
@@ -829,7 +818,7 @@ class LCGridDual(LCObject):
         item_sizer = wx.BoxSizer(wx.VERTICAL)
 
         static_label = MODULE_KEY.join(key)
-        static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
+        static_text = wx.StaticText(panel, label=f'{translate_key(static_label)}:', style=wx.ALIGN_RIGHT)
         item_sizer.Add(static_text)
 
         inputs = {}
@@ -967,7 +956,7 @@ class LCChooseSingle(LCObject):
 
         static_label = MODULE_KEY.join(key)
         if not self.empty_label:
-            static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
+            static_text = wx.StaticText(panel, label=f'{translate_key(static_label)}:', style=wx.ALIGN_RIGHT)
             item_sizer.Add(static_text)
 
         item_key = MODULE_KEY.join(key + ['list_box'])
@@ -1042,7 +1031,7 @@ class LCChooseMultiple(LCChooseSingle):
 
         static_label = MODULE_KEY.join(key)
         if not self.empty_label:
-            static_text = wx.StaticText(panel, label=u'{}:'.format(translate_key(static_label)), style=wx.ALIGN_RIGHT)
+            static_text = wx.StaticText(panel, label=f'{translate_key(static_label)}:', style=wx.ALIGN_RIGHT)
             item_sizer.Add(static_text)
 
         item_key = MODULE_KEY.join(key + ['list_box'])
@@ -1084,7 +1073,6 @@ TYPE_TO_LC = {
     OrderedDict: LCStaticBox,
     bool: LCBool,
     str: LCText,
-    unicode: LCText,
     int: LCText,
     'spin': LCSpin,
     'dropdown': LCDropdown,

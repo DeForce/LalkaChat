@@ -24,8 +24,8 @@ CONF_DICT['config']['message'] = LCText(u'{0} has leveled up, now he is {1}')
 CONF_DICT['config']['db'] = LCText(os.path.join('conf', u'levels.db'))
 CONF_DICT['config']['experience'] = LCDropdown('geometrical', ['geometrical', 'static', 'random'])
 CONF_DICT['config']['exp_for_level'] = LCSpin(200)
-CONF_DICT['config']['exp_for_message'] = LCSpin(1, min=0, max=sys.maxint)
-CONF_DICT['config']['decrease_window'] = LCSpin(1, min=0, max=sys.maxint)
+CONF_DICT['config']['exp_for_message'] = LCSpin(1, min=0, max=sys.maxsize)
+CONF_DICT['config']['decrease_window'] = LCSpin(1, min=0, max=sys.maxsize)
 
 
 CONF_GUI = {
@@ -79,8 +79,8 @@ class Levels(MessagingModule):
         if webchat_location and os.path.exists(webchat_location):
             self.level_file = os.path.join(webchat_location, 'levels.xml')
         else:
-            log.error("{0} not found, generating from template".format(self.level_file))
-            raise ModuleLoadException("{0} not found, generating from template".format(self.level_file))
+            log.error("%s not found, generating from template", self.level_file)
+            raise ModuleLoadException(f"{self.level_file} not found, generating from template")
 
         if self.experience == 'random':
             self.db_location += '.random'
@@ -116,7 +116,7 @@ class Levels(MessagingModule):
                     level_exp = self.exp_for_level * level_count
                 level_data.attrib['exp'] = level_exp
                 if not level_data.attrib['url'].startswith('/'):
-                    level_data.attrib['url'] = '/{}'.format(level_data.attrib['url'])
+                    level_data.attrib['url'] = f'/{level_data.attrib["url"]}'
 
                 self.levels.append(level_data.attrib)
 
@@ -160,7 +160,7 @@ class Levels(MessagingModule):
                 max_level += 1
             queue.put(
                 SystemMessage(
-                    self.get_config('config', 'message').decode('utf-8').format(
+                    self.get_config('config', 'message').format(
                         user,
                         self.levels[max_level]['name']),
                     category='module'

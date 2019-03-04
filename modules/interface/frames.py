@@ -142,7 +142,7 @@ class StatusFrame(wx.Panel):
                                  size=wx.Size(16, 16))
         module_sizer.Add(bitmap, 0, wx.EXPAND)
 
-        channel_name = '{}: '.format(channel) if multiple else ''
+        channel_name = f'{channel}: ' if multiple else ''
         channel_text = wx.StaticText(self, id=wx.ID_ANY, label=channel_name)
         module_sizer.Add(channel_text, 0, wx.EXPAND)
 
@@ -245,7 +245,7 @@ class StatusFrame(wx.Panel):
         for chat_name, chat in self.chats.items():
             show_names = self.chat_modules[chat_name].get_config('config', 'show_channel_names')
             for name, ch_status in self.chats[chat_name].items():
-                channel = '{}: '.format(ch_status.name) if show_names else ''
+                channel = f'{ch_status.name}: ' if show_names else ''
                 wx.CallAfter(self._update_channel_name,
                              self.chats[chat_name][name], channel)
         wx.CallAfter(self.Layout)
@@ -262,7 +262,7 @@ class StatusFrame(wx.Panel):
         if isinstance(viewers, int):
             viewers = str(viewers)
         if len(viewers) >= 5:
-            viewers = '{0}k'.format(viewers[:-3])
+            viewers = f'{viewers[:-3]}k'
 
         status = self.chats[module_name][channel.lower()]
         if status.viewers == viewers:

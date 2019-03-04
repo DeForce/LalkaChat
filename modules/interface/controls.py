@@ -25,7 +25,7 @@ class CustomColourPickerCtrl(object):
         label_panel = wx.Panel(panel, style=wx.BORDER_SIMPLE)
         label_sizer = wx.BoxSizer(wx.HORIZONTAL)
         label_sizer2 = wx.BoxSizer(wx.VERTICAL)
-        label_text = wx.StaticText(label_panel, label=unicode(value), style=wx.ALIGN_CENTER)
+        label_text = wx.StaticText(label_panel, label=value, style=wx.ALIGN_CENTER)
         self.text = label_text
         label_sizer.Add(label_text, 1, wx.ALIGN_CENTER)
         label_sizer2.Add(label_sizer, 1, wx.ALIGN_CENTER)

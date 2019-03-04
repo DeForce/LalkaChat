@@ -100,7 +100,7 @@ def load_translations_keys(translation_folder, language):
         if language_item in dir_list:
             load_language(os.path.join(translation_folder, language_item))
         else:
-            log.warning("Unable to load language {0}".format(language_item))
+            log.warning("Unable to load language %s", language_item)
 
 
 def find_key_translation(item, language=ACTIVE_LANGUAGE):
@@ -109,7 +109,7 @@ def find_key_translation(item, language=ACTIVE_LANGUAGE):
         split_item = [f_item for f_item in item.split(MODULE_KEY) if f_item != '*']
         if len(split_item) > 1:
             wildcard_item = MODULE_KEY.join(split_item[1:])
-            return find_key_translation('*{0}{1}'.format(MODULE_KEY, wildcard_item))
+            return find_key_translation(f'*{MODULE_KEY}{wildcard_item}')
         else:
             if language == ACTIVE_LANGUAGE:
                 return find_key_translation(item, language=DEFAULT_LANGUAGE)
@@ -133,12 +133,12 @@ def translate_key(item):
 
     if re.match('\*', translation):
         return old_item
-    return translation.replace('\\n', '\n').decode('utf-8')
+    return translation.replace('\\n', '\n')
 
 
 def cleanup_tags(message):
     for symbol in REPLACE_SYMBOLS:
-        message.replace(symbol, '\{0}'.format(symbol))
+        message.replace(symbol, f'\{symbol}')
     return message
 
 
@@ -160,7 +160,7 @@ def get_update(sem_version):
                     update_url = update_item['html_url']
             return update, update_url
     except Exception as exc:
-        log.info("Got exception: {0}".format(exc))
+        log.info("Got exception: %s", exc)
     return False, None
 
 

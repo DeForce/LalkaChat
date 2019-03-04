@@ -41,7 +41,7 @@ class Blacklist(MessagingModule):
             return True
 
         for word in self.get_config('words_hide'):
-            if re.search(word, message.text.encode('utf-8')):
+            if re.search(word, message.text):
                 return True
 
     def _blocked(self, message):
@@ -49,5 +49,5 @@ class Blacklist(MessagingModule):
             message.text = self.get_config('main', 'message').simple()
 
         for word in self.get_config('words_block'):
-            if re.search(word, message.text.encode('utf-8')):
+            if re.search(word, message.text):
                 message.text = self.get_config('main', 'message').simple()

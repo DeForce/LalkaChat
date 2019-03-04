@@ -77,13 +77,13 @@ class Message(threading.Thread):
                 # We load the module, and then we initalize it.
                 # When writing your modules you should have class with the
                 #  same name as module name
-                join_path = [main_config['root_folder']] + self.module_tag.split('.') + ['{0}.py'.format(m_module_name)]
+                join_path = [main_config['root_folder']] + self.module_tag.split('.') + [f'{m_module_name}.py']
                 file_path = os.path.join(*join_path)
 
                 try:
                     class_init = get_class_from_iname(file_path, m_module_name)
                     class_module = class_init(main_settings=settings,
-                                              conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(m_module_name)),
+                                              conf_file=os.path.join(CONF_FOLDER, f'{m_module_name}.cfg'),
                                               queue=self.queue)
 
                     priority = class_module.load_priority
@@ -95,7 +95,7 @@ class Message(threading.Thread):
                     modules[int(priority)].append(class_module)
                     modules_list[m_module_name.lower()] = class_module
                 except ModuleLoadException:
-                    log.error("Unable to load module {0}".format(m_module_name))
+                    log.error("Unable to load module %s", m_module_name)
             messaging_module.config['messaging'].value = enabled_list
         sorted_module = sorted(modules.items(), key=operator.itemgetter(0))
         for sorted_priority, sorted_list in sorted_module:
@@ -109,7 +109,7 @@ class Message(threading.Thread):
         # All modules should return the message with modified/not modified
         #  content so it can be passed to new module, or to pass to CLI
         for m_module in self.modules:  # type: MessagingModule
-            log.debug('{}'.format(m_module))
+            log.debug('%s', m_module)
             message = m_module.process_message(message, queue=self.queue)
 
     def run(self):

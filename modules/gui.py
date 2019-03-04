@@ -19,10 +19,10 @@ import logging
 import wx
 from modules.helper.system import translate_key, WINDOWS, LOG_FOLDER
 from modules.helper.module import UIModule
-from interface import TRANSPARENCY_MULTIPLIER
+from modules.interface import TRANSPARENCY_MULTIPLIER
 
 if WINDOWS:
-    from interface import chromium as browser
+    from modules.interface import chromium as browser
 
     HAS_CHROME = True
 else:
@@ -72,8 +72,8 @@ class ChatGui(wx.Frame):
                           size=self.gui_settings.get('size'),
                           pos=self.gui_settings.get('position'))
         # Set window style
-        if self.gui_settings.get('transparency') > 0:
-            transp = self.gui_settings.get('transparency')
+        if self.gui_settings.get('transparency').value > 0:
+            transp = self.gui_settings.get('transparency').value
             if transp > 90:
                 transp = 90
             log.info("Application is transparent")
@@ -215,7 +215,7 @@ class ChatGui(wx.Frame):
         config['pos_x'] = self.Position.x
         config['pos_y'] = self.Position.y
 
-        for module_name, module_dict in self.loaded_modules.iteritems():
+        for module_name, module_dict in self.loaded_modules.items():
             log.info('stopping %s', module_name)
             module_dict.apply_settings(system_exit=True)
         self.status_frame.Close()
@@ -231,7 +231,7 @@ class ChatGui(wx.Frame):
         event.Skip()
 
     def on_settings(self, event):
-        log.debug("Got event from {0}".format(event.GetId()))
+        log.debug("Got event from %s", event.GetId())
         if self.settings_window:
             self.settings_window.Maximize(False)
             self.settings_window.Raise()
@@ -288,6 +288,7 @@ class GuiThread(UIModule):
         else:
             app = wx.App(True, filename=os.path.join(LOG_FOLDER, 'main.log'))
         self.gui = ChatGui(None, "LalkaChat", url, **self.kwargs)  # A Frame is a top-level window.
+        self.gui.SetIcon(wx.Icon(self.kwargs['loaded_modules']['main'].get_config('system', 'icon').value))
         app.MainLoop()
         log.info('quit main loop')
         del app

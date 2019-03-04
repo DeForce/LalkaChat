@@ -13,7 +13,8 @@ from ws4py.client.threadedclient import WebSocketClient
 
 from modules.gui import MODULE_KEY
 from modules.helper.message import TextMessage, SystemMessage, Emote
-from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_NO_VIEWERS, CHANNEL_OFFLINE
+from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_NO_VIEWERS, CHANNEL_OFFLINE, \
+    CHANNEL_DISABLED
 from modules.helper.system import translate_key, EMOTE_FORMAT
 from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText
 
@@ -89,7 +90,7 @@ class FsChatMessage(TextMessage):
                         self._emotes.append(Emote(smile, smile_find['url']))
 
     def process_pm(self, to_name, channel_name, show_pm):
-        self.text = u'@{},{}'.format(to_name, self.text)
+        self._text = f'@{to_name},{self.text}'
         if to_name == channel_name:
             if show_pm:
                 self._pm = True
@@ -157,7 +158,7 @@ class FsChat(WebSocketClient):
             return
         if mes.data in ['2', '3']:
             return
-        log.debug('received message {}'.format(mes))
+        log.debug('received message %s', mes)
         regex = re.match(r'(\d+)(.*)', mes.data)
         sio_iter, json_message = regex.groups()
         if sio_iter == '0':
@@ -179,7 +180,7 @@ class FsChat(WebSocketClient):
             else:
                 error_message = request.json()
                 if 'message' in error_message:
-                    log.error("Unable to get channel ID. {0}".format(error_message['message']))
+                    log.error("Unable to get channel ID. %s", error_message['message'])
                     self.closed(4000, 'INV_CH_ID')
                 else:
                     log.error("Unable to get channel ID. No message available")
@@ -191,9 +192,9 @@ class FsChat(WebSocketClient):
     def fs_join(self):
         # Then we send the message acording to needed format and
         #  hope it joins us
-        logging.debug("Joining Channel {}".format(str(self.channel_id)))
+        logging.debug("Joining Channel %s", str(self.channel_id))
         if self.channel_id:
-            payload = ['/chat/join', {'channel': 'stream/{0}'.format(str(self.channel_id))}]
+            payload = ['/chat/join', {'channel': f'stream/{self.channel_id}'}]
             self.fs_send(payload)
 
             msg_joining = CONNECTION_JOINING
@@ -203,8 +204,7 @@ class FsChat(WebSocketClient):
     def fs_send(self, payload):
         iter_sio = "42"+str(self.iter)
 
-        self.send('{iter}{payload}'.format(iter=iter_sio,
-                                           payload=json.dumps(payload)))
+        self.send(f'{iter_sio}{json.dumps(payload)}')
         history_item = {
             'iter': str(self.iter),
             'payload': payload
@@ -314,9 +314,12 @@ class FsChannel(threading.Thread, Channel):
         # Connecting to funstream websocket
         try_count = 0
         while True:
+            if self._status == CHANNEL_DISABLED:
+                break
+
             try:
                 try_count += 1
-                log.info("Connecting, try {0}".format(try_count))
+                log.info("Connecting, try %s", try_count)
                 self._get_info()
                 self.ws = FsChat(self.socket, self.queue, self.get_channel_name(),
                                  protocols=['websocket'], smiles=self.smiles,
@@ -330,7 +333,7 @@ class FsChannel(threading.Thread, Channel):
                     break
                 time.sleep(5)
             except Exception as exc:
-                log.error('Exception occured {}'.format(exc))
+                log.error('Exception occured %s', exc)
 
     def get_channel_name(self):
         user_payload = {'name': self.slug}
@@ -339,7 +342,7 @@ class FsChannel(threading.Thread, Channel):
             user_payload = {'slug': self.slug}
             user_req = requests.post(API_URL.format('/user'), timeout=5, data=user_payload)
             if not user_req.ok:
-                raise AttributeError('Unable to find user {}'.format(self.slug))
+                raise AttributeError('Unable to find user %s', self.slug)
 
         self.slug = user_req.json()['slug']
         channel_req = requests.post(API_URL.format('/stream'), timeout=5, data={'slug': user_req.json()['slug']})
@@ -348,12 +351,13 @@ class FsChannel(threading.Thread, Channel):
             return r_json['owner']['name']
 
     def stop(self):
+        self._status = CHANNEL_DISABLED
         self.ws.send("11")
         self.ws.close(4000, reason="CLOSE_OK")
 
     def get_viewers(self):
         status_data = {'slug': self.slug}
-        request = ['/chat/channel/list', {'channel': 'stream/{0}'.format(str(self.ws.channel_id))}]
+        request = ['/chat/channel/list', {'channel': f'stream/{self.ws.channel_id}'}]
         try:
             status_request = requests.post(API_URL.format('/stream'), timeout=10, data=status_data)
             if status_request.ok:
@@ -363,7 +367,7 @@ class FsChannel(threading.Thread, Channel):
                 else:
                     self._viewers = CHANNEL_NO_VIEWERS
         except Exception as exc:
-            log.error("Unable to get viewers. Got error: %s", exc.message)
+            log.error("Unable to get viewers. Got error: %s", exc)
 
     def _get_info(self):
         if not self.smiles:
@@ -383,14 +387,14 @@ class Sc2tvMessage(object):
             {
                 u'from': {
                     u'color': 0,
-                    u'name': u'{}'.format(nickname)},
-                u'text': u'{}'.format(text),
+                    u'name': f'{nickname}'},
+                u'text': f'{text}',
                 u'to': None,
                 u'store': {u'bonuses': [], u'icon': 0, u'subscriptions': []},
                 u'id': ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
             }
         ]
-        self.data = '42{}'.format(json.dumps(message))
+        self.data = f'42{json.dumps(message)}'
 
 
 class TestSc2tv(threading.Thread):

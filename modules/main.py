@@ -1,7 +1,7 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import Queue
+import queue
 import logging
 import logging.config
 import logging.handlers
@@ -48,9 +48,9 @@ HIDDEN_CHATS = ['hitbox', 'beampro']
 
 
 def load_modules(modules, base_config):
-    for module_name, f_module in modules.iteritems():
+    for module_name, f_module in modules.items():
         f_module.load_module(main_settings=base_config, loaded_modules=modules)
-        logging.debug('loaded module {}'.format(module_name))
+        logging.debug('loaded module %s', module_name)
 
 
 with open('default_branch') as branch_file:
@@ -91,7 +91,7 @@ def button_test(event):
 
 def main(root_logger):
     def close():
-        for l_module, l_module_dict in loaded_modules.iteritems():
+        for l_module, l_module_dict in loaded_modules.items():
             l_module_dict['class'].apply_settings(system_exit=True)
 
         if window:
@@ -143,6 +143,7 @@ def main(root_logger):
     main_config_dict['system']['check_updates'] = LCBool(True)
     main_config_dict['system']['current_version'] = LCText(DEFAULT_VERSION)
     main_config_dict['system']['release_channel'] = LCDropdown(DEFAULT_BRANCH)
+    main_config_dict['system']['icon'] = LCText(os.path.join('img', 'lalka_cup.png'))
     main_config_dict['gui'] = LCStaticBox()
     main_config_dict['gui']['language'] = LCDropdown(get_language(), get_languages())
     main_config_dict['gui']['cli'] = LCBool(False)
@@ -159,7 +160,7 @@ def main(root_logger):
 
     main_config_gui = {
         'system': {
-            'hidden': ['log_level', 'testing_mode', 'current_version'],
+            'hidden': ['log_level', 'testing_mode', 'current_version', 'icon'],
         },
         'gui': {
             'hidden': ['cli'],
@@ -206,9 +207,9 @@ def main(root_logger):
             current_version = main_class.get_config('system', 'current_version')
             channel_versions = versions.get(channel, {})
             if channel_versions:
-                latest_version = max(map(int, channel_versions.keys()))
-                if latest_version > int(current_version):
-                    main_class.set_update(versions[channel][unicode(latest_version)]['url'], latest_version)
+                latest_version = str(max(map(int, channel_versions.keys())))
+                if int(latest_version) > int(current_version):
+                    main_class.set_update(versions[channel][latest_version]['url'], latest_version)
 
     if main_class.update:
         log.info("There is new update, please update!")
@@ -239,9 +240,9 @@ def main(root_logger):
         log.exception("Failed loading translations")
 
     # Creating queues for messaging transfer between chat threads
-    queue = Queue.Queue()
+    m_queue = queue.Queue()
     # Loading module for message processing...
-    msg = Message(queue)
+    msg = Message(m_queue)
     loaded_modules.update(msg.load_modules(base_config, loaded_modules['main']))
     msg.start()
 
@@ -264,19 +265,19 @@ def main(root_logger):
     loaded_modules['chat'] = chat_init_module
 
     for chat_module_name in chat_conf_dict['chats'].list:
-        log.info("Loading chat module: {0}".format(chat_module_name))
+        log.info("Loading chat module: %s", chat_module_name)
         module_location = os.path.join(chat_location, chat_module_name + ".py")
         if os.path.isfile(module_location):
-            log.info("found {0}".format(chat_module_name))
+            log.info("found %s", chat_module_name)
             # After module is find, we are initializing it.
             # Class should be named same as module(Case insensitive)
             # Also passing core folder to module so it can load it's own
             #  configuration correctly
 
             chat_init = get_class_from_iname(module_location, chat_module_name)
-            class_module = chat_init(queue=queue,
+            class_module = chat_init(queue=m_queue,
                                      conf_folder=CONF_FOLDER,
-                                     conf_file=os.path.join(CONF_FOLDER, '{0}.cfg'.format(chat_module_name)),
+                                     conf_file=os.path.join(CONF_FOLDER, f'{chat_module_name}.cfg'),
                                      testing=main_config_dict['system']['testing_mode'])
             if chat_module_name in HIDDEN_CHATS:
                 chat_conf_dict['chats'].skip[chat_module_name] = True
@@ -292,7 +293,7 @@ def main(root_logger):
         window = gui.GuiThread(gui_settings=gui_settings,
                                main_module=loaded_modules['main'],
                                loaded_modules=loaded_modules,
-                               queue=queue)
+                               queue=m_queue)
         loaded_modules['gui'] = window
 
         module_load_thread = threading.Thread(target=load_modules, args=[loaded_modules, base_config])
@@ -304,7 +305,7 @@ def main(root_logger):
         if main_config_dict['gui']['cli']:
             try:
                 while True:
-                    console = raw_input("> ")
+                    console = input("> ")
                     log.info(console)
                     if console == "exit":
                         log.info("Exiting now!")

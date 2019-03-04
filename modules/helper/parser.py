@@ -5,7 +5,7 @@ import logging
 import os
 
 import rtyaml
-from ConfigParser import RawConfigParser
+from configparser import RawConfigParser
 
 from modules.interface.types import LCPanel, LCStaticBox, LCDict, LCObject, LCGridDual
 
@@ -100,7 +100,7 @@ def convert_to_dict(source, ignored_keys=(), ordered=True):
         if type(value) in DICT_MAPPING:
             output[item] = convert_to_dict(
                 value,
-                [key.replace('{}.'.format(item), '') for key in ignored_keys if key.startswith(item)],
+                [key.replace(f'{item}.', '') for key in ignored_keys if key.startswith(item)],
                 ordered=ordered)
         else:
             try:
