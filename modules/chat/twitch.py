@@ -1,5 +1,5 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import Queue
+import queue
 import logging.config
 import os
 import random
@@ -10,10 +10,10 @@ import time
 import irc.client
 import requests
 
-from modules.helper.parser import update
 from modules.gui import MODULE_KEY
-from modules.helper.message import TextMessage, SystemMessage, Badge, Emote, RemoveMessageByUsers
-from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING
+from modules.helper.message import TextMessage, SystemMessage, Badge, RemoveMessageByUsers
+from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING, \
+    CHANNEL_DISABLED
 from modules.helper.system import translate_key, EMOTE_FORMAT, NO_VIEWERS, register_iodc
 from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool, LCButton
 
@@ -108,10 +108,10 @@ class TwitchSystemMessage(SystemMessage):
 
 
 class TwitchMessageHandler(threading.Thread):
-    def __init__(self, queue, twitch_queue, **kwargs):
+    def __init__(self, m_queue, twitch_queue, **kwargs):
         super(self.__class__, self).__init__()
         self.daemon = True
-        self.message_queue = queue
+        self.message_queue = m_queue
         self.twitch_queue = twitch_queue
         self.source = SOURCE
 
@@ -195,7 +195,7 @@ class TwitchMessageHandler(threading.Thread):
         message.text = ' '.join(words)
 
     def _handle_pm(self, message):
-        if re.match('^@?{0}[ ,]?'.format(self.nick), message.text.lower()):
+        if re.match(f'^@?{self.nick}[ ,]?', message.text.lower()):
             if self.chat_module.get_config()['config'].get('show_pm'):
                 message.pm = True
 
@@ -263,7 +263,7 @@ class TwitchMessageHandler(threading.Thread):
             tier = min([tier for tier in self.bits[emote]['tiers'].keys() if tier - int(amount) <= 0],
                        key=lambda x: (abs(x - int(amount)), x))
 
-            emote_key = '{}-{}'.format(emote, tier)
+            emote_key = f'{emote}-{tier}'
             if emote_key in message.bits:
                 continue
 
@@ -323,18 +323,18 @@ class TwitchPingHandler(threading.Thread):
 
 
 class IRC(irc.client.SimpleIRCClient):
-    def __init__(self, queue, channel, **kwargs):
+    def __init__(self, m_queue, channel, **kwargs):
         irc.client.SimpleIRCClient.__init__(self)
         # Basic variables, twitch channel are IRC so #channel
         self.channel = "#" + channel.lower()
         self.nick = channel.lower()
-        self.queue = queue
-        self.twitch_queue = Queue.Queue()
+        self.queue = m_queue
+        self.twitch_queue = queue.Queue()
         self.tw_connection = None
         self.main_class = kwargs.get('main_class')
         self.chat_module = kwargs.get('chat_module')
 
-        self.msg_handler = TwitchMessageHandler(queue, self.twitch_queue,
+        self.msg_handler = TwitchMessageHandler(m_queue, self.twitch_queue,
                                                 irc_class=self,
                                                 nick=self.nick,
                                                 **kwargs)
@@ -350,8 +350,8 @@ class IRC(irc.client.SimpleIRCClient):
             raise TwitchNormalDisconnect()
         else:
             log.info("Connection lost")
-            log.debug("connection: {}".format(connection))
-            log.debug("event: {}".format(event))
+            log.debug("connection: %s", connection)
+            log.debug("event: %s", event)
             self.main_class.status = CHANNEL_OFFLINE
             self.system_message(CONNECTION_DIED.format(self.nick), category='connection')
             timer = threading.Timer(5.0, self.reconnect,
@@ -362,7 +362,7 @@ class IRC(irc.client.SimpleIRCClient):
         try_count = 0
         while True:
             try_count += 1
-            log.info("Reconnecting, try {0}".format(try_count))
+            log.info("Reconnecting, try %s", try_count)
             try:
                 self.connect(host, port, nickname)
                 break
@@ -370,8 +370,8 @@ class IRC(irc.client.SimpleIRCClient):
                 log.exception(exc)
 
     def on_welcome(self, connection, event):
-        log.info("Welcome Received, joining {0} channel".format(self.channel))
-        log.debug("event: {}".format(event))
+        log.info("Welcome Received, joining %s channel", self.channel)
+        log.debug("event: %s", event)
         self.tw_connection = connection
         self.system_message(CHANNEL_JOINING.format(self.channel),
                             category='connection')
@@ -385,36 +385,36 @@ class IRC(irc.client.SimpleIRCClient):
         ping_handler.start()
 
     def on_join(self, connection, event):
-        log.debug("connection: {}".format(connection))
-        log.debug("event: {}".format(event))
+        log.debug("connection: %s", connection)
+        log.debug("event: %s", event)
         msg = CHANNEL_JOIN_SUCCESS.format(self.channel)
         self.main_class.status = CHANNEL_ONLINE
         log.info(msg)
         self.system_message(msg, category='connection')
 
     def on_pubmsg(self, connection, event):
-        log.debug("connection: {}".format(connection))
-        log.debug("event: {}".format(event))
+        log.debug("connection: %s", connection)
+        log.debug("event: %s", event)
         self.twitch_queue.put(event)
 
     def on_action(self, connection, event):
-        log.debug("connection: {}".format(connection))
-        log.debug("event: {}".format(event))
+        log.debug("connection: %s", connection)
+        log.debug("event: %s", event)
         self.twitch_queue.put(event)
 
     def on_clearchat(self, connection, event):
-        log.debug("connection: {}".format(connection))
-        log.debug("event: {}".format(event))
+        log.debug("connection: %s", connection)
+        log.debug("event: %s", event)
         self.twitch_queue.put(event)
 
     def on_usernotice(self, connection, event):
-        log.debug("connection: {}".format(connection))
-        log.debug("event: {}".format(event))
+        log.debug("connection: %s", connection)
+        log.debug("event: %s", event)
         self.twitch_queue.put(event)
 
 
 class TWChannel(threading.Thread, Channel):
-    def __init__(self, queue, host, port, channel, anon=True, **kwargs):
+    def __init__(self, m_queue, host, port, channel, anon=True, **kwargs):
         threading.Thread.__init__(self)
         Channel.__init__(self, channel)
 
@@ -422,7 +422,7 @@ class TWChannel(threading.Thread, Channel):
         # Daemon is needed so when main programm exits
         # all threads will exit too.
         self.daemon = True
-        self.queue = queue
+        self.queue = m_queue
 
         self.host = host
         self.port = port
@@ -456,8 +456,11 @@ class TWChannel(threading.Thread, Channel):
         # We are connecting via IRC handler.
         while True:
             try_count += 1
-            log.info("Connecting, try {0}".format(try_count))
             try:
+                if self._status == CHANNEL_DISABLED:
+                    break
+
+                log.info("Connecting, try %s", try_count)
                 self._status = CHANNEL_PENDING
                 if self.load_config():
                     self.irc = IRC(
@@ -482,7 +485,7 @@ class TWChannel(threading.Thread, Channel):
 
     def load_config(self):
         try:
-            request = requests.get("https://api.twitch.tv/kraken/channels/{0}".format(self.channel), headers=headers)
+            request = requests.get(f"https://api.twitch.tv/kraken/channels/{self.channel}", headers=headers)
             if request.status_code == 200:
                 log.info("Channel found, continuing")
                 data = request.json()
@@ -491,22 +494,22 @@ class TWChannel(threading.Thread, Channel):
             elif request.status_code == 404:
                 raise TwitchUserError
             else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
+                raise Exception(f"Not successful status code: {request.status_code}")
         except TwitchUserError:
             raise TwitchUserError
         except Exception as exc:
-            log.error("Unable to get channel ID, error: {0}\nArgs: {1}".format(exc.message, exc.args))
+            log.error(f"Unable to get channel ID, error: {exc}\nArgs: {exc.args}")
             return False
 
         try:
             # Getting random IRC server to connect to
-            request = requests.get("http://tmi.twitch.tv/servers?channel={0}".format(self.channel))
+            request = requests.get(f"http://tmi.twitch.tv/servers?channel={self.channel}")
             if request.status_code == 200:
                 self.host = random.choice(request.json()['servers']).split(':')[0]
             else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
+                raise Exception(f"Not successful status code: {request.status_code}")
         except Exception as exc:
-            log.error("Unable to get server list, error: {0}\nArgs: {1}".format(exc.message, exc.args))
+            log.error(f"Unable to get server list, error: {exc}\nArgs: {exc.args}")
             return False
 
         try:
@@ -517,17 +520,17 @@ class TWChannel(threading.Thread, Channel):
                     for smile in request.json()['emotes']:
                         self.custom_smiles[smile['regex']] = {
                             'key': smile['regex'],
-                            'url': 'https:{}'.format(smile['url'])
+                            'url': f"https:{smile['url']}"
                         }
                 else:
-                    raise Exception("Not successful status code: {0}".format(request.status_code))
+                    raise Exception(f"Not successful status code: {request.status_code}")
         except Exception as exc:
-            log.warning("Unable to get BTTV smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))
+            log.warning(f"Unable to get BTTV smiles, error {exc}\nArgs: {exc.args}")
 
         try:
             # Getting FrankerZ smiles
             if self.frankerz:
-                request = requests.get("https://api.frankerfacez.com/v1/room/id/{}".format(self.channel_id), timeout=10)
+                request = requests.get(f"https://api.frankerfacez.com/v1/room/id/{self.channel_id}", timeout=10)
                 if request.status_code == 200:
                     req_json = request.json()
                     for set_name, s_set in req_json['sets'].items():
@@ -536,12 +539,12 @@ class TWChannel(threading.Thread, Channel):
                             url = urls.get('4', urls.get('2', urls.get('1')))
                             self.custom_smiles[smile['name']] = {
                                 'key': smile['name'],
-                                'url': 'https:{}'.format(url)
+                                'url': f'https:{url}'
                             }
                 else:
-                    raise Exception("Not successful status code: {0}".format(request.status_code))
+                    raise Exception(f"Not successful status code: {request.status_code}")
         except Exception as exc:
-            log.warning("Unable to get FrankerZ smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))
+            log.warning(f"Unable to get FrankerZ smiles, error {exc}\nArgs: {exc.args}")
 
         try:
             # Warning, undocumented, can change a LOT
@@ -555,10 +558,9 @@ class TWChannel(threading.Thread, Channel):
                         } for version, v in badge_config['versions'].items()
                     }
             else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
+                raise Exception(f"Not successful status code: {request.status_code}")
         except Exception as exc:
-            log.warning("Unable to get twitch undocumented api badges, error {0}\n"
-                        "Args: {1}".format(exc.message, exc.args))
+            log.warning(f"Unable to get twitch undocumented api badges, error {exc}\nArgs: {exc.args}")
 
         try:
             # Warning, undocumented, can change a LOT
@@ -578,33 +580,32 @@ class TWChannel(threading.Thread, Channel):
                     else:
                         self.badges[badge] = processed_badge
             else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
+                raise Exception(f"Not successful status code: {request.status_code}")
         except Exception as exc:
-            log.warning("Unable to get twitch undocumented api badges, error {0}\n"
-                        "Args: {1}".format(exc.message, exc.args))
+            log.warning(f"Unable to get twitch undocumented api badges, error {exc}\nArgs: {exc.args}")
 
         try:
-            bits_url = "https://api.twitch.tv/kraken/bits/actions/?channel_id={}"
-            request = requests.get(bits_url.format(self.channel_id), headers=headers_v5)
+            bits_url = f"https://api.twitch.tv/kraken/bits/actions/?channel_id={self.channel_id}"
+            request = requests.get(bits_url, headers=headers_v5)
             if request.status_code == 200:
                 data = request.json()['actions']
                 self.bits = {item['prefix'].lower(): item for item in data}
             else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
+                raise Exception("Not successful status code: %s", request.status_code)
         except Exception as exc:
-            log.warning("Unable to get twitch undocumented api badges, error {0}\n"
-                        "Args: {1}".format(exc.message, exc.args))
+            log.warning(f"Unable to get twitch undocumented api badges, error {exc}\nArgs: {exc.args}")
 
         return True
 
     def stop(self):
         try:
+            self._status = CHANNEL_DISABLED
             self.irc.tw_connection.disconnect("CLOSE_OK")
         except TwitchNormalDisconnect:
             pass
 
     def get_viewers(self):
-        streams_url = 'https://api.twitch.tv/kraken/streams/{0}'.format(self.channel)
+        streams_url = f'https://api.twitch.tv/kraken/streams/{self.channel}'
         try:
             request = requests.get(streams_url, headers=headers)
             if request.status_code == 200:
@@ -613,9 +614,9 @@ class TWChannel(threading.Thread, Channel):
                     return request.json()['stream'].get('viewers', NO_VIEWERS)
                 return NO_VIEWERS
             else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
+                raise Exception(f"Not successful status code: {request.status_code}")
         except Exception as exc:
-            log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
+            log.warning(f"Unable to get user count, error {exc}\nArgs: {exc.args}")
 
 
 class TestTwitch(threading.Thread):
@@ -656,7 +657,7 @@ class Twitch(ChatModule):
         self.frankerz = CONF_DICT['config']['frankerz']
         self.access_code = self.get_config('access_code')
         if self.access_code:
-            headers['Authorization'] = 'OAuth {}'.format(self.access_code)
+            headers['Authorization'] = f'OAuth {self.access_code}'
 
         self.rest_add('GET', 'oidc', self.parse_oidc_request)
         self.rest_add('POST', 'oidc', self.oidc_code)
@@ -690,25 +691,24 @@ class Twitch(ChatModule):
             self.access_code = item_dict['access_token']
             self._conf_params['config']['access_code'] = self.access_code
 
-            headers['Authorization'] = 'OAuth {}'.format(self.access_code)
+            headers['Authorization'] = f'OAuth {self.access_code}'
         if self.channels:
-            self.api_call('channels/{}/editors'.format(self.channels.items()[0][0]))
+            self.api_call(f'channels/{self.channels.items()[0][0]}/editors')
         return 'Access Code saved'
 
     def api_call(self, key):
         req = requests.get(API_URL.format(key), headers=headers)
         if req.ok:
             return req.json()
-        raise TwitchAPIError('Unable to get {}'.format(key))
+        raise TwitchAPIError(f'Unable to get {key}')
 
     def register_iodc(self, parent_window):
         port = self._loaded_modules['webchat']['port']
 
-        url = 'https://api.twitch.tv/kraken/oauth2/authorize?client_id={}' \
-              '&redirect_uri={}' \
-              '&response_type={}' \
-              '&scope={}'.format(headers['Client-ID'], 'http://localhost:{}/{}'.format(port, 'rest/twitch/oidc'),
-                                 'token', 'channel_editor channel_read')
+        url = f'https://api.twitch.tv/kraken/oauth2/authorize?client_id={headers["Client-ID"]}' \
+              f'&redirect_uri=http://localhost:{port}/rest/twitch/oidc' \
+              f'&response_type=token' \
+              f'&scope=channel_editor channel_read'
         request = requests.get(url)
 
         if request.ok:

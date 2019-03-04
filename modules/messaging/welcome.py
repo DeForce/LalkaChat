@@ -21,7 +21,7 @@ class Welcome(MessagingModule):
         self.clients = []
 
     def welcome_message(self, user):
-        user = user.encode('utf-8')
+        user = user
         self._msg_queue.put(SystemMessage(
             self.get_config('config', 'welcome_msg').format(user),
             category='module',

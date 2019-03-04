@@ -434,7 +434,7 @@ class SettingsWindow(wx.Frame):
         dynamic_check = False
         for module_name in self.main_class.loaded_modules.keys():
             change_list = {}
-            for item, change in self.changes.iteritems():
+            for item, change in self.changes.items():
                 if module_name == item.split(MODULE_KEY)[0]:
                     change_list[item] = change
             for key in change_list.keys():
@@ -452,7 +452,7 @@ class SettingsWindow(wx.Frame):
             non_dynamic = module_item.conf_params.get('gui', {}).get('non_dynamic', [])
             module_config = module_item.get_config()
 
-            for item, change in changed_items.iteritems():
+            for item, change in changed_items.items():
                 item_split = item.split(MODULE_KEY)
                 if item_split[-1] in ['list_box']:
                     del item_split[-1]

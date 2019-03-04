@@ -152,7 +152,7 @@ class TextMessage(Message):
 
         self._platform = Platform(platform_id, icon)
         self._user = user
-        self._text = self._to_utf8(text)
+        self._text = text
         self._emotes = [] if emotes is None else emotes
         self._badges = [] if badges is None else badges
         self._pm = pm
@@ -165,12 +165,6 @@ class TextMessage(Message):
         self._jsonable += ['user', 'text', 'emotes', 'badges',
                            'id', 'platform', 'pm', 'nick_colour',
                            'channel_name', 'me', 'message_type']
-
-    @staticmethod
-    def _to_utf8(text):
-        if type(text) is str:
-            return text.decode('utf-8')
-        return text
 
     @property
     def platform(self):

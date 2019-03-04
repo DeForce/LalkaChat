@@ -1,4 +1,4 @@
-FROM cdrx/pyinstaller-windows:python2
+FROM cdrx/pyinstaller-windows:python3
 
 MAINTAINER CzT/DeForce <vlad@czt.lv>
 

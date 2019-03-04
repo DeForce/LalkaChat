@@ -1,16 +1,19 @@
 # -*- mode: python -*-
 
 import sys
+import os.path
 
 sys.modules['FixTk'] = None
 block_cipher = None
+
+specpath = os.path.dirname(os.path.abspath(SPEC))
 
 data = [
     ('modules', 'modules'),
     ('img', 'img'),
     ('scripts', 'scripts'),
     ('translations', 'translations'),
-    ('default_branch', ''),
+    ('default_branch', '.'),
 ]
 
 a = Analysis(['main.py'],
@@ -21,7 +24,7 @@ a = Analysis(['main.py'],
                             'ws4py',
                             'requests',
                             'irc',
-                            'ConfigParser',
+                            'configparser',
                             'modules.main',
                             'modules.gui',
                             'modules.message_handler',
@@ -57,7 +60,8 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
-          console=True )
+          console=True,
+          icon=os.path.join(specpath, "img", 'lalka_cup.ico'))
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,

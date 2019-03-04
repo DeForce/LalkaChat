@@ -9,7 +9,7 @@ from modules.helper.system import PYTHON_FOLDER
 
 def find_by_type(data, type_to_find):
     found = collections.OrderedDict()
-    for key, value in data.iteritems():
+    for key, value in data.items():
         if isinstance(value, type_to_find):
             found[key] = None
         if isinstance(value, collections.Mapping):

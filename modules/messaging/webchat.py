@@ -1,6 +1,6 @@
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import Queue
-import cgi
+import html
+import queue
 import datetime
 import json
 
@@ -29,7 +29,7 @@ logging.getLogger('ws4py').setLevel(logging.ERROR)
 DEFAULT_STYLE = 'default'
 DEFAULT_GUI_STYLE = 'default'
 HISTORY_SIZE = 50
-s_queue = Queue.Queue()
+s_queue = queue.Queue()
 log = logging.getLogger('webchat')
 REMOVED_TRIGGER = '%%REMOVED%%'
 
@@ -100,13 +100,13 @@ def prepare_message(message, style_settings, msg_class):
     if message['type'] == 'command':
         if payload['command'].startswith('remove'):
             if not style_settings['keys']['replace_message']:
-                payload['text'] = cgi.escape(unicode(style_settings['keys']['replace_text']))
+                payload['text'] = html.escape(style_settings['keys']['replace_text'].value)
                 payload['command'] = payload['command'].replace('remove', 'replace')
         return message
 
     if 'levels' in payload:
         if '?' not in payload['levels']['url']:
-            payload['levels']['url'] = '{}?{}'.format(payload['levels']['url'], style_settings['style_name'])
+            payload['levels']['url'] = f"{payload['levels']['url']}?{style_settings['style_name']}"
 
     if 'emotes' in payload and payload['emotes']:
         payload['emotes'] = process_emotes(payload['emotes'])
@@ -117,7 +117,7 @@ def prepare_message(message, style_settings, msg_class):
     if 'platform' in payload:
         payload['platform'] = process_platform(payload['platform'])
 
-    payload['text'] = cgi.escape(payload['text'])
+    payload['text'] = html.escape(payload['text'])
     return message
 
 
@@ -143,7 +143,7 @@ class MessagingThread(threading.Thread):
             message = s_queue.get()
 
             if isinstance(message, dict):
-                raise Exception("Got dict message {}".format(message))
+                raise Exception(f"Got dict message {message}")
 
             add_to_history(message)
             process_command(message)
@@ -341,7 +341,7 @@ class RestRoot(object):
         self.settings = settings
         self._rest_modules = {}
 
-        for name, module in modules.iteritems():
+        for name, module in modules.items():
             if module:
                 api = module.rest_api()
                 if api:
@@ -412,19 +412,20 @@ class CssRoot(object):
         self.apply_headers()
         css_namespace = Namespace()
         for key, value in self.settings['keys'].items():
+            s_value = value.value
             if isinstance(value, LCText):
-                css_value = String(unicode(value))
+                css_value = String(s_value)
             elif isinstance(value, LCColour):
-                css_value = Color.from_hex(value)
+                css_value = Color.from_hex(s_value)
             elif isinstance(value, LCBool):
-                css_value = Boolean(value.simple())
+                css_value = Boolean(s_value)
             elif isinstance(value, LCSpin):
-                css_value = Number(value.simple())
+                css_value = Number(s_value)
             elif isinstance(value, LCObject):
-                css_value = String(value.simple())
+                css_value = String(s_value)
             else:
                 raise ValueError("Unable to find comparable values")
-            css_namespace.set_variable('${}'.format(key), css_value)
+            css_namespace.set_variable(f'${key}', css_value)
 
         cherrypy.response.headers['Content-Type'] = 'text/css'
         with open(os.path.join(self.settings['location'], *path), 'r') as css:
@@ -595,7 +596,7 @@ class Webchat(MessagingModule):
                                              modules=self._loaded_modules)
                 self.s_thread.start()
             except:
-                log.error('Unable to bind at {}:{}'.format(self.host, self.port))
+                log.error('Unable to bind at %s:%s', self.host, self.port)
 
             for thread in range(WS_THREADS):
                 self.message_threads.append(MessagingThread(self.style_settings))
@@ -622,7 +623,7 @@ class Webchat(MessagingModule):
     def apply_settings(self, **kwargs):
         save_settings(self.conf_params, ignored_sections=self.conf_params['gui'].get('ignored_sections', ()))
         html_template = jinja2.Template(HTML_TEMPLATE)
-        with open('{}/index.html'.format(HTTP_FOLDER), 'w') as template_file:
+        with open(f'{HTTP_FOLDER}/index.html', 'w') as template_file:
             template_file.write(html_template.render(port=self.port))
         if 'system_exit' in kwargs:
             return
@@ -659,7 +660,7 @@ class Webchat(MessagingModule):
             chat_type = 'server_chat'
 
         return json.dumps(
-            convert_to_dict(self._conf_params['style_settings'][chat_type]['keys']))
+            convert_to_dict(self._conf_params['style_settings'][chat_type]['keys'].value))
 
     def rest_get_history(self, *args, **kwargs):
         return json.dumps(

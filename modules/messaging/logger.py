@@ -36,12 +36,9 @@ class Logger(MessagingModule):
     @process_text_messages
     @ignore_system_messages
     def _process_message(self, message, **kwargs):
-        with open('{0}.txt'.format(
-                os.path.join(self.destination, datetime.datetime.now().strftime(str(self.format)))), 'a') as f:
-            f.write('[{}] [{}] [{}] {}: {}\n'.format(
-                datetime.datetime.now().strftime(self.ts_format).encode('utf-8'),
-                message.platform.id.encode('utf-8'),
-                message.channel_name,
-                message.user.encode('utf-8'),
-                message.text.encode('utf-8')))
+        log_file = os.path.join(self.destination, datetime.datetime.now().strftime(str(self.format)))
+        with open(f'{log_file}.txt', 'a', encoding='utf-8') as f:
+            time = datetime.datetime.now().strftime(self.ts_format)
+            f.write(f'[{time}] [{message.platform.id}] [{message.channel_name}] {message.user}: '
+                    f'{message.text}\n')
         return message

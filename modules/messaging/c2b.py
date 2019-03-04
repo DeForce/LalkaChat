@@ -13,7 +13,7 @@ log = logging.getLogger('c2b')
 CONF_DICT = LCPanel()
 CONF_DICT['config'] = LCGridDual()
 
-C2B_REGEXP = ur'(^|\s)({})(?=(\s|$))'
+C2B_REGEXP = r'(^|\s)({})(?=(\s|$))'
 
 
 class C2B(MessagingModule):
@@ -26,7 +26,7 @@ class C2B(MessagingModule):
     def _process_message(self, message, **kwargs):
         # Replacing the message if needed.
         # Please do the needful
-        for item, replace in self.get_config('config').value.iteritems():
+        for item, replace in self.get_config('config').value.items():
             if item in message.text.split(' '):
                 replace_word = random.choice(replace.split('/'))
                 message.text = message.text.replace(item, replace_word)

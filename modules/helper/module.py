@@ -5,15 +5,16 @@ import os
 
 from modules.helper import parser
 from modules.helper.message import TextMessage, Message
+from modules.helper.parser import save_settings, load_from_config_file
+from modules.helper.system import RestApiException, CONF_FOLDER
 from modules.interface.types import LCPanel, LCStaticBox, LCBool, LCList, deep_get
-from parser import save_settings, load_from_config_file
-from system import RestApiException, CONF_FOLDER
 
 DEFAULT_PRIORITY = 30
 
 CHANNEL_ONLINE = 'online'
 CHANNEL_OFFLINE = 'offline'
 CHANNEL_PENDING = 'pending'
+CHANNEL_DISABLED = 'disabled'
 CHANNEL_STATUSES = [CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING]
 CHANNEL_NO_VIEWERS = 'N/A'
 
@@ -53,7 +54,7 @@ class BaseModule(object):
         self._msg_queue = queue
 
         if conf_file is None:
-            conf_file = os.path.join(CONF_FOLDER, "{}.cfg".format(self._module_name.lower()))
+            conf_file = os.path.join(CONF_FOLDER, f"{self._module_name.lower()}.cfg")
         conf_file = os.path.join(CONF_FOLDER, conf_file)
         self._config = load_from_config_file(conf_file, self._config)
 

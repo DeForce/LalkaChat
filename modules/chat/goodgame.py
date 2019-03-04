@@ -1,7 +1,7 @@
 # This Python file uses the following encoding: utf-8
 # -*- coding: utf-8 -*-
 # Copyright (C) 2016   CzT/Vladislav Ivanov
-import Queue
+import queue
 import json
 import logging
 import os
@@ -15,8 +15,9 @@ import requests
 from ws4py.client.threadedclient import WebSocketClient
 
 from modules.gui import MODULE_KEY
-from modules.helper.message import TextMessage, SystemMessage, Emote, RemoveMessageByIDs
-from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_PENDING, CHANNEL_OFFLINE
+from modules.helper.message import TextMessage, SystemMessage, RemoveMessageByIDs
+from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_PENDING, CHANNEL_OFFLINE, \
+    CHANNEL_DISABLED
 from modules.helper.system import translate_key, EMOTE_FORMAT, NO_VIEWERS
 from modules.interface.types import LCStaticBox, LCPanel, LCBool, LCText
 
@@ -165,7 +166,7 @@ class GoodgameMessageHandler(threading.Thread):
             msg['data'].get('payments', '0')
         )
 
-        if re.match('^{0},'.format(self.nick).lower(), message.text.lower()):
+        if re.match(f'^{self.nick},'.lower(), message.text.lower()):
             if self.chat_module.get_config('config', 'show_pm'):
                 message.pm = True
         self._send_message(message)
@@ -174,7 +175,7 @@ class GoodgameMessageHandler(threading.Thread):
         self.ws_class.system_message(CHANNEL_JOIN_SUCCESS.format(self.nick), category='connection')
 
     def _process_error(self, msg):
-        log.info("Received error message: {0}".format(msg))
+        log.info("Received error message: %s", msg)
         if msg['data']['errorMsg'] == 'Invalid channel id':
             self.ws_class.close(reason='INV_CH_ID')
             log.error("Failed to find channel on GoodGame, please check channel name")
@@ -227,7 +228,7 @@ class GGChat(WebSocketClient):
         # Received value setting.
         self.ch_id = kwargs.get('ch_id')
         self.queue = kwargs.get('queue')
-        self.gg_queue = Queue.Queue()
+        self.gg_queue = queue.Queue()
 
         self.main_thread = kwargs.get('main_thread')  # type: GGChannel
         self.chat_module = kwargs.get('chat_module')
@@ -306,35 +307,35 @@ class GGChannel(threading.Thread, Channel):
     def load_config(self):
         try:
             if self.ch_id:
-                request = requests.get(API.format('streams/{}').format(self.ch_id))
+                request = requests.get(API.format(f'streams/{self.ch_id}'))
                 if request.status_code == 200:
                     channel_name = request.json()['channel']['key']
                     if self.nick != channel_name:
                         self.nick = channel_name
             else:
-                request = requests.get(API.format('streams/{}').format(self.nick))
+                request = requests.get(API.format(f'streams/{self.nick}'))
                 if request.status_code == 200:
                     self.ch_id = request.json()['channel']['id']
         except Exception as exc:
-            log.warning("Unable to get channel name, error {0}\nArgs: {1}".format(exc.message, exc.args))
+            log.warning("Unable to get channel name, error %s\nArgs: %s", exc, exc.args)
 
         try:
             smile_request = requests.get(SMILE_API)
             if not smile_request.ok:
-                raise IndexError('URL Error {}'.format(smile_request.reason))
+                raise IndexError(f'URL Error {smile_request.reason}')
 
             req_json = smile_request.json()
             for smile in req_json:
                 self.smiles[smile['key']] = smile
         except Exception as exc:
-            log.error("Unable to download smiles, error {0}\nArgs: {1}".format(exc.message, exc.args))
+            log.error("Unable to download smiles, error %s\nArgs: %s", exc, exc.args)
 
         return True
 
     def get_viewers(self):
         if not self.chat_module.get_config('config', 'check_viewers'):
             return NO_VIEWERS
-        streams_url = API.format('streams/{0}'.format(self.nick))
+        streams_url = API.format(f'streams/{self.nick}')
         try:
             request = requests.get(streams_url)
             if request.ok:
@@ -344,9 +345,9 @@ class GGChannel(threading.Thread, Channel):
                 else:
                     return NO_VIEWERS
             else:
-                raise Exception("Not successful status code: {0}".format(request.status_code))
+                raise Exception(f"Not successful status code: {request.status_code}")
         except Exception as exc:
-            log.warning("Unable to get user count, error {0}\nArgs: {1}".format(exc.message, exc.args))
+            log.warning("Unable to get user count, error %s\nArgs: %s", exc, exc.args)
 
     def run(self):
         self.connect()
@@ -355,8 +356,11 @@ class GGChannel(threading.Thread, Channel):
         try_count = 0
         while True:
             try_count += 1
-            log.info("Connecting, try {0}".format(try_count))
 
+            if self._status == CHANNEL_DISABLED:
+                break
+
+            log.info("Connecting, try %s", try_count)
             self._status = CHANNEL_PENDING
             if self.load_config():
                 # Connecting to goodgame websocket
@@ -373,20 +377,21 @@ class GGChannel(threading.Thread, Channel):
             time.sleep(5)
 
     def stop(self):
+        self._status = CHANNEL_DISABLED
         self.ws.close(4000)
 
 
 def gg_message(nickname, text):
     return {
-        'type': u'message',
+        'type': 'message',
         'data': {
-            u'color': u'streamer',
-            u'hideIcon': 0,
-            u'mobile': 0,
-            u'text': u'{}'.format(text),
-            u'user_name': u'{}'.format(nickname),
-            u'icon': u'none',
-            u'message_id': ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+            'color': 'streamer',
+            'hideIcon': 0,
+            'mobile': 0,
+            'text': f'{text}',
+            'user_name': f'{nickname}',
+            'icon': 'none',
+            'message_id': ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
         }
     }
 
