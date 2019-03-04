@@ -488,16 +488,27 @@ class SocketThread(threading.Thread):
         cherrypy.tools.websocket = WebSocketTool()
 
     def update_settings(self):
+        server_static_dir = self.style_settings['server_chat']['location']
+        server_folders = [folder for folder in os.listdir(server_static_dir)
+                          if os.path.isdir(os.path.join(server_static_dir, folder))]
+
+        gui_static_dir = self.style_settings['gui_chat']['location']
+        gui_folders = [folder for folder in os.listdir(gui_static_dir)
+                       if os.path.isdir(os.path.join(gui_static_dir, folder))]
+
         self.root_config = {
             '/ws': {'tools.websocket.on': True,
-                    'tools.websocket.handler_cls': WebChatSocketServer},
-            '/js': {'tools.staticdir.on': True,
-                    'tools.staticdir.dir': os.path.join(self.style_settings['server_chat']['location'], 'js')},
-            '/img': {'tools.staticdir.on': True,
-                     'tools.staticdir.dir': os.path.join(self.style_settings['server_chat']['location'], 'img'),
-                     'tools.caching.on': True,
-                     'tools.expires.on': True,
-                     'tools.expires.secs': 1}}
+                    'tools.websocket.handler_cls': WebChatSocketServer}
+        }
+        self.root_config.update({
+            f'/{folder}': {
+                'tools.staticdir.on': True,
+                'tools.staticdir.dir': os.path.join(server_static_dir, folder),
+                'tools.expires.on': True,
+                'tools.expires.secs': 1
+            } for folder in server_folders if folder not in ['css']
+        })
+
         self.css_config = {
             '/': {}
         }
@@ -508,13 +519,15 @@ class SocketThread(threading.Thread):
         self.gui_root_config = {
             '/ws': {'tools.websocket.on': True,
                     'tools.websocket.handler_cls': WebChatGUISocketServer},
-            '/js': {'tools.staticdir.on': True,
-                    'tools.staticdir.dir': os.path.join(self.style_settings['gui_chat']['location'], 'js')},
-            '/img': {'tools.staticdir.on': True,
-                     'tools.staticdir.dir': os.path.join(self.style_settings['gui_chat']['location'], 'img'),
-                     'tools.caching.on': True,
-                     'tools.expires.on': True,
-                     'tools.expires.secs': 1}}
+        }
+        self.gui_root_config.update({
+            f'/{folder}': {
+                'tools.staticdir.on': True,
+                'tools.staticdir.dir': os.path.join(gui_static_dir, folder),
+                'tools.expires.on': True,
+                'tools.expires.secs': 1
+            } for folder in gui_folders if folder not in ['css']
+        })
         self.gui_css_config = {'/': {}}
 
     def run(self):
