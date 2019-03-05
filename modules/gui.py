@@ -7,7 +7,7 @@ import threading
 import requests
 
 from modules.helper.updater import UPDATE_FOLDER, do_update, UPDATE_FILE, prepare_update
-from modules.interface.controls import MainMenuToolBar
+from modules.interface.controls import MainMenuToolBar, AboutWindow
 
 from modules.interface.events import EVT_STATUS_CHANGE
 from modules.interface.frames import OAuthBrowser, StatusFrame, UpdateDialog
@@ -224,6 +224,10 @@ class ChatGui(wx.Frame):
             event.Skip()
         else:
             self.Destroy()
+
+    def on_about(self, event):
+        with AboutWindow(self, title=translate_key('menu.about')) as dlg:
+            dlg.ShowModal()
 
     @staticmethod
     def on_right_down(event):
