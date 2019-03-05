@@ -154,6 +154,7 @@ class FsChat(WebSocketClient):
         self.queue.put(FsSystemMessage(message, category=category, channel_name=self.channel_name))
 
     def received_message(self, mes):
+        mes.data = mes.data.decode('utf-8')
         if mes.data == '40':
             return
         if mes.data in ['2', '3']:

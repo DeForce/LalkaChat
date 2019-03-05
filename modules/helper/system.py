@@ -20,6 +20,9 @@ MODULE_FOLDER = os.path.join(PYTHON_FOLDER, "modules")
 MAIN_CONF_FILE = os.path.join(CONF_FOLDER, "config.cfg")
 HTTP_FOLDER = os.path.join(PYTHON_FOLDER, "http")
 
+VERSION = '0.4.0'
+SOURCE_REPO_URL = 'https://github.com/DeForce/LalkaChat'
+
 GUI_TAG = 'gui'
 WINDOWS = True if sys.platform == 'win32' else False
 
@@ -68,7 +71,8 @@ def system_message(message, queue, source=SOURCE,
 
 
 class ModuleLoadException(Exception):
-    def __init__(self, message):
+    def __init__(self, message, *args: object):
+        super().__init__(*args)
         self.message = message
 
     def __str__(self):

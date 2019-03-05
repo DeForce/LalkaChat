@@ -1,7 +1,8 @@
 import wx
 import wx.grid
+import wx.adv
 
-from modules.helper.system import translate_key, MODULE_KEY
+from modules.helper.system import translate_key, MODULE_KEY, VERSION, SOURCE_REPO_URL
 
 
 class GuiCreationError(Exception):
@@ -95,6 +96,48 @@ class KeyChoice(wx.Choice):
         return self.keys[index]
 
 
+class AboutWindow(wx.Dialog):
+    def __init__(self, parent, title):
+        self.parent = parent
+
+        super().__init__(parent, style=wx.OK, title=title, size=wx.Size(300, 170))
+        self.button_sizer = self.CreateStdDialogButtonSizer(wx.OK)
+
+        title = 'LalkaChat'
+        title_ctrl = wx.StaticText(self, label=title)
+
+        branch = parent.loaded_modules['main'].config['system']['release_channel']
+        version = parent.loaded_modules['main'].config['system']['current_version']
+
+        version_text = f'Version: {VERSION}-{branch}-{version}'
+        version_ctrl = wx.StaticText(self, label=version_text)
+
+        owner_text = f'Created by Open Source'
+        owner_ctrl = wx.StaticText(self, label=owner_text)
+
+        hyper_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        repo_text = f'Link to GitHub:'
+        repo_ctrl = wx.StaticText(self, label=repo_text)
+        hyper_sizer.Add(repo_ctrl, 0, wx.ALIGN_CENTER | wx.ALIGN_RIGHT)
+
+        hyperlink = SOURCE_REPO_URL
+        hyperlink_ctrl = wx.adv.HyperlinkCtrl(self, label='Repo Link', url=hyperlink, style=wx.adv.HL_ALIGN_LEFT)
+        hyper_sizer.Add(hyperlink_ctrl, 0, wx.ALIGN_LEFT)
+
+        empty_ctrl = wx.StaticText(self)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(title_ctrl, 0, wx.TOP | wx.ALIGN_CENTER, 5)
+        sizer.Add(version_ctrl, 0, wx.TOP | wx.ALIGN_CENTER, 5)
+        sizer.Add(owner_ctrl, 0, wx.TOP | wx.ALIGN_CENTER, 5)
+        sizer.Add(hyper_sizer, 0, wx.TOP | wx.ALIGN_CENTER, 5)
+
+        sizer.Add(empty_ctrl, 1, wx.TOP | wx.BOTTOM | wx.ALIGN_CENTER, 10)
+        sizer.Add(self.button_sizer, 0, wx.ALIGN_BOTTOM | wx.ALIGN_CENTER | wx.BOTTOM, 5)
+        self.SetSizer(sizer)
+        self.Layout()
+
+
 class MainMenuToolBar(wx.ToolBar):
     def __init__(self, *args, **kwargs):
         self.main_class = kwargs['main_class']
@@ -107,6 +150,7 @@ class MainMenuToolBar(wx.ToolBar):
 
         self.create_tool('menu.settings', self.main_class.on_settings)
         self.create_tool('menu.reload', self.main_class.on_reload)
+        self.create_tool('menu.about', self.main_class.on_about)
 
         self.Realize()
 

@@ -15,7 +15,7 @@ from modules.helper.functions import get_class_from_iname, get_modules_in_folder
 from modules.helper.module import ConfigModule
 from modules.helper.parser import load_from_config_file
 from modules.helper.system import load_translations_keys, PYTHON_FOLDER, CONF_FOLDER, MAIN_CONF_FILE, MODULE_FOLDER, \
-    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_languages
+    LOG_FOLDER, GUI_TAG, TRANSLATION_FOLDER, LOG_FILE, LOG_FORMAT, get_language, get_languages, VERSION
 from modules.helper.updater import get_available_versions
 from modules.interface.types import LCStaticBox, LCText, LCBool, LCButton, LCPanel, LCSlider, LCChooseMultiple, \
     LCDropdown
@@ -41,7 +41,6 @@ if sys.platform.lower().startswith('win'):
         if whnd != 0:
             ctypes.windll.user32.ShowWindow(whnd, 1)
 
-VERSION = '0.4.0'
 SEM_VERSION = semantic_version.Version(VERSION)
 LOG_FILES_COUNT = 5
 HIDDEN_CHATS = ['hitbox', 'beampro']
