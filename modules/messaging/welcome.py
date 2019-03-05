@@ -20,13 +20,17 @@ class Welcome(MessagingModule):
         MessagingModule.__init__(self, config=CONF_DICT, *args, **kwargs)
         self.clients = []
 
+    @property
+    def only_gui(self):
+        return self.get_config('config', 'only_gui')
+
+    @property
+    def welcome_msg(self):
+        return self.get_config('config', 'welcome_msg')
+
     def welcome_message(self, user):
         user = user
-        self._msg_queue.put(SystemMessage(
-            self.get_config('config', 'welcome_msg').format(user),
-            category='module',
-            only_gui=self.get_config('config', 'only_gui')
-        ))
+        self.send_system_message(self.welcome_msg.format(user), only_gui=self.only_gui)
 
     @process_text_messages
     @ignore_system_messages

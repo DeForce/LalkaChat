@@ -38,7 +38,7 @@ def get_config_item_path(*keys):
 
 def get_modules_in_folder(folder):
     item_path = os.path.join(PYTHON_FOLDER, 'modules', folder)
-    return [item.strip('.py') for item in os.listdir(item_path)
+    return [item.rstrip('.py') for item in os.listdir(item_path)
             if os.path.isfile(os.path.join(item_path, item))
             and not item.startswith('_')
             and not item.endswith('.pyc')]

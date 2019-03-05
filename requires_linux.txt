@@ -6,3 +6,4 @@ semantic_version
 jinja2
 pyScss
 rtyaml
+youtube-python

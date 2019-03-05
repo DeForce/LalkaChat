@@ -1,14 +1,18 @@
 # coding=utf-8
 # Copyright (C) 2016   CzT/Vladislav Ivanov
+import collections
 import locale
 import logging
 import random
+from functools import reduce
+
 import re
 import os
 import string
 import sys
 import requests
 import semantic_version
+import yaml
 
 if hasattr(sys, 'frozen'):
     PYTHON_FOLDER = os.path.dirname(sys.executable)
@@ -39,6 +43,8 @@ THREADS = 2
 SOURCE = 'sy'
 SOURCE_USER = 'System'
 SOURCE_ICON = '/img/sources/lalka_cup.png'
+
+SECRETS_FILE = 'secrets.yaml'
 
 NO_VIEWERS = 'N/A'
 
@@ -87,7 +93,7 @@ def load_translations_keys(translation_folder, language):
     def load_language(language_folder):
         files_list = [r_item for r_item in os.listdir(language_folder) if r_item.endswith(TRANSLATION_FILETYPE)]
         for f_file in files_list:
-            with open(os.path.join(language_folder, f_file)) as r_file:
+            with open(os.path.join(language_folder, f_file), encoding='utf-8') as r_file:
                 for line in r_file.readlines():
                     log.debug(line.strip())
                     if line.strip():
@@ -183,15 +189,17 @@ def get_key(*args):
     return MODULE_KEY.join(args)
 
 
-def register_iodc(event):
-    parent = get_wx_parent(event.GetEventObject()).Parent
-    twitch = parent.loaded_modules.get('twitch')['class']
-    if not twitch:
-        raise ValueError('Unable to find loaded Twitch.TV Module')
+def deep_get_from_dict(dictionary, *keys):
+    return reduce(lambda d, key: d.get(key, None) if isinstance(d, collections.Mapping) else None, keys, dictionary)
 
-    twitch.register_iodc(parent)
-    pass
 
+def get_secret(path):
+    path_list = path.split('.')
+
+    with open(SECRETS_FILE, 'r') as secrets_file:
+        data = yaml.safe_load(secrets_file)
+
+    return deep_get_from_dict(data, *path_list)
 
 def get_wx_parent(item):
     if item.GrandParent:

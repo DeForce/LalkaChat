@@ -14,6 +14,7 @@ data = [
     ('scripts', 'scripts'),
     ('translations', 'translations'),
     ('default_branch', '.'),
+    ('secrets.yaml', '.')
 ]
 
 a = Analysis(['main.py'],
@@ -31,6 +32,7 @@ a = Analysis(['main.py'],
                             'modules.chat.goodgame',
                             'modules.chat.sc2tv',
                             'modules.chat.twitch',
+                            'modules.chat.cyoutube',
                             'modules.helper.parser',
                             'modules.helper.system',
                             'modules.messaging.blacklist',

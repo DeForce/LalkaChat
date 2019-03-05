@@ -209,11 +209,12 @@ class ChatGui(wx.Frame):
         config = self.loaded_modules['main'].get_config('gui_information')
 
         if self.gui_settings['show_browser']:
-            size = self.Size
+            size = self.GetSize()
             config['width'] = size[0]
             config['height'] = size[1]
-        config['pos_x'] = self.Position.x
-        config['pos_y'] = self.Position.y
+        position = self.GetPosition()
+        config['pos_x'] = position.x
+        config['pos_y'] = position.y
 
         for module_name, module_dict in self.loaded_modules.items():
             log.info('stopping %s', module_name)
@@ -253,6 +254,9 @@ class ChatGui(wx.Frame):
         webchat = self.loaded_modules.get('webchat')
         if webchat:
             webchat.reload_chat()
+
+    def update_item(self, item, *args, **kwargs):
+        wx.CallAfter(item, *args, **kwargs)
 
     def create_browser(self, url):
         browser_window = OAuthBrowser(self, url)

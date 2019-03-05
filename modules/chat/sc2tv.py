@@ -40,10 +40,6 @@ CONF_DICT['config']['show_channel_names'] = LCBool(False)
 CONF_GUI = {
     'config': {
         'hidden': ['socket'],
-        'channels_list': {
-            'view': 'list',
-            'addable': 'true'
-        },
     },
     'non_dynamic': ['config.socket'],
 }
@@ -96,12 +92,6 @@ class FsChatMessage(TextMessage):
                 self._pm = True
 
 
-class FsSystemMessage(SystemMessage):
-    def __init__(self, text, category='system', **kwargs):
-        SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
-                               user=SYSTEM_USER, category=category, **kwargs)
-
-
 class FsChat(WebSocketClient):
     def __init__(self, ws, queue, channel_name, **kwargs):
         super(self.__class__, self).__init__(ws, protocols=kwargs.get('protocols', None))
@@ -150,8 +140,8 @@ class FsChat(WebSocketClient):
             timer = threading.Timer(5.0, self.main_thread.connect)
             timer.start()
 
-    def fs_system_message(self, message, category='system'):
-        self.queue.put(FsSystemMessage(message, category=category, channel_name=self.channel_name))
+    def fs_system_message(self, message, **kwargs):
+        self.chat_module.send_system_message(message, **kwargs)
 
     def received_message(self, mes):
         mes.data = mes.data.decode('utf-8')
@@ -292,14 +282,13 @@ class FsPingThread(threading.Thread):
 
 class FsChannel(threading.Thread, Channel):
     def __init__(self, queue, socket, channel_name, **kwargs):
-        Channel.__init__(self, channel_name)
+        Channel.__init__(self, channel_name, queue, icon=SOURCE_ICON, platform_id=SOURCE, system_user=SYSTEM_USER)
         threading.Thread.__init__(self)
 
         # Basic value setting.
         # Daemon is needed so when main programm exits
         # all threads will exit too.
         self.daemon = "True"
-        self.queue = queue
         self.socket = str(socket)
         self.chat_module = kwargs.get('chat_module')
         self.smiles = []
@@ -436,6 +425,3 @@ class SC2TV(ChatModule):
     def _add_channel(self, chat):
         self.channels[chat] = FsChannel(self.queue, self.socket, chat, chat_module=self)
         self.channels[chat].start()
-
-    def apply_settings(self, **kwargs):
-        ChatModule.apply_settings(self, **kwargs)

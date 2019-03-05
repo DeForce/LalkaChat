@@ -9,6 +9,7 @@ levels.db*
 /dl
 *.log
 govno_rutony.py
+secrets.yaml
 default_branch
 /node_modules/
 /http

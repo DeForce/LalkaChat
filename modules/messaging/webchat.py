@@ -361,6 +361,10 @@ class RestRoot(object):
             except:
                 pass
 
+        cherrypy.response.headers["Expires"] = -1
+        cherrypy.response.headers["Pragma"] = "no-cache"
+        cherrypy.response.headers["Cache-Control"] = "private, max-age=0, no-cache, no-store, must-revalidate"
+
         if len(args) > 1:
             module_name = args[0]
             rest_path = args[1]
