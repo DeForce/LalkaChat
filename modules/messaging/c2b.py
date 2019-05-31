@@ -21,12 +21,16 @@ class C2B(MessagingModule):
         MessagingModule.__init__(self, config=CONF_DICT, *args, **kwargs)
         self._load_priority = 10
 
+    @property
+    def replace_list(self):
+        return self.get_config('config').value
+
     @process_text_messages
     @ignore_system_messages
     def _process_message(self, message, **kwargs):
         # Replacing the message if needed.
         # Please do the needful
-        for item, replace in self.get_config('config').value.items():
+        for item, replace in self.replace_list.items():
             if item in message.text.split(' '):
                 replace_word = random.choice(replace.split('/'))
                 message.text = message.text.replace(item, replace_word)

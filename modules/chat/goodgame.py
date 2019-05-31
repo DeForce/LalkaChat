@@ -45,10 +45,6 @@ SMILE_FORMAT = ':{}:'
 CONF_GUI = {
     'config': {
         'hidden': ['socket'],
-        'channels_list': {
-            'view': 'list',
-            'addable': 'true'
-        }
     },
     'non_dynamic': ['config.socket']
 }
@@ -108,25 +104,17 @@ class GoodgameTextMessage(TextMessage):
                 self.add_emote(smile, url)
 
 
-class GoodgameSystemMessage(SystemMessage):
-    def __init__(self, text, category='system', **kwargs):
-        SystemMessage.__init__(self, text, platform_id=SOURCE, icon=SOURCE_ICON,
-                               user=SYSTEM_USER, category=category, **kwargs)
-
-
 class GoodgameMessageHandler(threading.Thread):
-    def __init__(self, ws_class, **kwargs):
+    def __init__(self, ws_class, gg_queue=None, nick=None, smiles=None, channel_class=None, chat_module=None, **kwargs):
         super(self.__class__, self).__init__()
-        self.ws_class = ws_class  # type: GGChat
+        self.ws_class = ws_class
         self.daemon = True
-        self.message_queue = kwargs.get('queue')
-        self.gg_queue = kwargs.get('gg_queue')
-        self.source = SOURCE
+        self.gg_queue = gg_queue
 
-        self.nick = kwargs.get('nick')
-        self.smiles = kwargs.get('smiles')
-        self.main_thread = kwargs.get('main_thread')
-        self.chat_module = kwargs.get('chat_module')
+        self.nick = nick
+        self.smiles = smiles
+        self.channel_class = channel_class
+        self.chat_module = chat_module
         self.kwargs = kwargs
 
     def run(self):
@@ -172,7 +160,7 @@ class GoodgameMessageHandler(threading.Thread):
         self._send_message(message)
 
     def _process_join(self):
-        self.ws_class.system_message(CHANNEL_JOIN_SUCCESS.format(self.nick), category='connection')
+        self.channel_class.put_system_message(CHANNEL_JOIN_SUCCESS.format(self.nick))
 
     def _process_error(self, msg):
         log.info("Received error message: %s", msg)
@@ -181,71 +169,70 @@ class GoodgameMessageHandler(threading.Thread):
             log.error("Failed to find channel on GoodGame, please check channel name")
 
     def _process_user_warn(self, msg):
-        self.ws_class.system_message(MESSAGE_WARNING.format(
-            msg['data']['moder_name'], msg['data']['user_name']), category='chat')
+        self.channel_class.put_system_message(MESSAGE_WARNING.format(
+            msg['data']['moder_name'], msg['data']['user_name']))
 
     def _process_remove_message(self, msg):
         remove_id = ID_PREFIX.format(msg['data']['message_id'])
-        self.message_queue.put(RemoveMessageByIDs(remove_id, platform=SOURCE))
+        self.channel_class.put_message(RemoveMessageByIDs(remove_id, platform=SOURCE))
 
     def _process_user_ban(self, msg):
         if msg['data']['duration']:
-            self.ws_class.system_message(MESSAGE_BAN.format(
+            self.channel_class.put_system_message(MESSAGE_BAN.format(
                 msg['data']['moder_name'],
                 msg['data']['user_name'],
                 msg['data']['duration']/60,
-                msg['data']['reason']),
-                category='chat')
+                msg['data']['reason']))
         else:
             if msg['data']['permanent']:
-                self.ws_class.system_message(
-                    MESSAGE_BAN_PERM.format(msg['data']['moder_name'], msg['data']['user_name']),
-                    category='chat')
+                self.channel_class.put_system_message(
+                    MESSAGE_BAN_PERM.format(msg['data']['moder_name'], msg['data']['user_name']))
             else:
-                self.ws_class.system_message(MESSAGE_UNBAN.format(
+                self.channel_class.put_system_message(MESSAGE_UNBAN.format(
                     msg['data']['moder_name'],
-                    msg['data']['user_name']), category='chat')
+                    msg['data']['user_name']))
 
     def _process_channel_counters(self):
         try:
-            self.main_thread.viewers = self.main_thread.get_viewers()
+            self.channel_class.viewers = self.channel_class.get_viewers()
         except Exception as exc:
             log.exception(exc)
 
     def _post_process_multiple_channels(self, message):
         if self.chat_module.get_config('config', 'show_channel_names'):
-            message.channel_name = self.main_thread.nick
+            message.channel_name = self.channel_class.nick
 
-    def _send_message(self, comp):
-        self._post_process_multiple_channels(comp)
-        self.message_queue.put(comp)
+    def _send_message(self, message):
+        self._post_process_multiple_channels(message)
+        self.channel_class.put_message(message)
 
 
 class GGChat(WebSocketClient):
-    def __init__(self, ws, **kwargs):
+    def __init__(self, ws, ch_id=None, channel_class=None, chat_module=None, **kwargs):
         super(self.__class__, self).__init__(ws, heartbeat_freq=kwargs.get('heartbeat_freq'),
                                              protocols=kwargs.get('protocols'))
         # Received value setting.
-        self.ch_id = kwargs.get('ch_id')
-        self.queue = kwargs.get('queue')
+        self.ch_id = ch_id
         self.gg_queue = queue.Queue()
 
-        self.main_thread = kwargs.get('main_thread')  # type: GGChannel
-        self.chat_module = kwargs.get('chat_module')
+        self.channel_class = channel_class
+        self.chat_module = chat_module
         self.crit_error = False
 
-        self.message_handler = GoodgameMessageHandler(self, gg_queue=self.gg_queue, **kwargs)
+        self.message_handler = GoodgameMessageHandler(
+            self, gg_queue=self.gg_queue, channel_class=self.channel_class, chat_module=self.chat_module,
+            **kwargs)
         self.message_handler.start()
 
     def opened(self):
         success_msg = "Connection Successful"
         log.info(success_msg)
-        self.main_thread.status = CHANNEL_ONLINE
+        self.channel_class.status = CHANNEL_ONLINE
         try:
-            self.main_thread.viewers = self.main_thread.get_viewers()
+            self.channel_class.viewers = self.channel_class.get_viewers()
         except Exception as exc:
             log.exception(exc)
-        self.system_message(CONNECTION_SUCCESS.format(self.main_thread.nick), category='connection')
+        self.channel_class.put_system_message(CONNECTION_SUCCESS.format(self.channel_class.nick))
         # Sending join channel command to goodgame websocket
         join = json.dumps({'type': "join", 'data': {'channel_id': self.ch_id, 'hidden': "true"}}, sort_keys=False)
         self.send(join)
@@ -262,39 +249,33 @@ class GGChat(WebSocketClient):
         :param reason: 
         """
         log.info("Connection Closed Down")
-        self.main_thread.status = CHANNEL_OFFLINE
+        self.channel_class.status = CHANNEL_OFFLINE
         if code in [4000, 4001]:
             self.crit_error = True
-            self.system_message(CONNECTION_CLOSED.format(self.main_thread.nick),
-                                category='connection')
+            self.channel_class.put_system_message(CONNECTION_CLOSED.format(self.channel_class.nick))
         else:
-            self.system_message(CONNECTION_DIED.format(self.main_thread.nick),
-                                category='connection')
-            timer = threading.Timer(5.0, self.main_thread.connect)
+            self.channel_class.put_system_message(CONNECTION_DIED.format(self.channel_class.nick))
+            timer = threading.Timer(5.0, self.channel_class.connect)
             timer.start()
 
     def received_message(self, mes):
         # Deserialize message to json for easier parsing
         self.gg_queue.put(json.loads(str(mes)))
 
-    def system_message(self, msg, category='system'):
-        self.queue.put(GoodgameSystemMessage(msg, category=category, channel_name=self.main_thread.nick))
-
 
 class GGChannel(threading.Thread, Channel):
-    def __init__(self, queue, address, nick, use_chid, **kwargs):
+    def __init__(self, queue, address, nick, use_chid, chat_module=None, **kwargs):
         threading.Thread.__init__(self)
-        Channel.__init__(self, nick)
+        Channel.__init__(self, nick, queue, icon=SOURCE_ICON, platform_id=SOURCE, system_user=SYSTEM_USER)
 
         # Basic value setting.
         # Daemon is needed so when main programm exits
         # all threads will exit too.
         self.daemon = True
-        self.queue = queue
         self.address = str(address)
         self.nick = nick
 
-        self.chat_module = kwargs.get('chat_module')
+        self.chat_module = chat_module
         try:
             self.ch_id = int(nick)
         except:
@@ -366,7 +347,8 @@ class GGChannel(threading.Thread, Channel):
                 # Connecting to goodgame websocket
                 self.ws = GGChat(self.address, protocols=['websocket'], queue=self.queue,
                                  ch_id=self.ch_id, nick=self.nick, smiles=self.smiles,
-                                 heartbeat_freq=30, main_thread=self, **self.kwargs)
+                                 heartbeat_freq=30, channel_class=self, chat_module=self.chat_module,
+                                 **self.kwargs)
                 try:
                     self.ws.connect()
                     self.ws.run_forever()

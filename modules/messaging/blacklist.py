@@ -28,6 +28,26 @@ class Blacklist(MessagingModule):
     def __init__(self, *args, **kwargs):
         super(Blacklist, self).__init__(config=CONF_DICT, gui=GUI, *args, **kwargs)
 
+    @property
+    def users_hide(self):
+        return self.get_config('users_hide')
+
+    @property
+    def words_hide(self):
+        return self.get_config('words_hide')
+
+    @property
+    def users_block(self):
+        return self.get_config('users_block')
+
+    @property
+    def words_block(self):
+        return self.get_config('words_block')
+
+    @property
+    def message(self):
+        return self.get_config('main', 'message').simple()
+
     @process_text_messages
     @ignore_system_messages
     def _process_message(self, message, **kwargs):
@@ -37,17 +57,17 @@ class Blacklist(MessagingModule):
         return message
 
     def _bl_hidden(self, message):
-        if message.user.lower() in self.get_config('users_hide'):
+        if message.user.lower() in self.users_hide:
             return True
 
-        for word in self.get_config('words_hide'):
+        for word in self.words_hide:
             if re.search(word, message.text):
                 return True
 
     def _blocked(self, message):
-        if message.user.lower() in self.get_config('users_block'):
-            message.text = self.get_config('main', 'message').simple()
+        if message.user.lower() in self.users_block:
+            message.text = self.message
 
-        for word in self.get_config('words_block'):
+        for word in self.words_block:
             if re.search(word, message.text):
-                message.text = self.get_config('main', 'message').simple()
+                message.text = self.message

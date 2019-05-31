@@ -319,6 +319,10 @@ class SettingsWindow(wx.Frame):
             if section_key in SKIP_TAGS:
                 continue
 
+            if not self.show_hidden:
+                if section_item.hidden:
+                    continue
+
             gui_settings = gui.get(section_key, {}).copy() if gui else {}
             item_keys = key + [section_key]
             sizer_item = section_item.create_ui(
@@ -470,8 +474,9 @@ class SettingsWindow(wx.Frame):
                             non_dynamic_check = True
                             break
 
-                self.apply_custom_gui_settings(item, change['value'])
+                old_value = deep_config[item_name].value
                 deep_config[item_name].value = change['value']
+                self.apply_custom_gui_settings(item, new=change['value'], old=old_value)
             module_item.apply_settings(changes=changed_items)
         return non_dynamic_check
 
@@ -500,56 +505,57 @@ class SettingsWindow(wx.Frame):
             self.categories[category][key_string]['config'] = panel_data
             self.categories[category][key_string]['gui'] = gui_data
 
-    def apply_custom_gui_settings(self, key, value):
+    def apply_custom_gui_settings(self, key, new, old):
         if key in self.special_settings:
-            self.special_settings[key](value, key=key)
+            self.special_settings[key](new=new, old=old, key=key)
         self.main_class.status_frame.refresh_labels()
 
-    def process_hidden(self, value, **kwargs):
-        self.show_hidden = value
+    def process_hidden(self, new, **kwargs):
+        self.show_hidden = new
 
-    def process_counters(self, value, **kwargs):
+    def process_counters(self, new, **kwargs):
         if self.main_class.status_frame.chat_count:
-            self.main_class.status_frame.is_shown(value)
+            self.main_class.status_frame.is_shown(new)
         else:
             self.main_class.status_frame.is_shown(False)
 
-    def process_on_top(self, value, **kwargs):
-        if value:
+    def process_on_top(self, new, **kwargs):
+        if new:
             style = self.main_class.styles | wx.STAY_ON_TOP
         else:
             style = self.main_class.styles ^ wx.STAY_ON_TOP
         self.main_class.styles = style
         self.main_class.SetWindowStyle(style)
 
-    def process_transparency(self, value, **kwargs):
-        self.main_class.SetTransparent((100 - value) * TRANSPARENCY_MULTIPLIER)
+    def process_transparency(self, new, **kwargs):
+        self.main_class.SetTransparent((100 - new) * TRANSPARENCY_MULTIPLIER)
 
-    def process_text_module_change(self, value, **kwargs):
-        old_items = self.main_class.loaded_modules['messaging'].get_config()['messaging'].value
-        delta = set(old_items).symmetric_difference(set(value))
+    def process_text_module_change(self, new, old, **kwargs):
+        delta = set(old).symmetric_difference(set(new))
 
         for item in delta:
-            if item in value:
+            if item in new:
                 self.toggle_module(True, item)
             else:
                 self.toggle_module(False, item)
             [self.sizer_dict.pop(module) for module in self.sizer_dict.keys() if module.startswith(item)]
 
-    def toggle_module(self, state, key):
+    def toggle_module(self, new, key, **kwargs):
         module = key.split(MODULE_KEY)[0]
         module_class = self.main_class.loaded_modules[module]
         messaging_list = self.main_class.loaded_modules['messaging'].config['messaging'].value
 
-        if state:
+        if new:
             titem = self.tree_ctrl_ids[module]
             self.tree_ctrl.SetItemTextColour(titem['id'], titem['color'])
             module_class.enable()
-            messaging_list.append(module)
+            if module not in messaging_list:
+                messaging_list.append(module)
         else:
             self.tree_ctrl.SetItemTextColour(self.tree_ctrl_ids[module]['id'], wx.Colour('gray'))
             module_class.disable()
-            messaging_list.remove(module)
+            if module in messaging_list:
+                messaging_list.remove(module)
         self.main_class.loaded_modules['messaging'].config['messaging'].value = messaging_list
         if 'messaging' in self.sizer_dict:
             self.sizer_dict.pop('messaging')

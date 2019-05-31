@@ -13,4 +13,4 @@ chmod a+x -R dist/windows/LalkaChat/
 cd dist/windows
 zip -r ${ZIP_NAME}.zip LalkaChat
 chmod 664 ${ZIP_NAME}.zip
-sudo mv ${ZIP_NAME}.zip $UPLOAD_DIR/
+mv ${ZIP_NAME}.zip $UPLOAD_DIR/

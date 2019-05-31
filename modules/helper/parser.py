@@ -21,7 +21,7 @@ def update(dst, src, overwrite=True):
         dst_type = type(dst.get(k, v))
 
         if isinstance(v, (LCDict, collections.Mapping)) and not isinstance(dst.get(k), LCGridDual):
-            r = update(dst.get(k, type(v)()), v, overwrite=overwrite)
+            r = update(dst.get(k, v), v, overwrite=overwrite)
             dst[k] = r
         else:
             if has_key and not overwrite:

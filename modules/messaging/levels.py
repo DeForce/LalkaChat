@@ -21,12 +21,11 @@ log = logging.getLogger('levels')
 CONF_DICT = LCPanel()
 CONF_DICT['config'] = LCStaticBox()
 CONF_DICT['config']['message'] = LCText(u'{0} has leveled up, now he is {1}')
-CONF_DICT['config']['db'] = LCText(os.path.join('conf', u'levels.db'))
+CONF_DICT['config']['db'] = LCText(os.path.join('conf', 'levels.db'))
 CONF_DICT['config']['experience'] = LCDropdown('geometrical', ['geometrical', 'static', 'random'])
 CONF_DICT['config']['exp_for_level'] = LCSpin(200)
 CONF_DICT['config']['exp_for_message'] = LCSpin(1, min=0, max=sys.maxsize)
 CONF_DICT['config']['decrease_window'] = LCSpin(1, min=0, max=sys.maxsize)
-
 
 CONF_GUI = {
     'non_dynamic': ['config.db']
@@ -48,30 +47,44 @@ class Levels(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
 
-        self.experience = None
-        self.exp_for_level = None
-        self.exp_for_message = None
         self.level_file = None
         self.levels = None
         self.special_levels = None
         self.db_location = None
-        self.decrease_window = None
         self.threshold_users = None
+
+    @property
+    def db_path(self):
+        return self.get_config('config', 'db').simple()
+
+    @property
+    def decrease_window(self):
+        return self.get_config('config', 'decrease_window').simple()
+
+    @property
+    def experience(self):
+        return self.get_config('config', 'experience').simple()
+
+    @property
+    def exp_for_level(self):
+        return self.get_config('config', 'exp_for_level').simple()
+
+    @property
+    def exp_for_message(self):
+        return self.get_config('config', 'exp_for_message').simple()
+
+    @property
+    def message(self):
+        return self.get_config('config', 'message')
 
     def load_module(self, *args, **kwargs):
         MessagingModule.load_module(self, *args, **kwargs)
         self._loaded_modules['webchat'].add_depend('levels')
 
-        conf_dict = self.get_config()
-
-        self.experience = None
-        self.exp_for_level = None
-        self.exp_for_message = None
         self.level_file = None
         self.levels = []
         self.special_levels = {}
-        self.db_location = os.path.join(str(conf_dict['config'].get('db')))
-        self.decrease_window = int(conf_dict['config'].get('decrease_window'))
+        self.db_location = self.db_path
         self.threshold_users = {}
 
         # Load levels
@@ -89,10 +102,6 @@ class Levels(MessagingModule):
         self.load_levels()
 
     def load_levels(self):
-        self.experience = str(self.get_config('config').get('experience'))
-        self.exp_for_level = float(self.get_config('config').get('exp_for_level'))
-        self.exp_for_message = float(self.get_config('config').get('exp_for_message'))
-
         if self.levels:
             self.levels = []
 
@@ -121,10 +130,10 @@ class Levels(MessagingModule):
                 self.levels.append(level_data.attrib)
 
     def apply_settings(self, **kwargs):
-        save_settings(self.get_config(), ignored_sections=self.conf_params['gui'].get('ignored_sections', ()))
+        MessagingModule.apply_settings(self, **kwargs)
         self.load_levels()
 
-    def set_level(self, user, queue):
+    def set_level(self, user):
         db = sqlite3.connect(self.db_location)
 
         cursor = db.cursor()
@@ -158,20 +167,13 @@ class Levels(MessagingModule):
                 db.commit()
             else:
                 max_level += 1
-            queue.put(
-                SystemMessage(
-                    self.get_config('config', 'message').format(
-                        user,
-                        self.levels[max_level]['name']),
-                    category='module'
-                )
-            )
+            self.send_system_message(self.message.format(user, self.levels[max_level]['name']))
         cursor.close()
         return self.levels[max_level].copy()
 
     @process_text_messages
     @ignore_system_messages
-    def _process_message(self, message, queue=None, **kwargs):
+    def _process_message(self, message, **kwargs):
         if message.user in self.special_levels:
             level_info = self.special_levels[message.user]
             try:
@@ -180,7 +182,7 @@ class Levels(MessagingModule):
                 message.s_levels = [level_info.copy()]
                 message.jsonable.append('s_levels')
 
-        message.levels = self.set_level(message.user, queue)
+        message.levels = self.set_level(message.user)
         message.jsonable.append('levels')
         return message
 

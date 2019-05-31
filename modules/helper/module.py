@@ -4,7 +4,7 @@ import logging
 import os
 
 from modules.helper import parser
-from modules.helper.message import TextMessage, Message
+from modules.helper.message import TextMessage, Message, SystemMessage
 from modules.helper.parser import save_settings, load_from_config_file
 from modules.helper.system import RestApiException, CONF_FOLDER
 from modules.interface.types import LCPanel, LCStaticBox, LCBool, LCList, deep_get
@@ -50,7 +50,6 @@ class BaseModule(object):
         self._category = category
         self._loaded_modules = {}
         self._rest_api = {}
-        self._load_queue = {}
         self._msg_queue = queue
 
         if conf_file is None:
@@ -67,13 +66,8 @@ class BaseModule(object):
         }
         self._conf_params.update(kwargs.get('conf_params', {}))
 
-    def add_to_queue(self, q_type, data):
-        if q_type not in self._load_queue:
-            self._load_queue[q_type] = []
-        self._load_queue[q_type].append(data)
-
-    def get_queue(self, q_type):
-        return self._load_queue.get(q_type, {})
+    def put_message_in_queue(self, message):
+        self._msg_queue.put(message)
 
     def add_depend(self, module_name):
         self._dependencies.add(module_name)
@@ -164,6 +158,8 @@ class UIModule(BaseModule):
 
 
 class DefaultModule(BaseModule):
+    sys_category = 'module'
+
     def __init__(self, config=None, *args, **kwargs):
         if config is None:
             config = LCPanel()
@@ -173,6 +169,9 @@ class DefaultModule(BaseModule):
         parser.update(def_config, config, overwrite=True)
 
         super(DefaultModule, self).__init__(config=def_config, *args, **kwargs)
+
+    def send_system_message(self, text, category=sys_category, **kwargs):
+        self.put_message_in_queue(SystemMessage(text=text, category=category, **kwargs))
 
     @property
     def enabled(self):
@@ -283,14 +282,23 @@ class ChatModule(DefaultModule):
 
 
 class Channel(object):
-    def __init__(self, channel):
+    def __init__(self, channel, queue, icon, platform_id, system_user):
+        # TODO: Do A lot of shit with this. Systemmessage passthrough, message passthrough
         self._viewers = None
         self._status = CHANNEL_OFFLINE
         self._channel = channel
+        self._queue = queue
+        self._icon = icon
+        self._platform_id = platform_id
+        self._system_user = system_user
 
     @property
     def channel(self):
         return self._channel
+
+    @property
+    def queue(self):
+        return self._queue
 
     @property
     def viewers(self):
@@ -299,12 +307,6 @@ class Channel(object):
     @viewers.setter
     def viewers(self, value):
         self._viewers = value
-
-    def get_viewers(self):
-        """
-        Overwrite this.
-        :return:
-        """
 
     @property
     def status(self):
@@ -316,3 +318,17 @@ class Channel(object):
             self._status = value
         else:
             raise TypeError('Invalid channel status: {}', value)
+
+    def put_system_message(self, text, category='chat', **kwargs):
+        self._put_message(
+            SystemMessage(text, category=category, icon=self._icon, platform_id=self._platform_id,
+                          user=self._system_user, **kwargs))
+
+    def create_message(self, *args, **kwargs):
+        return TextMessage(icon=self._icon, platform_id=self._platform_id, *args, **kwargs)
+
+    def put_message(self, message):
+        self._put_message(message)
+
+    def _put_message(self, message):
+        self._queue.put(message)

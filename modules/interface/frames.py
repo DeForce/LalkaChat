@@ -12,6 +12,7 @@ try:
     HAS_CHROME = True
 except ImportError:
     from wx import html2 as browser, StdDialogButtonSizer
+    HAS_CHROME = False
 
 log = logging.getLogger('chat_gui')
 

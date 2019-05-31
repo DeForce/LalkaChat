@@ -34,6 +34,14 @@
                     </div>
                 </template>
 
+                <template v-if="message.s_levels">
+                    <div v-for="level in message.s_levels">
+                        <div class="message-level">
+                            <img class="level" :src="level.url" />
+                        </div>
+                    </div>
+                </template>
+
                 <div class="message-badges" v-for="badge in message.badges">
                     <img class="badge" :src="badge.url" :class="{ 'broadcaster': badge.badge == 'broadcaster', 'mod': badge.badge == 'mod', 'turbo': badge.badge == 'turbo', 'premium': badge.badge == 'premium' }" />
                 </div>

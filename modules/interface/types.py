@@ -1,4 +1,6 @@
 import collections
+from builtins import object
+
 from functools import reduce
 
 import wx
@@ -28,7 +30,7 @@ class DualGridDict(OrderedDict):
 
 
 class LCObject(object):
-    def __init__(self, value=None, always_on=False, *args, **kwargs):
+    def __init__(self, value=None, always_on=False, hidden=False, *args, **kwargs):
         self._value = value
 
         self.key = None
@@ -36,6 +38,7 @@ class LCObject(object):
         self.module = None
 
         self._enabled = True
+        self._hidden = hidden
         self._always_on = always_on
 
         self.wx_controls = {}
@@ -43,7 +46,7 @@ class LCObject(object):
         self.properties = ['always_on']
 
     def __bool__(self):
-        return self._value.__bool__()
+        return bool(self._value)
 
     def __len__(self):
         return self._value.__len__()
@@ -53,6 +56,17 @@ class LCObject(object):
 
     def __repr__(self):
         return self._value.__repr__()
+
+    def __str__(self):
+        return self._value.__str__()
+
+    @property
+    def hidden(self):
+        return self._hidden
+
+    @hidden.setter
+    def hidden(self, value: bool):
+        self._hidden = value
 
     @property
     def enabled(self):
@@ -108,7 +122,7 @@ class LCObject(object):
 
 class LCDict(LCObject):
     def __init__(self, *args, **kwargs):
-        super(LCDict, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._value = OrderedDict()
 
     def __bool__(self):
@@ -161,7 +175,7 @@ class LCPanel(LCDict):
 class LCStaticBox(LCDict):
     def __init__(self, label=True, *args, **kwargs):
         self.label = label
-        super(LCStaticBox, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.properties.append('label')
 
     def _enable(self):
@@ -195,8 +209,11 @@ class LCStaticBox(LCDict):
 
         # Create elements that are child of static-box
         for item, value in self._value.items():
-            if item in hidden_items and not kwargs.get('show_hidden'):
-                continue
+            if not kwargs.get('show_hidden'):
+                if value.hidden:
+                    continue
+                elif item in hidden_items:
+                    continue
 
             item_dict = value.create_ui(panel=static_box, key=key+[item], from_sb=True,
                                         **kwargs)
@@ -222,6 +239,38 @@ class LCStaticBox(LCDict):
         return {'item': static_sizer, 'box': static_box}
 
 
+class LCLabel(LCObject):
+    def __init__(self, value='', *args, **kwargs):
+        super().__init__(str(value), *args, **kwargs)
+        self.color = None
+        self.def_color = None
+
+    def _create_ui(self, panel=None, key=None, **kwargs):
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        item_text = wx.StaticText(panel, label=translate_key(self.value))
+        self.def_color = item_text.GetForegroundColour()
+        if self.color:
+            item_text.SetForegroundColour(wx.Colour(self.color))
+        item_text.Wrap(250)
+        item_sizer.Add(item_text, 0, wx.ALIGN_CENTER | wx.RIGHT, TEXT_BORDER)
+        return {'item': item_sizer, 'control': item_text}
+
+    def update(self):
+        if not self.wx_controls:
+            return
+
+        if self.color:
+            self.wx_controls['control'].SetForegroundColour(wx.Colour(self.color))
+        else:
+            self.wx_controls['control'].SetForegroundColour(self.def_color)
+
+    def hide(self, enabled):
+        if not self.wx_controls:
+            return
+
+        self.wx_controls['control'].Show(not enabled)
+
+
 class LCText(LCObject):
     def __init__(self, value=None):
         if isinstance(value, int):
@@ -232,12 +281,6 @@ class LCText(LCObject):
         LCObject.__init__(self, value)
 
     def simple(self):
-        return self._value
-
-    def __repr__(self):
-        return self._value
-
-    def __str__(self):
         return self._value
 
     def __int__(self):
@@ -313,14 +356,13 @@ class LCColour(LCObject):
 
 
 class LCBool(LCObject):
+    _value = bool
+
     def __init__(self, value, *args, **kwargs):
         super(LCBool, self).__init__(value, *args, **kwargs)
 
-    def __nonzero__(self):
-        return bool(self._value)
-
     def __repr__(self):
-        return str(bool(self._value))
+        return str(self._value)
 
     def simple(self):
         return bool(self)

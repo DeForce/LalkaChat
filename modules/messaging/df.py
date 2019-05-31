@@ -21,7 +21,7 @@ class DF(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
         # Dwarf professions.
-        self.file = str(CONF_DICT['grep']['file'])
+        self.file = self.config_file
 
         dir_name = os.path.dirname(self.file)
         if not os.path.exists(dir_name):
@@ -30,6 +30,18 @@ class DF(MessagingModule):
         if not os.path.isfile(self.file):
             with open(self.file, 'w'):
                 pass
+
+    @property
+    def config_file(self):
+        return self.get_config('grep', 'file').simple()
+
+    @property
+    def professions(self):
+        return self.get_config('prof').value
+
+    @property
+    def regexp_symbol(self):
+        return self.get_config('grep', 'symbol')
 
     def write_to_file(self, user, role):
         with open(self.file, 'r') as f:
@@ -42,9 +54,8 @@ class DF(MessagingModule):
     @process_text_messages
     @ignore_system_messages
     def _process_message(self, message, **kwargs):
-        for role, regexp in self.get_config('prof').value.items():
-            if re.search(f'{self.get_config("grep", "symbol")}{regexp}',
-                         message.text):
+        for role, regexp in self.professions.items():
+            if re.search(f'{self.regexp_symbol}{regexp}', message.text):
                 self.write_to_file(message.user, role.capitalize())
                 break
         return message
