@@ -938,7 +938,7 @@ class LCChooseSingle(LCObject):
         self.keep_extension = kwargs.get('keep_extension', False)
         self.description = kwargs.get('description')
         self.empty_label = empty_label
-        self._skip = {item: True if item == value else False for item in hidden}
+        self._skip = {item: item == value for item in hidden}
         self.bind_map = {}
 
     @property

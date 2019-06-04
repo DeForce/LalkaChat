@@ -1,4 +1,5 @@
 import glob
+import json
 import logging
 import os
 import shutil
@@ -40,11 +41,20 @@ def prepare_update():
         zip_file.extractall(UPDATE_FOLDER)
     os.remove(zip_path)
 
+    old_http_folder = os.path.join(HTTP_FOLDER.split(os.sep)[-1])
     http_folder = os.path.join(dst_path, HTTP_FOLDER.split(os.sep)[-1])
     for style in os.listdir(http_folder):
-        json_settings = glob.glob(os.path.join(http_folder, style, '*.json'))
-        for item in json_settings:
-            os.remove(item)
+        json_files = glob.glob(os.path.join(http_folder, style, '*.json'))
+        for item in json_files:
+            json_file = item.split(os.sep)[-1]
+            old_json_file = os.path.join(old_http_folder, style, json_file)
+            with open(old_json_file, 'r') as old_json:
+                old_data = json.load(old_json)
+            with open(item, 'r') as json_item:
+                new_data = json.load(json_item)
+                new_data.update(old_data)
+            with open(item, 'w') as json_item:
+                json.dump(new_data, json_item, indent=2)
 
 
 def do_update():

@@ -387,40 +387,12 @@ class Sc2tvMessage(object):
         self.data = f'42{json.dumps(message)}'
 
 
-class TestSc2tv(threading.Thread):
-    def __init__(self, main_class):
-        super(TestSc2tv, self).__init__()
-        self.main_class = main_class  # type: SC2TV
-        self.main_class.rest_add('POST', 'push_message', self.send_message)
-        self.fs_thread = None
-
-    def run(self):
-        while True:
-            try:
-                thread = self.main_class.channels.items()[0][1]
-                if thread.ws:
-                    self.fs_thread = thread.ws
-                    break
-            except:
-                continue
-        log.info("sc2tv Testing mode online")
-
-    def send_message(self, *args, **kwargs):
-        nickname = kwargs.get('nickname', 'super_tester')
-        text = kwargs.get('text', 'Kappa 123')
-
-        self.fs_thread.received_message(Sc2tvMessage(nickname, text))
-
-
 class SC2TV(ChatModule):
     def __init__(self, *args, **kwargs):
         log.info("Initializing funstream chat")
         ChatModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
 
         self.socket = CONF_DICT['config']['socket']
-
-    def _test_class(self):
-        return TestSc2tv(self)
 
     def _add_channel(self, chat):
         self.channels[chat] = FsChannel(self.queue, self.socket, chat, chat_module=self)

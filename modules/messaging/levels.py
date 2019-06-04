@@ -10,6 +10,8 @@ import datetime
 
 import sys
 
+import yaml
+
 from modules.helper.message import process_text_messages, SystemMessage, ignore_system_messages
 from modules.helper.parser import save_settings
 from modules.helper.system import ModuleLoadException
@@ -17,6 +19,8 @@ from modules.helper.module import MessagingModule
 from modules.interface.types import *
 
 log = logging.getLogger('levels')
+
+levels_file = 'levels.yaml'
 
 CONF_DICT = LCPanel()
 CONF_DICT['config'] = LCStaticBox()
@@ -48,8 +52,10 @@ class Levels(MessagingModule):
         MessagingModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
 
         self.level_file = None
-        self.levels = None
-        self.special_levels = None
+        self.levels = []
+        self.exp_dict = {}
+        self.users = {}
+        self.special_levels = {}
         self.db_location = None
         self.threshold_users = None
 
@@ -82,15 +88,13 @@ class Levels(MessagingModule):
         self._loaded_modules['webchat'].add_depend('levels')
 
         self.level_file = None
-        self.levels = []
-        self.special_levels = {}
         self.db_location = self.db_path
         self.threshold_users = {}
 
         # Load levels
         webchat_location = self._loaded_modules['webchat'].style_settings['gui_chat']['location']
         if webchat_location and os.path.exists(webchat_location):
-            self.level_file = os.path.join(webchat_location, 'levels.xml')
+            self.level_file = os.path.join(webchat_location, levels_file)
         else:
             log.error("%s not found, generating from template", self.level_file)
             raise ModuleLoadException(f"{self.level_file} not found, generating from template")
@@ -100,6 +104,17 @@ class Levels(MessagingModule):
         self.create_db(self.db_location)
 
         self.load_levels()
+        self.load_players()
+
+    def load_players(self):
+        db = sqlite3.connect(self.db_location)
+
+        cursor = db.cursor()
+        users_select = cursor.execute('SELECT User, Experience FROM UserLevels')
+        users_select = users_select.fetchall()
+        for user_q in users_select:
+            self.users[user_q[0]] = user_q[1]
+        pass
 
     def load_levels(self):
         if self.levels:
@@ -110,66 +125,60 @@ class Levels(MessagingModule):
 
         self.level_file = os.path.abspath(
             os.path.join(
-                self._loaded_modules['webchat'].style_settings['gui_chat']['location'], 'levels.xml'
+                self._loaded_modules['webchat'].style_settings['gui_chat']['location'], levels_file
             )
         )
-        tree = ElementTree.parse(self.level_file)
-        for level_data in tree.getroot():
+        with open(self.level_file, 'r', encoding='utf-8') as level_file:
+            items = yaml.safe_load(level_file)
+        for level_data in items.get('levels', {}):
             level_count = float(len(self.levels) + 1)
-            if 'nick' in level_data.attrib:
-                self.special_levels[level_data.attrib['nick']] = level_data.attrib
+            if 'nick' in level_data:
+                self.special_levels[level_data['nick']] = level_data
             else:
                 if self.experience == 'geometrical':
                     level_exp = math.floor(self.exp_for_level * (pow(level_count, 1.8)/2.0))
                 else:
                     level_exp = self.exp_for_level * level_count
-                level_data.attrib['exp'] = level_exp
-                if not level_data.attrib['url'].startswith('/'):
-                    level_data.attrib['url'] = f'/{level_data.attrib["url"]}'
+                level_data['exp'] = level_exp
+                if not level_data['url'].startswith('/'):
+                    level_data['url'] = f'/{level_data.get("url", "")}'
 
-                self.levels.append(level_data.attrib)
+                self.levels.append(level_data)
+        self.exp_dict = {level['exp']: level for level in self.levels}
+
+    def save_users(self):
+        db = sqlite3.connect(self.db_location)
+        cursor = db.cursor()
+        for user, experience in self.users.items():
+            cursor.execute('REPLACE INTO UserLevels (User, Experience) VALUES (?, ?)', [user, experience])
+        db.commit()
 
     def apply_settings(self, **kwargs):
         MessagingModule.apply_settings(self, **kwargs)
+        self.save_users()
         self.load_levels()
 
     def set_level(self, user):
-        db = sqlite3.connect(self.db_location)
-
-        cursor = db.cursor()
-        user_select = cursor.execute('SELECT User, Experience FROM UserLevels WHERE User = ?', [user])
-        user_select = user_select.fetchall()
-
-        experience = self.exp_for_message
         exp_to_add = self.calculate_experience(user)
-        if len(user_select) == 1:
-            row = user_select[0]
-            experience = int(row[1]) + exp_to_add
-            cursor.execute('UPDATE UserLevels SET Experience = ? WHERE User = ? ', [experience, user])
-        elif len(user_select) > 1:
-            log.error("Select yielded more than one User")
-        else:
-            cursor.execute('INSERT INTO UserLevels VALUES (?, ?)', [user, experience])
-        db.commit()
+        experience = int(self.users.get(user, self.exp_for_message))
 
-        max_level = 0
-        for level in self.levels:
-            if level['exp'] < experience:
-                max_level += 1
-        if max_level >= len(self.levels):
-            max_level -= 1
+        next_level_exp = next((level_exp for level_exp in self.exp_dict.keys() if level_exp > experience),
+                              max(self.exp_dict.keys()))
+        next_level = self.exp_dict.get(next_level_exp)
+        next_level_index = list(self.exp_dict.keys()).index(next_level_exp)
+        current_level = self.levels[next_level_index - 1]
 
-        if experience >= self.levels[max_level]['exp']:
+        experience = experience + exp_to_add
+        # TODO: Figure out better leveling algorithm
+        if experience >= next_level_exp:
             if self.experience == 'random':
-                max_level = random.randint(0, len(self.levels) - 1)
-                experience = self.levels[max_level]['exp'] - self.exp_for_level
-                cursor.execute('UPDATE UserLevels SET Experience = ? WHERE User = ? ', [experience, user])
-                db.commit()
+                current_level = random.choice(self.levels)
+                experience = current_level['exp']
             else:
-                max_level += 1
-            self.send_system_message(self.message.format(user, self.levels[max_level]['name']))
-        cursor.close()
-        return self.levels[max_level].copy()
+                current_level = next_level
+            self.send_system_message(self.message.format(user, current_level['name']))
+        self.users[user] = experience
+        return current_level.copy()
 
     @process_text_messages
     @ignore_system_messages

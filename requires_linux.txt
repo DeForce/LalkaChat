@@ -7,3 +7,4 @@ jinja2
 pyScss
 rtyaml
 youtube-python
+wxPython

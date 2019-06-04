@@ -9,3 +9,4 @@ rtyaml
 cefpython3==57.1
 more-itertools==5.0.0
 youtube-python
+wxPython

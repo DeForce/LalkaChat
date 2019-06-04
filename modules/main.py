@@ -52,8 +52,11 @@ def load_modules(modules, base_config):
         logging.debug('loaded module %s', module_name)
 
 
-with open('default_branch') as branch_file:
-    DEFAULT_BRANCH, DEFAULT_VERSION = branch_file.read().strip().split(',')
+if os.path.exists('default_branch'):
+    with open('default_branch') as branch_file:
+        DEFAULT_BRANCH, DEFAULT_VERSION = branch_file.read().strip().split(',')
+else:
+    DEFAULT_BRANCH, DEFAULT_VERSION = ('develop', 1)
 
 
 class MainModule(ConfigModule):

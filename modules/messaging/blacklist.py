@@ -61,7 +61,7 @@ class Blacklist(MessagingModule):
             return True
 
         for word in self.words_hide:
-            if re.search(word, message.text):
+            if word in message.text.split(' '):
                 return True
 
     def _blocked(self, message):
@@ -69,5 +69,5 @@ class Blacklist(MessagingModule):
             message.text = self.message
 
         for word in self.words_block:
-            if re.search(word, message.text):
+            if word in message.text.split(' '):
                 message.text = self.message

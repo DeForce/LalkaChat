@@ -378,31 +378,6 @@ def gg_message(nickname, text):
     }
 
 
-class TestGG(threading.Thread):
-    def __init__(self, main_class):
-        super(TestGG, self).__init__()
-        self.main_class = main_class  # type: GoodGame
-        self.main_class.rest_add('POST', 'push_message', self.send_message)
-        self.gg_handler = None
-
-    def run(self):
-        while True:
-            try:
-                thread = self.main_class.channels.items()[0][1]
-                if thread.ws:
-                    self.gg_handler = thread.ws.message_handler
-                    break
-            except:
-                continue
-        log.info("GG Testing mode online")
-
-    def send_message(self, *args, **kwargs):
-        nickname = kwargs.get('nickname', 'super_tester')
-        text = kwargs.get('text', 'Kappa 123')
-
-        self.gg_handler.process_message(gg_message(nickname, text))
-
-
 class GoodGame(ChatModule):
     def __init__(self, *args, **kwargs):
         log.info("Initializing goodgame chat")
@@ -412,9 +387,6 @@ class GoodGame(ChatModule):
 
     def load_module(self, *args, **kwargs):
         ChatModule.load_module(self, *args, **kwargs)
-
-    def _test_class(self):
-        return TestGG(self)
 
     def _add_channel(self, chat):
         gg = GGChannel(self.queue, self.host, chat,
