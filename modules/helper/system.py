@@ -66,16 +66,6 @@ LANGUAGE_DICT = {
 }
 
 
-def system_message(message, queue, source=SOURCE,
-                   icon=SOURCE_ICON, from_user=SOURCE_USER, category='system'):
-    queue.put({'source': source,
-               'source_icon': icon,
-               'user': from_user,
-               'text': cleanup_tags(message),
-               'category': category,
-               'type': 'system_message'})
-
-
 class ModuleLoadException(Exception):
     def __init__(self, message, *args: object):
         super().__init__(*args)

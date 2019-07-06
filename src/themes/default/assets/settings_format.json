@@ -1,4 +1,10 @@
 {
+  "show_system_msg": {
+    "view": "choose_mult",
+    "addable": false,
+    "available_list": ["system.chat", "system.module"],
+    "empty_label": true
+  },
   "font_size": {
     "view": "spin",
     "min_v": 10,

@@ -1,5 +1,5 @@
 {
-  "show_system_msg": true, 
+  "show_system_msg": ["system.chat", "system.module"],
   "replace_message": true,
   "replace_text": "<message removed>",
   "clear_timer": -1,

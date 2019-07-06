@@ -26,11 +26,12 @@ GUI = {
 
 class Blacklist(MessagingModule):
     def __init__(self, *args, **kwargs):
+        self._load_priority = 20
         super(Blacklist, self).__init__(config=CONF_DICT, gui=GUI, *args, **kwargs)
 
     @property
     def users_hide(self):
-        return self.get_config('users_hide')
+        return [item.lower() for item in self.get_config('users_hide')]
 
     @property
     def words_hide(self):
@@ -38,7 +39,7 @@ class Blacklist(MessagingModule):
 
     @property
     def users_block(self):
-        return self.get_config('users_block')
+        return [item.lower() for item in self.get_config('users_block')]
 
     @property
     def words_block(self):
@@ -53,7 +54,7 @@ class Blacklist(MessagingModule):
     def _process_message(self, message, **kwargs):
         self._blocked(message)
         if self._bl_hidden(message):
-            message.hidden = True
+            return
         return message
 
     def _bl_hidden(self, message):

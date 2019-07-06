@@ -13,13 +13,14 @@ import cherrypy
 from cherrypy.lib.static import serve_file
 from scss import Compiler
 from scss.namespace import Namespace
-from scss.types import Color, Boolean, String, Number
+from scss.types import Color, Boolean, String, Number, List
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
 from modules.helper.functions import get_themes
 from modules.helper.html_template import HTML_TEMPLATE
-from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByIDs
+from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByIDs, \
+    get_system_message_types
 from modules.helper.module import MessagingModule
 from modules.helper.parser import save_settings, convert_to_dict, update
 from modules.helper.system import THREADS, CONF_FOLDER, EMOTE_FORMAT, HTTP_FOLDER
@@ -49,7 +50,8 @@ CONF_DICT['gui_chat']['style'] = LCChooseSingle(DEFAULT_GUI_STYLE,
                                                 available_list=get_themes(),
                                                 empty_label=True)
 CONF_DICT['gui_chat']['style_settings'] = LCStaticBox()
-CONF_DICT['gui_chat']['style_settings']['show_system_msg'] = LCBool(True)
+CONF_DICT['gui_chat']['style_settings']['show_system_msg'] = LCChooseMultiple(
+    available_list=get_system_message_types(), addable=False, value=get_system_message_types())
 CONF_DICT['gui_chat']['style_settings']['show_history'] = LCBool(True)
 
 CONF_DICT['server_chat'] = LCPanel()
@@ -57,7 +59,8 @@ CONF_DICT['server_chat']['style'] = LCChooseSingle(DEFAULT_STYLE,
                                                    available_list=get_themes(),
                                                    empty_label=True)
 CONF_DICT['server_chat']['style_settings'] = LCStaticBox()
-CONF_DICT['server_chat']['style_settings']['show_system_msg'] = LCBool(True)
+CONF_DICT['server_chat']['style_settings']['show_system_msg'] = LCChooseMultiple(
+    available_list=get_system_message_types(), addable=False, value=get_system_message_types())
 CONF_DICT['server_chat']['style_settings']['show_history'] = LCBool(True)
 
 TYPE_DICT = {
@@ -158,7 +161,7 @@ class MessagingThread(threading.Thread):
 
     def send_message(self, message, chat_type):
         show_sys_msg = self.settings[chat_type]['keys']['show_system_msg']
-        if isinstance(message, SystemMessage) and not show_sys_msg:
+        if isinstance(message, SystemMessage) and message.category not in show_sys_msg:
             return
 
         send_message = prepare_message(message.json(), self.settings[chat_type], type(message))
@@ -184,10 +187,10 @@ class FireFirstMessages(threading.Thread):
         self.settings = settings
 
     def run(self):
-        show_system_msg = self.settings['keys'].get('show_system_msg', True)
+        show_system_msg = self.settings['keys'].get('show_system_msg', get_system_message_types())
         if self.ws.stream:
             for item in self.history:
-                if isinstance(item, SystemMessage) and not show_system_msg:
+                if isinstance(item, SystemMessage) and item.category not in show_system_msg:
                     continue
                 timedelta = datetime.datetime.now() - item.timestamp
                 timer = self.settings['keys'].get('clear_timer', LCSpin(-1)).simple()
@@ -425,6 +428,8 @@ class CssRoot(object):
                 css_value = Boolean(s_value)
             elif isinstance(value, LCSpin):
                 css_value = Number(s_value)
+            elif isinstance(value, LCChooseMultiple):
+                css_value = List([String(item) for item in s_value])
             elif isinstance(value, LCObject):
                 css_value = String(s_value)
             else:

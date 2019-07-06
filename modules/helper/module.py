@@ -158,7 +158,7 @@ class UIModule(BaseModule):
 
 
 class DefaultModule(BaseModule):
-    sys_category = 'module'
+    sys_category = 'system.module'
 
     def __init__(self, config=None, *args, **kwargs):
         if config is None:
@@ -305,7 +305,7 @@ class Channel(object):
         else:
             raise TypeError('Invalid channel status: {}', value)
 
-    def put_system_message(self, text, category='chat', **kwargs):
+    def put_system_message(self, text, category='system.chat', **kwargs):
         self._put_message(
             SystemMessage(text, category=category, icon=self._icon, platform_id=self._platform_id,
                           user=self._system_user, **kwargs))

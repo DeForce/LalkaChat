@@ -100,7 +100,7 @@ class FsChat(WebSocketClient):
         self.queue = queue
         self.channel_name = channel_name
 
-        self.main_thread = kwargs.get('main_thread')  # type: FsChannel
+        self.channel_module = kwargs.get('main_thread')  # type: FsChannel
         self.chat_module = kwargs.get('chat_module')  # type: SC2TV
         self.crit_error = False
 
@@ -116,7 +116,7 @@ class FsChat(WebSocketClient):
 
     def opened(self):
         log.info("Websocket Connection Succesfull")
-        self.fs_system_message(CONNECTION_SUCCESS, category='connection')
+        self.fs_system_message(CONNECTION_SUCCESS)
 
     def closed(self, code, reason=None):
         """
@@ -127,7 +127,7 @@ class FsChat(WebSocketClient):
         :param code: 
         :param reason: 
         """
-        self.main_thread.status = CHANNEL_OFFLINE
+        self.channel_module.status = CHANNEL_OFFLINE
         if code in [4000, 4001]:
             self.crit_error = True
             self.fs_system_message(CONNECTION_CLOSED.format(self.channel_name),
@@ -137,11 +137,11 @@ class FsChat(WebSocketClient):
             self.fs_system_message(
                 CONNECTION_DIED.format(self.channel_name),
                 category='connection')
-            timer = threading.Timer(5.0, self.main_thread.connect)
+            timer = threading.Timer(5.0, self.channel_module.connect)
             timer.start()
 
     def fs_system_message(self, message, **kwargs):
-        self.chat_module.send_system_message(message, **kwargs)
+        self.channel_module.put_system_message(message, **kwargs)
 
     def received_message(self, mes):
         mes.data = mes.data.decode('utf-8')
@@ -189,7 +189,7 @@ class FsChat(WebSocketClient):
             self.fs_send(payload)
 
             msg_joining = CONNECTION_JOINING
-            self.fs_system_message(msg_joining.format(self.channel_name), category='connection')
+            self.fs_system_message(msg_joining.format(self.channel_name))
             log.debug(msg_joining.format(self.channel_id))
 
     def fs_send(self, payload):
@@ -250,11 +250,11 @@ class FsChat(WebSocketClient):
             self._send_message(msg)
 
     def _process_joined(self):
-        self.main_thread.status = CHANNEL_ONLINE
-        self.fs_system_message(CHANNEL_JOIN_SUCCESS.format(self.channel_name), category='connection')
+        self.channel_module.status = CHANNEL_ONLINE
+        self.fs_system_message(CHANNEL_JOIN_SUCCESS.format(self.channel_name))
 
     def _process_channel_list(self, message):
-        self.main_thread.viewers = message['result']['amount']
+        self.channel_module.viewers = message['result']['amount']
 
     def _post_process_multiple_channels(self, message):
         if self.chat_module.get_config('config', 'show_channel_names'):
@@ -274,9 +274,9 @@ class FsPingThread(threading.Thread):
 
     def run(self):
         while not self.ws.terminated:
-            self.ws.main_thread.status = CHANNEL_ONLINE
+            self.ws.channel_module.status = CHANNEL_ONLINE
             self.ws.send("2")
-            self.ws.main_thread.get_viewers()
+            self.ws.channel_module.get_viewers()
             time.sleep(PING_DELAY)
 
 

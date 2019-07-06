@@ -108,9 +108,10 @@ class Message(threading.Thread):
         # When we receive message we pass it via all loaded modules
         # All modules should return the message with modified/not modified
         #  content so it can be passed to new module, or to pass to CLI
-        for m_module in self.modules:  # type: MessagingModule
+        for m_module in self.modules:
             log.debug('%s', m_module)
-            message = m_module.process_message(message, queue=self.queue)
+            if message:
+                message = m_module.process_message(message, queue=self.queue)
 
     def run(self):
         for thread in range(THREADS):

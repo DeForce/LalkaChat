@@ -1,5 +1,5 @@
 {
-  "show_system_msg": false,
+  "show_system_msg": ["system.module"],
   "replace_message": false,
   "replace_text": "<message removed>",
   "clear_timer": 120,
