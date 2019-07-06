@@ -621,33 +621,6 @@ class TWChannel(threading.Thread, Channel):
             log.warning(f"Unable to get user count, error {exc}\nArgs: {exc.args}")
 
 
-class TestTwitch(threading.Thread):
-    def __init__(self, main_class):
-        super(TestTwitch, self).__init__()
-        self.main_class = main_class  # type: Twitch
-        self.main_class.rest_add('POST', 'push_message', self.send_message)
-        self.tw_queue = None
-
-    def run(self):
-        while True:
-            try:
-                thread = self.main_class.channels.items()[0][1]
-                if thread.irc.twitch_queue:
-                    self.tw_queue = thread.irc.twitch_queue
-                    break
-            except:
-                continue
-        log.info("twitch Testing mode online")
-
-    def send_message(self, *args, **kwargs):
-        emotes = kwargs.get('emotes', False)
-        bits = kwargs.get('bits', False)
-        nickname = kwargs.get('nickname', 'super_tester')
-        text = kwargs.get('text', 'Kappa 123')
-
-        self.tw_queue.put({})
-
-
 class Twitch(ChatModule):
     def __init__(self, *args, **kwargs):
         log.info("Initializing twitch chat")
@@ -663,9 +636,6 @@ class Twitch(ChatModule):
 
         self.rest_add('GET', 'oidc', self.parse_oidc_request)
         self.rest_add('POST', 'oidc', self.oidc_code)
-
-    def _test_class(self):
-        return TestTwitch(self)
 
     def _add_channel(self, chat):
         self.channels[chat] = TWChannel(self.queue, self.host, self.port, chat, bttv=self.bttv, frankerz=self.frankerz,

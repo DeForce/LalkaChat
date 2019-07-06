@@ -227,19 +227,8 @@ class ChatModule(DefaultModule):
 
         self.channels_list = self.get_config('config', 'channels_list')
 
-        self.testing = kwargs.get('testing')
-        if self.testing:
-            self.testing = self._test_class()
-
     @property
     def viewers(self):
-        return {}
-
-    def _test_class(self):
-        """
-            Override this method
-        :return: Chat test class (object/Class)
-        """
         return {}
 
     def _remove_channel(self, chat):
@@ -272,9 +261,6 @@ class ChatModule(DefaultModule):
         BaseModule.load_module(self, *args, **kwargs)
         for channel in self.channels_list:
             self._add_channel(channel)
-
-        if self.testing and self.channels:
-            self.testing = self.testing.start()
 
     def apply_settings(self, **kwargs):
         BaseModule.apply_settings(self, **kwargs)

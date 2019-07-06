@@ -28,7 +28,7 @@ VERSION = '0.4.0'
 SOURCE_REPO_URL = 'https://github.com/DeForce/LalkaChat'
 
 GUI_TAG = 'gui'
-WINDOWS = True if sys.platform == 'win32' else False
+WINDOWS = sys.platform == 'win32'
 
 LOG_FOLDER = os.path.join(PYTHON_FOLDER, "logs")
 if not os.path.exists(LOG_FOLDER):
@@ -200,6 +200,7 @@ def get_secret(path):
         data = yaml.safe_load(secrets_file)
 
     return deep_get_from_dict(data, *path_list)
+
 
 def get_wx_parent(item):
     if item.GrandParent:
