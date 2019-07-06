@@ -21,7 +21,7 @@ CONF_GUI = {'non_dynamic': ['config.*']}
 class Logger(MessagingModule):
     def __init__(self, *args, **kwargs):
         MessagingModule.__init__(self, config=CONF_DICT, gui=CONF_GUI, *args, **kwargs)
-        self._load_priority = 20
+        self._load_priority = 10
         # Creating filter and replace strings.
         self.format = self.get_config('config', 'file_format')
         self.ts_format = str(self.get_config('config', 'message_date_format'))

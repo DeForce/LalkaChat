@@ -7,6 +7,7 @@ from modules.helper.system import SOURCE, SOURCE_ICON, SOURCE_USER
 log = logging.getLogger('helper.message')
 
 AVAILABLE_COMMANDS = ['remove_by_users', 'remove_by_ids', 'replace_by_users', 'replace_by_ids', 'reload']
+AVAILABLE_SYSTEM_MESSAGES = ['system.chat', 'system.module']
 
 
 def _validate_command(command):
@@ -19,6 +20,10 @@ def _validate_command(command):
     if command not in AVAILABLE_COMMANDS:
         raise NonExistentCommand()
     return command
+
+
+def get_system_message_types():
+    return AVAILABLE_SYSTEM_MESSAGES
 
 
 def process_text_messages(func):

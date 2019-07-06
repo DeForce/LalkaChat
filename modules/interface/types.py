@@ -1044,7 +1044,7 @@ class LCChooseMultiple(LCChooseSingle):
 
         super(LCChooseMultiple, self).__init__(value, *args, **kwargs)
         self.multiple = True
-        self._skip = {item: True if item in value else False for item in hidden}
+        self._skip = {item: item in value for item in hidden}
 
     @property
     def value(self):
@@ -1121,7 +1121,8 @@ TYPE_TO_LC = {
     'slider': LCSlider,
     'colour_picker': LCColour,
     'list': LCList,
-    'button': LCButton
+    'button': LCButton,
+    'choose_mult': LCChooseMultiple
 }
 
 
