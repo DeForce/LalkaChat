@@ -20,8 +20,7 @@ from modules.interface.types import LCStaticBox, LCPanel, LCText, LCBool, LCButt
 logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('twitch')
-headers = {'Client-ID': get_secret('twitch.clientid')}
-headers_v5 = {'Client-ID': get_secret('twitch.clientid'),
+headers = {'Client-ID': get_secret('twitch.clientid'),
               'Accept': 'application/vnd.twitchtv.v5+json'}
 BITS_THEME = 'dark'
 BITS_TYPE = 'animated'
@@ -33,7 +32,7 @@ SOURCE_ICON = 'https://www.twitch.tv/favicon.ico'
 FILE_ICON = os.path.join('img', 'tw.png')
 SYSTEM_USER = 'Twitch.TV'
 BITS_REGEXP = r'(\D+)(\d+)'
-API_URL = 'https://api.twitch.tv/kraken/{}'
+API_URL = 'https://api.twitch.tv/kraken'
 
 PING_DELAY = 10
 
@@ -486,27 +485,22 @@ class TWChannel(threading.Thread, Channel):
             time.sleep(5)
 
     def load_config(self):
-        try:
-            request = requests.get(f"https://api.twitch.tv/kraken/channels/{self.channel}", headers=headers)
-            if request.status_code == 200:
-                log.info("Channel found, continuing")
-                data = request.json()
-                self.display_name = data['display_name']
-                self.channel_id = data['_id']
-            elif request.status_code == 404:
-                raise TwitchUserError
-            else:
-                raise Exception(f"Not successful status code: {request.status_code}")
-        except TwitchUserError:
-            raise TwitchUserError
-        except Exception as exc:
-            log.error(f"Unable to get channel ID, error: {exc}\nArgs: {exc.args}")
+        request = requests.get(f'{API_URL}/users', params={'login': self.channel}, headers=headers)
+        if request.ok:
+            data = request.json()
+            if len(data['users']) > 1:
+                log.error('Multiple Users found, that is an issue, verify user name')
+            user = data['users'][0]
+            self.display_name = user['display_name']
+            self.channel_id = user['_id']
+        else:
+            log.error('Unable to get channel ID, error: %s\nArgs: %s')
             return False
 
         try:
             # Getting random IRC server to connect to
-            request = requests.get(f"http://tmi.twitch.tv/servers?channel={self.channel}")
-            if request.status_code == 200:
+            request = requests.get(f"http://tmi.twitch.tv/servers?channel={self.channel}", headers=headers)
+            if request.ok:
                 self.host = random.choice(request.json()['servers']).split(':')[0]
             else:
                 raise Exception(f"Not successful status code: {request.status_code}")
@@ -518,7 +512,7 @@ class TWChannel(threading.Thread, Channel):
             # Getting Better Twitch TV smiles
             if self.bttv:
                 request = requests.get("https://api.betterttv.net/emotes", timeout=10)
-                if request.status_code == 200:
+                if request.ok:
                     for smile in request.json()['emotes']:
                         self.custom_smiles[smile['regex']] = {
                             'key': smile['regex'],
@@ -533,7 +527,7 @@ class TWChannel(threading.Thread, Channel):
             # Getting FrankerZ smiles
             if self.frankerz:
                 request = requests.get(f"https://api.frankerfacez.com/v1/room/id/{self.channel_id}", timeout=10)
-                if request.status_code == 200:
+                if request.ok:
                     req_json = request.json()
                     for set_name, s_set in req_json['sets'].items():
                         for smile in s_set['emoticons']:
@@ -552,7 +546,7 @@ class TWChannel(threading.Thread, Channel):
             # Warning, undocumented, can change a LOT
             # Getting CUSTOM twitch badges
             request = requests.get("https://badges.twitch.tv/v1/badges/global/display")
-            if request.status_code == 200:
+            if request.ok:
                 for badge, badge_config in request.json()['badge_sets'].items():
                     self.badges[badge] = {
                         version: {
@@ -569,7 +563,7 @@ class TWChannel(threading.Thread, Channel):
             # Getting CUSTOM twitch badges
             badges_url = "https://badges.twitch.tv/v1/badges/channels/{0}/display"
             request = requests.get(badges_url.format(self.channel_id))
-            if request.status_code == 200:
+            if request.ok:
                 for badge, badge_config in request.json()['badge_sets'].items():
                     processed_badge = {
                         version: {
@@ -588,7 +582,7 @@ class TWChannel(threading.Thread, Channel):
 
         try:
             bits_url = f"https://api.twitch.tv/kraken/bits/actions/?channel_id={self.channel_id}"
-            request = requests.get(bits_url, headers=headers_v5)
+            request = requests.get(bits_url, headers=headers)
             if request.status_code == 200:
                 data = request.json()['actions']
                 self.bits = {item['prefix'].lower(): item for item in data}
@@ -607,7 +601,7 @@ class TWChannel(threading.Thread, Channel):
             pass
 
     def get_viewers(self):
-        streams_url = f'https://api.twitch.tv/kraken/streams/{self.channel}'
+        streams_url = f'https://api.twitch.tv/kraken/streams/{self.channel_id}'
         try:
             request = requests.get(streams_url, headers=headers)
             if request.status_code == 200:
@@ -669,7 +663,7 @@ class Twitch(ChatModule):
         return 'Access Code saved'
 
     def api_call(self, key):
-        req = requests.get(API_URL.format(key), headers=headers)
+        req = requests.get(f'{API_URL}/{key}', headers=headers)
         if req.ok:
             return req.json()
         raise TwitchAPIError(f'Unable to get {key}')
