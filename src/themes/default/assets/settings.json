@@ -5,6 +5,7 @@
   "clear_timer": 120,
   "decay_timer": 30,
   "message_opacity": 67,
+  "message_limit": 30,
   "font_size": 15,
   "smile_size": 20,
   "badge_size": 16,

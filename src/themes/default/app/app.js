@@ -49,6 +49,8 @@ var twemoji = require('twemoji');
                 if (self.messagesDecayInterval > 0) {
                     setInterval(self.decay, 500);
                 }
+
+                self.messagesLimit = response.message_limit;
             });
         },
         methods: {
