@@ -60,6 +60,9 @@ class LCObject(object):
     def __str__(self):
         return self._value.__str__()
 
+    def bind(self, *args, **kwargs):
+        pass
+
     @property
     def hidden(self):
         return self._hidden
@@ -165,7 +168,7 @@ class LCDict(LCObject):
 class LCPanel(LCDict):
     def __init__(self, icon=None, *args, **kwargs):
         super(LCPanel, self).__init__(*args, **kwargs)
-        self.properties += 'icon'
+        self.properties += ['icon']
         self.icon = icon
 
     def _create_ui(self, panel=None, key=None, **kwargs):

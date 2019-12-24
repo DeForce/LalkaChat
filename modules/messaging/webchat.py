@@ -23,8 +23,13 @@ from modules.helper.message import TextMessage, CommandMessage, SystemMessage, R
     get_system_message_types
 from modules.helper.module import MessagingModule
 from modules.helper.parser import save_settings, convert_to_dict, update
-from modules.helper.system import THREADS, CONF_FOLDER, EMOTE_FORMAT, HTTP_FOLDER
+from modules.helper.system import THREADS, CONF_FOLDER, EMOTE_FORMAT, HTTP_FOLDER, TRANSLATIONS, TRANSLATION_FILETYPE, \
+    SPLIT_TRANSLATION
 from modules.interface.types import *
+
+GUI_CHAT = 'gui_chat'
+BROWSER_CHAT = 'server_chat'
+CHAT_TYPES = [GUI_CHAT, BROWSER_CHAT]
 
 logging.getLogger('ws4py').setLevel(logging.ERROR)
 DEFAULT_STYLE = 'default'
@@ -45,23 +50,15 @@ CONF_DICT['server'] = LCStaticBox()
 CONF_DICT['server']['host'] = LCDropdown('127.0.0.1', ['127.0.0.1', '0.0.0.0'])
 CONF_DICT['server']['port'] = LCText('8080')
 
-CONF_DICT['gui_chat'] = LCPanel()
-CONF_DICT['gui_chat']['style'] = LCChooseSingle(DEFAULT_GUI_STYLE,
-                                                available_list=get_themes(),
-                                                empty_label=True)
-CONF_DICT['gui_chat']['style_settings'] = LCStaticBox()
-CONF_DICT['gui_chat']['style_settings']['show_system_msg'] = LCChooseMultiple(
-    available_list=get_system_message_types(), addable=False, value=get_system_message_types())
-CONF_DICT['gui_chat']['style_settings']['show_history'] = LCBool(True)
+for g_ui_type in CHAT_TYPES:
+    CONF_DICT[g_ui_type] = LCPanel()
+    CONF_DICT[g_ui_type]['style'] = LCChooseSingle(DEFAULT_GUI_STYLE, available_list=get_themes(), empty_label=True)
+    CONF_DICT[g_ui_type]['style_settings'] = LCStaticBox()
+    CONF_DICT[g_ui_type]['style_settings']['show_system_msg'] = LCChooseMultiple(
+        available_list=get_system_message_types(), addable=False, value=get_system_message_types())
+    CONF_DICT[g_ui_type]['style_settings']['show_history'] = LCBool(True)
 
-CONF_DICT['server_chat'] = LCPanel()
-CONF_DICT['server_chat']['style'] = LCChooseSingle(DEFAULT_STYLE,
-                                                   available_list=get_themes(),
-                                                   empty_label=True)
-CONF_DICT['server_chat']['style_settings'] = LCStaticBox()
-CONF_DICT['server_chat']['style_settings']['show_system_msg'] = LCChooseMultiple(
-    available_list=get_system_message_types(), addable=False, value=get_system_message_types())
-CONF_DICT['server_chat']['style_settings']['show_history'] = LCBool(True)
+MANDATORY_KEYS = ['show_system_msg', 'show_history']
 
 TYPE_DICT = {
     TextMessage: 'message',
@@ -69,7 +66,7 @@ TYPE_DICT = {
 }
 
 
-def class_replace(dst, src):
+def merge_lc_dicts(dst, src):
     for k, v in src.items():
         if isinstance(v, LCDict):
             dst[k] = update(dst[k], v)
@@ -497,11 +494,11 @@ class SocketThread(threading.Thread):
         cherrypy.tools.websocket = WebSocketTool()
 
     def update_settings(self):
-        server_static_dir = self.style_settings['server_chat']['location']
+        server_static_dir = self.style_settings[BROWSER_CHAT]['location']
         server_folders = [folder for folder in os.listdir(server_static_dir)
                           if os.path.isdir(os.path.join(server_static_dir, folder))]
 
-        gui_static_dir = self.style_settings['gui_chat']['location']
+        gui_static_dir = self.style_settings[GUI_CHAT]['location']
         gui_folders = [folder for folder in os.listdir(gui_static_dir)
                        if os.path.isdir(os.path.join(gui_static_dir, folder))]
 
@@ -556,11 +553,11 @@ class SocketThread(threading.Thread):
             log.error('Unable to start webchat: %s', exc)
 
     def mount_dirs(self):
-        cherrypy.tree.mount(CssRoot(self.style_settings['gui_chat']), '/gui/css', self.gui_css_config)
-        cherrypy.tree.mount(CssRoot(self.style_settings['server_chat']), '/css', self.css_config)
+        cherrypy.tree.mount(CssRoot(self.style_settings[GUI_CHAT]), '/gui/css', self.gui_css_config)
+        cherrypy.tree.mount(CssRoot(self.style_settings[BROWSER_CHAT]), '/css', self.css_config)
 
-        cherrypy.tree.mount(HttpRoot(self.style_settings['gui_chat']), '/gui', self.gui_root_config)
-        cherrypy.tree.mount(HttpRoot(self.style_settings['server_chat']), '', self.root_config)
+        cherrypy.tree.mount(HttpRoot(self.style_settings[GUI_CHAT]), '/gui', self.gui_root_config)
+        cherrypy.tree.mount(HttpRoot(self.style_settings[BROWSER_CHAT]), '', self.root_config)
 
         cherrypy.tree.mount(RestRoot(self.style_settings, self.modules), '/rest', self.rest_config)
 
@@ -576,27 +573,16 @@ class Webchat(MessagingModule):
         MessagingModule.__init__(self, config=CONF_DICT, gui=self._gui_settings(), hidden=True, *args, **kwargs)
         self._load_priority = 9001
         self._category = 'main'
+        self._language = kwargs['main_settings'].language
+        self._translations = TRANSLATIONS
 
-        self._conf_params.update({
-            'style_settings': {
-                'gui_chat': {
-                    'style_name': None,
-                    'location': None,
-                    'keys': {}
-                },
-                'server_chat': {
-                    'style_name': None,
-                    'location': None,
-                    'keys': {}
-                }
-            }
-        })
+        self.style_settings = {}
         self.prepare_style_settings()
-        self.style_settings = self._conf_params['style_settings']
+
         self.host = self.get_config('server', 'host').simple()
         self.port = self.get_config('server', 'port').simple()
 
-        self.s_thread = None
+        self.socket_thread = None
         self.queue = kwargs.get('queue')
         self.message_threads = []
 
@@ -613,10 +599,10 @@ class Webchat(MessagingModule):
     def start_webserver(self):
         if socket_open(self.host, self.port):
             try:
-                self.s_thread = SocketThread(self.host, self.port, CONF_FOLDER,
-                                             style_settings=self.style_settings,
-                                             modules=self._loaded_modules)
-                self.s_thread.start()
+                self.socket_thread = SocketThread(self.host, self.port, CONF_FOLDER,
+                                                  style_settings=self.style_settings,
+                                                  modules=self._loaded_modules)
+                self.socket_thread.start()
             except:
                 log.error('Unable to bind at %s:%s', self.host, self.port)
 
@@ -637,7 +623,6 @@ class Webchat(MessagingModule):
             dirs = os.listdir(HTTP_FOLDER)
             if dirs:
                 return os.path.join(HTTP_FOLDER, dirs[0])
-        return None
 
     def reload_chat(self):
         self.queue.put(CommandMessage('reload'))
@@ -651,19 +636,18 @@ class Webchat(MessagingModule):
             return
 
         changes = [item.split(MODULE_KEY)[1] for item in kwargs.get('changes').keys()]
-        changed_chat_type = [item for item in changes if item in self._conf_params['style_settings']]
-        if changed_chat_type:
-            for chat in changed_chat_type:
-                style_name = self.get_config(chat, 'style')
-                self._conf_params['style_settings'][chat]['style_name'] = style_name.value
-                self._conf_params['style_settings'][chat]['location'] = self.get_style_path(style_name.value)
+        changed_chat_type = [item for item in changes if item in self.style_settings]
+        for chat in changed_chat_type:
+            style_name = self.get_config(chat, 'style').value
+            self.style_settings[chat]['style_name'] = style_name
+            self.style_settings[chat]['location'] = self.get_style_path(style_name)
 
         if changes:
-            self.s_thread.update_settings()
-            self.s_thread.mount_dirs()
-        chat_style = self.get_config('server_chat', 'style').value
-        gui_style = self.get_config('gui_chat', 'style').value
-        self.update_style_settings(chat_style, gui_style)
+            self.socket_thread.update_settings()
+            self.socket_thread.mount_dirs()
+        self.write_style_to_file(self.get_config('server_chat', 'style').value, BROWSER_CHAT)
+        self.write_style_to_file(self.get_config('gui_chat', 'style').value, GUI_CHAT)
+
         self.reload_chat()
 
         for module in self._dependencies:
@@ -677,12 +661,11 @@ class Webchat(MessagingModule):
     def rest_get_style_settings(self, *args):
         chat_path = args[0][0]
         if chat_path == 'gui':
-            chat_type = 'gui_chat'
+            chat_type = GUI_CHAT
         else:
-            chat_type = 'server_chat'
+            chat_type = BROWSER_CHAT
 
-        return json.dumps(
-            convert_to_dict(self._conf_params['style_settings'][chat_type]['keys'].value))
+        return json.dumps(convert_to_dict(self.style_settings[chat_type]['keys']))
 
     def rest_get_history(self, *args, **kwargs):
         return json.dumps(
@@ -714,8 +697,12 @@ class Webchat(MessagingModule):
     def write_style_to_file(self, style_name, style_type):
         file_name = SETTINGS_GUI_FILE if style_type == 'gui_chat' else SETTINGS_FILE
         file_path = os.path.join(self.get_style_path(style_name), file_name)
+        data = self.style_settings[style_type]['keys']
+        if not data:
+            log.error('Unable to get data for style %s', style_name)
+            return
+
         with open(file_path, 'w') as style_file:
-            data = self._conf_params['style_settings'][style_type]['keys']
             json.dump(convert_to_dict(data, ordered=True), style_file, indent=2)
 
     def get_style_format_from_file(self, style_name):
@@ -725,68 +712,64 @@ class Webchat(MessagingModule):
                 return json.load(gui_file)
         return {}
 
-    def load_style_settings(self, style_name, style_type=None, keys=None):
-        # Shortcut
-        params = self._conf_params
-
+    def load_style_keys(self, style_name, style_type=None, keys=None):
+        # Key check for GUI Redraw
         if keys:
             style_type = keys['all_settings']['type']
 
         lc_settings = alter_data_to_lc_style(self.get_style_from_file(style_name, style_type),
                                              self.get_style_format_from_file(style_name))
 
-        class_replace(params['config'][style_type]['style_settings'], lc_settings)
-        params['style_settings'][style_type]['keys'] = params['config'][style_type]['style_settings']
-        params['gui'][style_type].update(
-            {'style_settings': self.get_style_format_from_file(style_name)})
-        return params['config'][style_type]['style_settings']
+        current_config = self.get_config(style_type, 'style_settings')
+        missing_keys = [item for item in current_config.value.keys()
+                        if item not in lc_settings.value.keys() and item not in MANDATORY_KEYS]
+        for key in missing_keys:
+            current_config.value.pop(key)
 
-    def update_style_settings(self, chat_style, gui_style):
-        params = self._conf_params['style_settings']
-        params['server_chat']['keys'] = self.get_config('server_chat', 'style_settings')
-        params['gui_chat']['keys'] = self.get_config('gui_chat', 'style_settings')
-        self.write_style_to_file(chat_style, 'server_chat')
-        self.write_style_to_file(gui_style, 'gui_chat')
+        merge_lc_dicts(current_config, lc_settings)
+
+        self.update_translations(style_name, style_type)
+        return current_config.value
 
     def prepare_style_settings(self):
-        server_style_settings = self._conf_params['style_settings']['server_chat']
-        gui_style_settings = self._conf_params['style_settings']['gui_chat']
-
-        server_style = self.get_config('server_chat', 'style')
-        gui_style = self.get_config('gui_chat', 'style')
-
-        server_style_settings['style_name'] = server_style
-        server_style_settings['location'] = self.get_style_path(server_style.value)
-        server_style_settings['keys'] = self.load_style_settings(server_style.value, 'server_chat')
-
-        gui_style_settings['style_name'] = gui_style
-        gui_style_settings['location'] = self.get_style_path(gui_style.value)
-        gui_style_settings['keys'] = self.load_style_settings(gui_style.value, 'gui_chat')
+        for ui_type in CHAT_TYPES:
+            style_config = self.get_config(ui_type).value
+            style_name = style_config['style'].value
+            self.style_settings[ui_type] = {
+                'style_name': style_name,
+                'location': self.get_style_path(style_name),
+                'keys': self.load_style_keys(style_name, ui_type)
+            }
 
     def _gui_settings(self):
-        return {
-            'server_chat': {
+        redraw = {
+            ui_type: {
                 'redraw': {
                     'style_settings': {
                         'redraw_trigger': ['style'],
-                        'type': 'server_chat',
-                        'get_config': self.load_style_settings,
+                        'type': ui_type,
+                        'get_config': self.load_style_keys,
                         'get_gui': self.get_style_format_from_file
                     },
                 }
-            },
-            'gui_chat': {
-                'redraw': {
-                    'style_settings': {
-                        'redraw_trigger': ['style'],
-                        'type': 'gui_chat',
-                        'get_config': self.load_style_settings,
-                        'get_gui': self.get_style_format_from_file
-                    },
-                }
-            },
+            } for ui_type in CHAT_TYPES
+        }
+        redraw.update({
             'non_dynamic': ['server.*'],
             'system': {'hidden': ['enabled']},
+            'ignored_sections': ['gui_chat.style_settings', 'server_chat.style_settings']
+        })
+        return redraw
 
-            'ignored_sections': ['gui_chat.style_settings', 'server_chat.style_settings'],
-        }
+    def update_translations(self, style_name, style_type):
+        locale_file = os.path.join(
+            self.get_style_path(style_name), 'translations', f'{self._language}')
+
+        with open(locale_file, 'r') as f:
+            for line in f.readlines():
+                if not line:
+                    continue
+
+                key, translation = map(str.strip, line.split(SPLIT_TRANSLATION))
+                style_key = MODULE_KEY.join(['webchat', style_type, 'style_settings', key])
+                self._translations[style_key] = translation

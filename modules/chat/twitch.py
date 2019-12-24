@@ -11,7 +11,8 @@ import irc.client
 import requests
 
 from modules.gui import MODULE_KEY
-from modules.helper.message import TextMessage, SystemMessage, Badge, RemoveMessageByUsers
+from modules.helper.message import TextMessage, SystemMessage, Badge, RemoveMessageByUsers, DEFAULT_MESSAGE_TYPE, \
+    SUBSCRIBE_MESSAGE_TYPE, HIGHLIGHT_MESSAGE_TYPE
 from modules.helper.module import ChatModule, Channel, CHANNEL_ONLINE, CHANNEL_OFFLINE, CHANNEL_PENDING, \
     CHANNEL_DISABLED
 from modules.helper.system import translate_key, EMOTE_FORMAT, NO_VIEWERS, get_wx_parent, get_secret
@@ -21,7 +22,7 @@ logging.getLogger('irc').setLevel(logging.ERROR)
 logging.getLogger('requests').setLevel(logging.ERROR)
 log = logging.getLogger('twitch')
 headers = {'Client-ID': get_secret('twitch.clientid'),
-              'Accept': 'application/vnd.twitchtv.v5+json'}
+           'Accept': 'application/vnd.twitchtv.v5+json'}
 BITS_THEME = 'dark'
 BITS_TYPE = 'animated'
 BITS_SCALE = '4'
@@ -74,10 +75,6 @@ CHANNEL_JOIN_SUCCESS = translate_key(MODULE_KEY.join(['twitch', 'join_success'])
 CHANNEL_JOINING = translate_key(MODULE_KEY.join(['twitch', 'joining']))
 
 
-def _parse_msg(msg):
-    return TwitchMessage(msg)
-
-
 class TwitchUserError(Exception):
     """Exception for twitch user error"""
 
@@ -99,12 +96,13 @@ class TwitchMessage(object):
 
 
 class TwitchTextMessage(TextMessage):
-    def __init__(self, msg, me, sub_message):
-        self.tags = msg.tags
-        self.bits = {}
+    def __init__(self, msg, me, message_type):
         user = msg.tags['display-name'] if 'display-name' in msg.tags else msg.source.split('!')[0]
-        TextMessage.__init__(self, platform_id=SOURCE, icon=SOURCE_ICON,
-                             user=user, text=msg.arguments.pop(), me=me, sub_message=sub_message)
+        super().__init__(platform_id=SOURCE, icon=SOURCE_ICON, user=user, text=msg.arguments.pop(),
+                         me=me, message_type=message_type)
+        self.tags = msg.tags
+        self.msg_id = self.tags.get('msg-id')
+        self.bits = {}
 
 
 class TwitchMessageHandler(threading.Thread):
@@ -115,8 +113,8 @@ class TwitchMessageHandler(threading.Thread):
         self.twitch_queue = twitch_queue
         self.source = SOURCE
 
-        self.irc_class = irc_class
-        self.channel_class = channel_class
+        self.irc_class: IRC = irc_class
+        self.channel_class: TWChannel = channel_class
         self.nick = nick
         self.badges = badges
         self.custom_smiles = custom_smiles
@@ -151,7 +149,7 @@ class TwitchMessageHandler(threading.Thread):
         # Also, there is slight problem with some users, they don't have
         #  the display-name tag, so we have to check their "real" username
         #  and capitalize it because twitch does so, so we do the same.
-        msg = _parse_msg(recv_msg)
+        msg = TwitchMessage(recv_msg)
         if msg.type in self.message_functions:
             self.message_functions[msg.type](msg)
 
@@ -206,7 +204,7 @@ class TwitchMessageHandler(threading.Thread):
     def _handle_sub(self, msg):
         if 'system-msg' in msg.tags:
             msg_text = msg.tags['system-msg']
-            self.channel_class.put_system_message(msg_text, sub_message=True)
+            self.channel_class.put_system_message(msg_text, message_type=SUBSCRIBE_MESSAGE_TYPE)
         if msg.arguments:
             self._handle_message(msg, sub_message=True)
 
@@ -218,17 +216,20 @@ class TwitchMessageHandler(threading.Thread):
         display_name = msg.tags['msg-param-displayName']
         viewer_count = msg.tags['msg-param-viewerCount']
         translate_text = translate_key('twitch.raid').format(display_name, viewer_count)
-        self.channel_class.put_system_message(translate_text, sub_message=True, badges=[Badge('raid', channel_image)])
+        self.channel_class.put_system_message(translate_text, message_type=SUBSCRIBE_MESSAGE_TYPE,
+                                              badges=[Badge('raid', channel_image)])
 
     def _handle_ritual(self, msg):
-        pass
+        log.info(f'Ritual: {msg}')
 
     def _handle_usernotice(self, msg):
         if msg.tags['msg-id'] in self.usernotice_functions:
             self.usernotice_functions[msg.tags['msg-id']](msg)
 
     def _handle_message(self, msg, sub_message=False, me=False):
-        message = self.channel_class.create_message(msg, me, sub_message=sub_message)
+        message_type = SUBSCRIBE_MESSAGE_TYPE if sub_message else DEFAULT_MESSAGE_TYPE
+
+        message: TwitchTextMessage = self.channel_class.create_message(msg, me, message_type=message_type)
         if message.user == 'twitchnotify':
             self.channel_class.put_system_message(message.text)
 
@@ -240,6 +241,8 @@ class TwitchMessageHandler(threading.Thread):
             self._handle_emotes(message)
         if 'color' in msg.tags:
             self._handle_viewer_color(message)
+
+        self._handle_channel_points(message)
 
         self._handle_custom_emotes(message)
         self._handle_pm(message)
@@ -302,6 +305,12 @@ class TwitchMessageHandler(threading.Thread):
             } for prefix, data in bits.items()
         }
 
+    def _handle_channel_points(self, message):
+        if message.msg_id:
+            log.info(f'msg_id: {message.msg_id}')
+        if message.msg_id == 'highlighted-message':
+            message.message_type = HIGHLIGHT_MESSAGE_TYPE
+
 
 class TwitchPingHandler(threading.Thread):
     def __init__(self, irc_connection, channel_class, irc_class):
@@ -352,7 +361,8 @@ class IRC(irc.client.SimpleIRCClient):
             self.channel_class.status = CHANNEL_OFFLINE
             self.channel_class.put_system_message(CONNECTION_DIED.format(self.nick))
             timer = threading.Timer(5.0, self.reconnect,
-                                    args=[self.channel_class.host, self.channel_class.port, self.channel_class.nickname])
+                                    args=[self.channel_class.host, self.channel_class.port,
+                                          self.channel_class.nickname])
             timer.start()
 
     def reconnect(self, host, port, nickname):
@@ -446,12 +456,8 @@ class TWChannel(threading.Thread, Channel):
             for number in range(0, nick_length):
                 self.nickname += str(random.randint(0, 9))
 
-    def create_message(self, msg, me, **kwargs):
-        user = msg.tags['display-name'] if 'display-name' in msg.tags else msg.source.split('!')[0]
-        message = Channel.create_message(self, text=msg.arguments.pop(), user=user, me=me, **kwargs)
-        message.bits = {}
-        message.tags = msg.tags
-        return message
+    def create_message(self, msg, me, message_type):
+        return TwitchTextMessage(msg, me, message_type)
 
     def run(self):
         try_count = 0
@@ -648,6 +654,7 @@ class Twitch(ChatModule):
     def oidc_code(self, req, **kwargs):
         def remove_hash(item):
             return item if '#' not in item else item[1:]
+
         items_list = map(remove_hash, kwargs.get('request').split('&'))
         item_dict = {}
         for item in items_list:

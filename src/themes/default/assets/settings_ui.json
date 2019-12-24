@@ -4,10 +4,16 @@
   "replace_text": "<message removed>",
   "clear_timer": -1,
   "decay_timer": -1,
-  "message_opacity": 67,
   "message_limit": 30,
   "font_size": 15,
   "smile_size": 20,
   "badge_size": 16,
+
+  "message_opacity": 67,
+
+  "message_background_colour": "#232323",
+  "message_sub_background_colour": "#FF0080",
+  "message_highlight_background_colour": "#1E90FF",
+
   "background_colour": "#FFFFFF"
 }

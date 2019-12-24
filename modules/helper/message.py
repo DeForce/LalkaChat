@@ -9,6 +9,10 @@ log = logging.getLogger('helper.message')
 AVAILABLE_COMMANDS = ['remove_by_users', 'remove_by_ids', 'replace_by_users', 'replace_by_ids', 'reload']
 AVAILABLE_SYSTEM_MESSAGES = ['system.chat', 'system.module']
 
+DEFAULT_MESSAGE_TYPE = 'message'
+SUBSCRIBE_MESSAGE_TYPE = 'message_sub'
+HIGHLIGHT_MESSAGE_TYPE = 'message_highlight'
+
 
 def _validate_command(command):
     """
@@ -139,7 +143,7 @@ class RemoveMessageByIDs(CommandMessage):
 class TextMessage(Message):
     def __init__(self, platform_id, icon, user, text,
                  emotes=None, badges=None, pm=False, nick_colour=None, mid=None,
-                 me=False, channel_name=None, sub_message=False, **kwargs):
+                 me=False, channel_name=None, message_type='message', **kwargs):
         """
             Text message used by main chat logic
         :param badges: Badges to display
@@ -165,11 +169,19 @@ class TextMessage(Message):
         self._nick_colour = nick_colour
         self._channel_name = channel_name
         self._id = str(mid) if mid else str(uuid.uuid1())
-        self._message_type = 'message_sub' if sub_message else 'message'
+        self._message_type = message_type
 
         self._jsonable += ['user', 'text', 'emotes', 'badges',
                            'id', 'platform', 'pm', 'nick_colour',
                            'channel_name', 'me', 'message_type']
+
+    @property
+    def message_type(self):
+        return self._message_type
+
+    @message_type.setter
+    def message_type(self, value):
+        self._message_type = value
 
     @property
     def platform(self):
@@ -241,10 +253,6 @@ class TextMessage(Message):
     @me.setter
     def me(self, value):
         self._me = value
-
-    @property
-    def message_type(self):
-        return self._message_type
 
     def add_badge(self, badge_id, url):
         self._badges.append(Badge(badge_id, url))

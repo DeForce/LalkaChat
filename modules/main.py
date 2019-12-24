@@ -65,6 +65,10 @@ class MainModule(ConfigModule):
         self._update = False
         self._update_config = {}
 
+    @property
+    def language(self):
+        return self.get_config('gui', 'language').value
+
     def apply_settings(self, **kwargs):
         changes = kwargs.get('changes', {})
         if 'main.system.release_channel' in changes:
