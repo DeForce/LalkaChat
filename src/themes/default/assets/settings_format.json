@@ -37,5 +37,14 @@
   },
   "background_colour": {
     "view": "colour_picker"
+  },
+  "message_background_colour": {
+    "view": "colour_picker"
+  },
+  "message_sub_background_colour": {
+    "view": "colour_picker"
+  },
+  "message_highlight_background_colour": {
+    "view": "colour_picker"
   }
 }

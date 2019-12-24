@@ -11,7 +11,8 @@
     <body>
         <div id="chat-container">
             <transition-group name="message">
-            <div v-for="message in messages"
+            <div class="message_shared"
+                 v-for="message in messages"
                  v-if="message"
                  :class="[message.message_type, { message_old: message.old }]"
                  :key="message.id"
