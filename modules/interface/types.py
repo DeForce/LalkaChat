@@ -209,6 +209,8 @@ class LCStaticBox(LCDict):
 
         # Create elements that are child of static-box
         for item, value in self._value.items():
+            if not isinstance(value, LCObject):
+                continue
             if not kwargs.get('show_hidden'):
                 if value.hidden:
                     continue

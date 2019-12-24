@@ -22,12 +22,12 @@ logging.getLogger('requests').setLevel(logging.ERROR)
 logging.getLogger('urllib3').setLevel(logging.ERROR)
 log = logging.getLogger('sc2tv')
 SOURCE = 'fs'
-SOURCE_ICON = 'https://peka2.tv/favicon-32x32.png'
+SOURCE_ICON = 'https://sc2tv.ru/favicon-32x32.png'
 FILE_ICON = os.path.join('img', 'fs.png')
 SYSTEM_USER = 'Peka2.tv'
 SMILE_REGEXP = r':(\w+|\d+):'
 SMILE_FORMAT = ':{}:'
-API_URL = 'https://peka2.tv/api{}'
+API_URL = 'https://sc2tv.ru/api{}'
 
 PING_DELAY = 25
 
