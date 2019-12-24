@@ -5,15 +5,13 @@ import math
 import os
 import random
 import sqlite3
-import xml.etree.ElementTree as ElementTree
 import datetime
 
 import sys
 
 import yaml
 
-from modules.helper.message import process_text_messages, SystemMessage, ignore_system_messages
-from modules.helper.parser import save_settings
+from modules.helper.message import process_text_messages, ignore_system_messages
 from modules.helper.system import ModuleLoadException
 from modules.helper.module import MessagingModule
 from modules.interface.types import *
@@ -43,7 +41,7 @@ class Levels(MessagingModule):
             db = sqlite3.connect(db_location)
             cursor = db.cursor()
             log.info("Creating new tables for levels")
-            cursor.execute('CREATE TABLE UserLevels (User, "Experience")')
+            cursor.execute("create table UserLevels (User text constraint table_name_pk primary key, Experience int);")
             cursor.close()
             db.commit()
             db.close()
@@ -53,7 +51,7 @@ class Levels(MessagingModule):
 
         self.level_file = None
         self.levels = []
-        self.exp_dict = {}
+        self.experience_set = {}
         self.users = {}
         self.special_levels = {}
         self.db_location = None
@@ -114,43 +112,37 @@ class Levels(MessagingModule):
         users_select = users_select.fetchall()
         for user_q in users_select:
             self.users[user_q[0]] = user_q[1]
-        pass
 
     def load_levels(self):
-        if self.levels:
-            self.levels = []
-
-        if self.special_levels:
-            self.special_levels = {}
-
-        self.level_file = os.path.abspath(
-            os.path.join(
-                self._loaded_modules['webchat'].style_settings['gui_chat']['location'], levels_file
-            )
-        )
+        self.level_file = os.path.abspath(os.path.join(
+            self._loaded_modules['webchat'].style_settings['gui_chat']['location'], levels_file
+        ))
         with open(self.level_file, 'r', encoding='utf-8') as level_file:
             items = yaml.safe_load(level_file)
-        for level_data in items.get('levels', {}):
-            level_count = float(len(self.levels) + 1)
+
+        # Reset Levels
+        self.levels = []
+        self.special_levels = {}
+        for index, level_data in enumerate(items.get('levels', {})):
             if 'nick' in level_data:
                 self.special_levels[level_data['nick']] = level_data
             else:
                 if self.experience == 'geometrical':
-                    level_exp = math.floor(self.exp_for_level * (pow(level_count, 1.8)/2.0))
+                    level_exp = 0 if not self.levels else int(self.exp_for_level + self.levels[-1]['exp'] * 1.15)
                 else:
-                    level_exp = self.exp_for_level * level_count
+                    level_exp = self.exp_for_level * index
                 level_data['exp'] = level_exp
                 if not level_data['url'].startswith('/'):
                     level_data['url'] = f'/{level_data.get("url", "")}'
 
                 self.levels.append(level_data)
-        self.exp_dict = {level['exp']: level for level in self.levels}
+        self.experience_set = [(level['exp'], level) for level in self.levels]
 
     def save_users(self):
         db = sqlite3.connect(self.db_location)
         cursor = db.cursor()
         for user, experience in self.users.items():
-            cursor.execute('REPLACE INTO UserLevels (User, Experience) VALUES (?, ?)', [user, experience])
+            cursor.execute('INSERT OR REPLACE INTO UserLevels (User, Experience) VALUES (?, ?)', [user, experience])
         db.commit()
 
     def apply_settings(self, **kwargs):
@@ -159,26 +151,19 @@ class Levels(MessagingModule):
         self.load_levels()
 
     def set_level(self, user):
-        exp_to_add = self.calculate_experience(user)
-        experience = int(self.users.get(user, self.exp_for_message))
+        experience = self.users.get(user, 0)
+        new_exp = experience + self.calculate_experience(user)
 
-        next_level_exp = next((level_exp for level_exp in self.exp_dict.keys() if level_exp > experience),
-                              max(self.exp_dict.keys()))
-        next_level = self.exp_dict.get(next_level_exp)
-        next_level_index = list(self.exp_dict.keys()).index(next_level_exp)
-        current_level = self.levels[next_level_index - 1]
+        current_level = next((level for exp, level in reversed(self.experience_set) if experience >= exp), None)
+        next_level = next((level for exp, level in reversed(self.experience_set) if new_exp >= exp), None)
 
-        experience = experience + exp_to_add
-        # TODO: Figure out better leveling algorithm
-        if experience >= next_level_exp:
+        if current_level['name'] != next_level['name']:
             if self.experience == 'random':
-                current_level = random.choice(self.levels)
-                experience = current_level['exp']
-            else:
-                current_level = next_level
-            self.send_system_message(self.message.format(user, current_level['name']))
-        self.users[user] = experience
-        return current_level.copy()
+                next_level = random.choice(self.levels)
+                new_exp = current_level['exp']
+            self.send_system_message(self.message.format(user, next_level['name']))
+        self.users[user] = new_exp
+        return next_level
 
     @process_text_messages
     @ignore_system_messages
@@ -198,7 +183,9 @@ class Levels(MessagingModule):
     def calculate_experience(self, user):
         exp_to_add = self.exp_for_message
         if user in self.threshold_users:
-            multiplier = (datetime.datetime.now() - self.threshold_users[user]).seconds / float(self.decrease_window)
-            exp_to_add *= multiplier if multiplier <= 1 else 1
+            if self.decrease_window:
+                multiplier = (datetime.datetime.now() - self.threshold_users[user]).seconds / float(
+                    self.decrease_window)
+                exp_to_add *= multiplier if multiplier <= 1 else 1
         self.threshold_users[user] = datetime.datetime.now()
         return exp_to_add
