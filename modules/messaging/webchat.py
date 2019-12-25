@@ -20,7 +20,7 @@ from ws4py.websocket import WebSocket
 from modules.helper.functions import get_themes
 from modules.helper.html_template import HTML_TEMPLATE
 from modules.helper.message import TextMessage, CommandMessage, SystemMessage, RemoveMessageByIDs, \
-    get_system_message_types
+    get_system_message_types, RemoveMessageByUsers
 from modules.helper.module import MessagingModule
 from modules.helper.parser import save_settings, convert_to_dict, update
 from modules.helper.system import THREADS, CONF_FOLDER, EMOTE_FORMAT, HTTP_FOLDER, TRANSLATIONS, TRANSLATION_FILETYPE, \
@@ -86,49 +86,39 @@ def process_platform(platform):
     return {'id': platform.id, 'icon': platform.icon}
 
 
-def prepare_message(message, style_settings, msg_class):
-    payload = message['payload']
+def prepare_message(message, style_settings):
+    json_message = message.json()
+
+    payload = json_message['payload']
 
     if 'text' in payload and payload['text'] == REMOVED_TRIGGER:
         payload['text'] = str(style_settings.get('remove_text'))
 
-    if 'type' not in message:
-        for m_class, m_type in TYPE_DICT.items():
-            if issubclass(msg_class, m_class):
-                payload['type'] = m_type
-
-    if message['type'] == 'command':
+    if json_message['type'] == 'command':
         if payload['command'].startswith('remove'):
             if not style_settings['keys']['replace_message']:
                 payload['text'] = html.escape(style_settings['keys']['replace_text'].value)
                 payload['command'] = payload['command'].replace('remove', 'replace')
-        return message
+        return json_message
 
     if 'levels' in payload:
         if '?' not in payload['levels']['url']:
             payload['levels']['url'] = f"{payload['levels']['url']}?{style_settings['style_name']}"
 
-    if 'emotes' in payload and payload['emotes']:
-        payload['emotes'] = process_emotes(payload['emotes'])
-
-    if 'badges' in payload:
-        payload['badges'] = process_badges(payload['badges'])
-
-    if 'platform' in payload:
-        payload['platform'] = process_platform(payload['platform'])
+    payload['emotes'] = process_emotes(payload.get('emotes', {}))
+    payload['badges'] = process_badges(payload.get('badges', {}))
+    payload['platform'] = process_platform(payload.get('platform', {}))
 
     payload['text'] = html.escape(payload['text'])
-    return message
+    return json_message
 
 
 def add_to_history(message):
-    if isinstance(message, TextMessage):
-        cherrypy.engine.publish('add-history', message)
+    cherrypy.engine.publish('add-history', message)
 
 
 def process_command(message):
-    if isinstance(message, CommandMessage):
-        cherrypy.engine.publish('process-command', message.command, message)
+    cherrypy.engine.publish('process-command', message.command, message)
 
 
 class MessagingThread(threading.Thread):
@@ -138,6 +128,9 @@ class MessagingThread(threading.Thread):
         self.settings = settings
         self.running = True
 
+    def system_message_types(self, chat_type):
+        return self.settings[chat_type]['keys']['show_system_msg'].value
+
     def run(self):
         while self.running:
             message = s_queue.get()
@@ -145,23 +138,25 @@ class MessagingThread(threading.Thread):
             if isinstance(message, dict):
                 raise Exception(f"Got dict message {message}")
 
-            add_to_history(message)
-            process_command(message)
+            if isinstance(message, TextMessage):
+                add_to_history(message)
+
+            if isinstance(message, CommandMessage):
+                process_command(message)
 
             if not message.only_gui:
-                self.send_message(message, 'server_chat')
-            self.send_message(message, 'gui_chat')
+                self.send_message(message, BROWSER_CHAT)
+            self.send_message(message, GUI_CHAT)
         log.info("Messaging thread stopping")
 
     def stop(self):
         self.running = False
 
     def send_message(self, message, chat_type):
-        show_sys_msg = self.settings[chat_type]['keys']['show_system_msg']
-        if isinstance(message, SystemMessage) and message.category not in show_sys_msg:
+        if isinstance(message, SystemMessage) and message.category not in self.system_message_types(chat_type):
             return
 
-        send_message = prepare_message(message.json(), self.settings[chat_type], type(message))
+        send_message = prepare_message(message, self.settings[chat_type])
         c_req = cherrypy.engine.publish('get-clients', chat_type)
         if not c_req:
             return
@@ -195,7 +190,7 @@ class FireFirstMessages(threading.Thread):
                     if timedelta > datetime.timedelta(seconds=timer):
                         continue
 
-                message = prepare_message(item.json(), self.settings, type(item))
+                message = prepare_message(item, self.settings)
                 self.ws.send(json.dumps(message))
 
 
@@ -298,19 +293,19 @@ class WebChatPlugin(WebSocketPlugin):
         return self.history
 
     def process_command(self, command, values):
-        if command == 'remove_by_id':
+        if command == 'remove_by_ids':
             self._remove_by_id(values.messages)
-        elif command == 'remove_by_user':
-            self._remove_by_user(values.user)
-        elif command == 'replace_by_id':
+        elif command == 'remove_by_users':
+            self._remove_by_user(values.users)
+        elif command == 'replace_by_ids':
             self._replace_by_id(values.messages)
-        elif command == 'replace_by_user':
-            self._replace_by_user(values.user)
+        elif command == 'replace_by_users':
+            self._replace_by_user(values.users)
 
     def _remove_by_id(self, ids):
         for item in ids:
             for message in self.history:
-                if message.get('id') == item:
+                if message.id == item:
                     self.history.remove(message)
 
     def _remove_by_user(self, users):
@@ -668,13 +663,10 @@ class Webchat(MessagingModule):
         return json.dumps(convert_to_dict(self.style_settings[chat_type]['keys']))
 
     def rest_get_history(self, *args, **kwargs):
-        return json.dumps(
-            [prepare_message(
-                message.json(),
-                self.style_settings['chat'],
-                type(message))
-                for message in cherrypy.engine.publish('get-history')[0]]
-        )
+        return json.dumps([
+            prepare_message(message, self.style_settings['chat'])
+            for message in cherrypy.engine.publish('get-history')[0]
+        ])
 
     @staticmethod
     def rest_delete_history(path, **kwargs):

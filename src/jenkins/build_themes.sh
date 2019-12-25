@@ -8,7 +8,7 @@ do
         echo "Building theme: ${folder}"
         THEME_NAME=${folder}
         cd ${folder}
-        npm install
+        npm ci
         npm start
         cp -r dist ${DIR_ROOT}/http/${THEME_NAME}
         cd ${THEME_ROOT}
