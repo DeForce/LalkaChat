@@ -6,7 +6,7 @@ semantic_version
 jinja2
 pyScss
 rtyaml
-cefpython3==57.1
+cefpython3==66.0
 more-itertools==5.0.0
 youtube-python
 wxPython
