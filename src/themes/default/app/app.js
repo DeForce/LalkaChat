@@ -8,7 +8,7 @@ var twemoji = require('twemoji');
     new Vue({
         el: '#chat-container',
         data: function () {
-            var wsUrl = 'ws://' + window.location.host + window.location.pathname + 'ws';
+            var wsUrl = this.get_websocket_url();
             var messages = [];
             var socket = new WebSocket(wsUrl);
 
@@ -30,15 +30,12 @@ var twemoji = require('twemoji');
             self.socket.onopen = this.onopen;
             self.socket.onclose = this.onclose;
 
-            var style_get = 'chat';
-            if(window.location.pathname.indexOf('gui') !== -1) {
-                style_get = 'gui'
-            }
-
-            self.get('http://' + window.location.host + '/rest/webchat/style/' + style_get, function (err, response) {
+            self.get(self.get_base_path() + 'api/get_window_settings', function (err, response) {
                 if (err) {
                     console.log('Error: Bad response from server')
                 }
+
+                console.log(JSON.stringify(response));
 
                 self.messagesClearInterval = response.clear_timer * 1000 || -1;
                 if (self.messagesClearInterval > 0) {
@@ -54,6 +51,14 @@ var twemoji = require('twemoji');
             });
         },
         methods: {
+            get_websocket_url: function () {
+                return 'ws://' + window.location.host + window.location.pathname + '/ws';
+            },
+            get_base_path: function() {
+                var path_array = window.location.pathname.split('/');
+                path_array.splice(path_array.length);
+                return path_array.join('/');
+            },
             mouseenter: function (message) {
                 message.deleteButton = true;
             },
@@ -73,8 +78,8 @@ var twemoji = require('twemoji');
                 var time = new Date();
 
                 this.messages = this.messages.filter(function (message) {
-                    if(message.old) return message;
-                    if(Math.abs(time - message.time) > that.messagesDecayInterval) {
+                    if (message.old) return message;
+                    if (Math.abs(time - message.time) > that.messagesDecayInterval) {
                         message.old = true
                     }
                     return message;
@@ -167,6 +172,7 @@ var twemoji = require('twemoji');
             },
             onmessage: function (event) {
                 var message = JSON.parse(event.data);
+                console.log(message);
                 if (!message.type)
                     return;
 
@@ -186,8 +192,9 @@ var twemoji = require('twemoji');
                 }
             },
             onopen: function () {
+                console.log('connection opened');
                 this.attempts = 0;
-                if (!this.socketInterval) {
+                if (this.socketInterval) {
                     clearInterval(this.socketInterval);
                     this.socketInterval = null;
                 }
@@ -197,8 +204,12 @@ var twemoji = require('twemoji');
             },
             reconnect: function () {
                 this.attempts++;
-
-                this.socket = new WebSocket(this.url);
+                console.log(this.attempts);
+                this.socket = null;
+                this.socket = new WebSocket(this.get_websocket_url());
+                this.socket.onmessage = this.onmessage;
+                this.socket.onopen = this.onopen;
+                this.socket.onclose = this.onclose;
             },
             load: function (method, url, callback, data) {
                 var xhr = new XMLHttpRequest();
