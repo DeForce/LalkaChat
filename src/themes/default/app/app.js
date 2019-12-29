@@ -187,18 +187,24 @@ var twemoji = require('twemoji');
             },
             onopen: function () {
                 this.attempts = 0;
-                if (!this.socketInterval) {
+                if (this.socketInterval) {
                     clearInterval(this.socketInterval);
                     this.socketInterval = null;
                 }
             },
             onclose: function () {
-                this.socketInterval = setInterval(this.reconnect, 1000);
+                if (!this.socketInterval) this.socketInterval = setInterval(this.reconnect, 1000);
             },
             reconnect: function () {
                 this.attempts++;
 
-                this.socket = new WebSocket(this.url);
+                var wsUrl = 'ws://' + window.location.host + window.location.pathname + 'ws';
+
+                this.socket = null;
+                this.socket = new WebSocket(wsUrl);
+                this.socket.onmessage = this.onmessage;
+                this.socket.onopen = this.onopen;
+                this.socket.onclose = this.onclose;
             },
             load: function (method, url, callback, data) {
                 var xhr = new XMLHttpRequest();
