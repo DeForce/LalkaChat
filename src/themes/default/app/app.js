@@ -52,7 +52,7 @@ var twemoji = require('twemoji');
         },
         methods: {
             get_websocket_url: function () {
-                return 'ws://' + window.location.host + window.location.pathname + '/ws';
+                return 'ws://' + window.location.host + window.location.pathname + 'ws';
             },
             get_base_path: function() {
                 var path_array = window.location.pathname.split('/');
@@ -200,11 +200,12 @@ var twemoji = require('twemoji');
                 }
             },
             onclose: function () {
-                this.socketInterval = setInterval(this.reconnect, 1000);
+                if (!this.socketInterval) this.socketInterval = setInterval(this.reconnect, 1000);
             },
             reconnect: function () {
                 this.attempts++;
                 console.log(this.attempts);
+
                 this.socket = null;
                 this.socket = new WebSocket(this.get_websocket_url());
                 this.socket.onmessage = this.onmessage;
