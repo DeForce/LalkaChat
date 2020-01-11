@@ -1,14 +1,14 @@
-FROM fedora:25
+FROM python:3.8
 
-# Misc packages
-RUN dnf -y install pwgen tar psmisc procps findutils iputils net-tools wget logrotate zip findutils git python-pip
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgtk-3-dev
 
-# Dependencies for LalkaChat
-RUN dnf -y install wxPython
 COPY requires_linux.txt /root/
 RUN pip install -r /root/requires_linux.txt
 
 # Dependencies for Testing
-RUN dnf -y install nodejs gcc python-devel redhat-rpm-config
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        npm
+
 RUN pip install git-lint pep8 pylint==1.9.3 junit-xml
 RUN npm install -g csslint webpack webpack-merge webpack-cli
