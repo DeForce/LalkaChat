@@ -2,7 +2,7 @@ var Vue = require('vue');
 var DOMPurify = require('dompurify');
 var twemoji = require('twemoji');
 
-(function (WebSocket, Vue, Sanitizer) {
+(function (WebSocket, Vue) {
     'use strict';
 
     new Vue({
@@ -17,10 +17,19 @@ var twemoji = require('twemoji');
                 url: wsUrl,
                 socket: socket,
                 attempts: 0,
-                socketInterval: null,
-                messagesClearInterval: -1,
-                messagesDecayInterval: -1,
-                messagesLimit: 30
+                socket_interval: null,
+                message_clear_interval: -1,
+                message_decay_interval: -1,
+                messagesLimit: 30,
+                loaded_style: null
+            }
+        },
+        computed: {
+            style_message: function () {
+                return this.loaded_style.message;
+            },
+            style_text: function () {
+                return this.loaded_style.text;
             }
         },
         created: function () {
@@ -48,13 +57,14 @@ var twemoji = require('twemoji');
                 }
 
                 self.messagesLimit = response.message_limit;
+                self.loaded_style = response.style;
             });
         },
         methods: {
             get_websocket_url: function () {
                 return 'ws://' + window.location.host + window.location.pathname + 'ws';
             },
-            get_base_path: function() {
+            get_base_path: function () {
                 var path_array = window.location.pathname.split('/');
                 path_array.splice(path_array.length);
                 return path_array.join('/');
@@ -70,7 +80,7 @@ var twemoji = require('twemoji');
                 var time = new Date();
 
                 this.messages = this.messages.filter(function (message) {
-                    return Math.abs(time - message.time) < that.messagesClearInterval;
+                    return Math.abs(time - message.time) < that.message_clear_interval;
                 });
             },
             decay: function () {
@@ -79,7 +89,7 @@ var twemoji = require('twemoji');
 
                 this.messages = this.messages.filter(function (message) {
                     if (message.old) return message;
-                    if (Math.abs(time - message.time) > that.messagesDecayInterval) {
+                    if (Math.abs(time - message.time) > that.message_decay_interval) {
                         message.old = true
                     }
                     return message;
@@ -172,7 +182,6 @@ var twemoji = require('twemoji');
             },
             onmessage: function (event) {
                 var message = JSON.parse(event.data);
-                console.log(message);
                 if (!message.type)
                     return;
 
@@ -184,6 +193,7 @@ var twemoji = require('twemoji');
                         message.payload.time = new Date();
                         message.payload.deleteButton = false;
                         message.payload.old = false;
+                        message.payload.style = 'style_' + message.type;
 
                         this.messages.push(message.payload);
                         if (this.messages.length > this.messagesLimit) {
@@ -194,17 +204,16 @@ var twemoji = require('twemoji');
             onopen: function () {
                 console.log('connection opened');
                 this.attempts = 0;
-                if (this.socketInterval) {
-                    clearInterval(this.socketInterval);
+                if (this.socket_interval) {
+                    clearInterval(this.socket_interval);
                     this.socketInterval = null;
                 }
             },
             onclose: function () {
-                if (!this.socketInterval) this.socketInterval = setInterval(this.reconnect, 1000);
+                if (!this.socket_interval) this.socketInterval = setInterval(this.reconnect, 1000);
             },
             reconnect: function () {
                 this.attempts++;
-                console.log(this.attempts);
 
                 this.socket = null;
                 this.socket = new WebSocket(this.get_websocket_url());

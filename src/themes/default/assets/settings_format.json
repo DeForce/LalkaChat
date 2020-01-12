@@ -10,12 +10,12 @@
     "min_v": 10,
     "max_v": 100
   },
-  "clear_timer": {
+  "clear_interval": {
     "view": "spin",
     "min_v": -1,
     "max_v": 3600
   },
-  "decay_timer": {
+  "decay_interval": {
     "view": "spin",
     "min_v": -1,
     "max_v": 3600

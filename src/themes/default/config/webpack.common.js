@@ -19,20 +19,20 @@ module.exports = {
     },
 
     module: {
-        rules: [
-
-        ]
+        rules: []
     },
 
     plugins: [
-        new CopyWebpackPlugin([
-            { from: './assets' }
-        ]),
+        new CopyWebpackPlugin([{
+            from: './assets',
+            ignore: ['*.vue']
+        }]),
 
         new HtmlWebpackPlugin({
-            template: './assets/index.html',
+            template: './assets/index.vue',
             chunksSortMode: 'dependency',
-            inject: 'body'
+            inject: 'body',
+            filename: 'index.html'
         })
     ]
 };

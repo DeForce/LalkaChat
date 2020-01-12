@@ -2,9 +2,18 @@
   "show_system_msg": ["system.module"],
   "replace_message": false,
   "replace_text": "<message removed>",
-  "clear_timer": 120,
-  "decay_timer": 30,
+  "clear_interval": 120,
+  "decay_interval": 30,
   "message_limit": 30,
+
+  "style": {
+    "text": {
+      "font-size": "15px !important"
+    },
+    "message": {
+      "opacity": 67
+    }
+  },
   "font_size": 15,
   "smile_size": 20,
   "badge_size": 16,

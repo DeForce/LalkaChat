@@ -25,7 +25,6 @@
 }
 
 body {
-  background-color: $background-colour;
   height: 100%;
   overflow: hidden;
   padding: 0;
@@ -45,23 +44,9 @@ body {
   font-size: 0;
   padding-top: 2px;
   color: #FFF;
-
-  div {
-    display: inline;
-    font-size: #{$font-size}pt;
-  }
 }
-
-.message {
-  background-color: change_color($message_background_colour, $alpha: ($message-opacity / 100));
-}
-
-.message_sub {
-  background-color: change_color($message_sub_background_colour, $alpha: ($message-opacity / 100));
-}
-
-.message_highlight {
-  background-color: change_color($message_highlight_background_colour, $alpha: ($message-opacity / 100));
+.message_shared div {
+    display: inline-block;
 }
 
 .message_old {
@@ -75,7 +60,6 @@ body {
 
 .message-remove,
 .message-source,
-.message-level,
 .message-badges {
   position: relative;
   margin: 0 3px 0 0;
@@ -85,14 +69,12 @@ body {
 
 .delete,
 .badge,
-.platform,
-.level,
-.s-level {
+.platform {
   background-color: rgba(47, 47, 47, 1);
   border: 2px solid rgba(47, 47, 47, 1);
   /*margin: -3px;*/
-  width: #{$badge-size}px;
-  height: #{$badge-size}px;
+  width: 20px;
+  height: 20px;
   /*padding: 2px;*/
   border-radius: 5px;
 }
@@ -100,7 +82,7 @@ body {
 .emoji,
 .smile {
   margin-top: -4px;
-  height: #{$smile-size}px;
+  /*height: #{$smile-size}px;*/
   width: auto;
   top: 2px;
 }
@@ -123,19 +105,19 @@ body {
   color: #c0ffc0;
 }
 
-.broadcaster {
+.badge-broadcaster {
   background-color: #e71818;
 }
 
-.mod {
+.badge-mod {
   background-color: #34ae0a;
 }
 
-.turbo {
+.badge-turbo {
   background-color: #6441a5;
 }
 
-.premium {
+.badge-premium {
   background-color: #009CDC;
 }
 
