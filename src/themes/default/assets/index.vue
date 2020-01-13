@@ -33,11 +33,11 @@
                     <img class="badge" :src="badge.url" :class="'badge-' + badge.badge" />
                 </div>
 
-                <div v-bind="style_text" class="username" :style="{color: message.username_color}">{{ message.username }}</div>
+                <div class="username" :style="[{color: message.username_color}, style_text]">{{ message.username }}</div>
                 <template v-if="!message.me">
-                    <div v-bind="style_text">:</div>
+                    <div :style="style_text">:</div>
                 </template>
-                <div v-bind="style_text" class="text" v-html="sanitize(message)" :class="{ 'private': message.pm, 'mention': message.mention }"></div>
+                <div :style="style_text" class="text" v-html="sanitize(message)" :class="{ 'private': message.pm, 'mention': message.mention }"></div>
             </div>
             </transition-group>
         </div>

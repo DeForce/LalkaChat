@@ -8,7 +8,7 @@
 
   "style": {
     "text": {
-      "font-size": "15px !important"
+      "font-size": "15 px"
     },
     "message": {
       "opacity": 67

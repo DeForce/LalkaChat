@@ -1,5 +1,4 @@
 var Vue = require('vue');
-var DOMPurify = require('dompurify');
 var twemoji = require('twemoji');
 
 (function (WebSocket, Vue) {
@@ -251,4 +250,4 @@ var twemoji = require('twemoji');
         },
         filters: {}
     });
-})(window.WebSocket, Vue, DOMPurify);
+})(window.WebSocket, Vue);
