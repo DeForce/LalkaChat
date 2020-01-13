@@ -8,10 +8,13 @@
 
   "style": {
     "text": {
-      "font-size": "15 px"
+      "opacity": 25
     },
     "message": {
-      "opacity": 67
+      "opacity": 100
+    },
+    "background": {
+      "backgroundColour": "#494949"
     }
   },
   "font_size": 15,

@@ -6,7 +6,7 @@ var twemoji = require('twemoji');
 
     new Vue({
         el: '#chat-container',
-        data: function () {
+        data() {
             var wsUrl = this.get_websocket_url();
             var messages = [];
             var socket = new WebSocket(wsUrl);
@@ -20,25 +20,28 @@ var twemoji = require('twemoji');
                 message_clear_interval: -1,
                 message_decay_interval: -1,
                 messagesLimit: 30,
-                loaded_style: null
+
+                style_message: {},
+                style_text: {},
+                style_background: {}
             }
         },
         computed: {
             style_message: function () {
-                return this.loaded_style.message;
+                return this.style_message;
             },
             style_text: function () {
-                return this.loaded_style.text;
+                return this.style_text;
             }
         },
         created: function () {
             var self = this;
 
-            self.socket.onmessage = this.onmessage;
-            self.socket.onopen = this.onopen;
-            self.socket.onclose = this.onclose;
+            this.socket.onmessage = this.onmessage;
+            this.socket.onopen = this.onopen;
+            this.socket.onclose = this.onclose;
 
-            self.get(self.get_base_path() + 'api/get_window_settings', function (err, response) {
+            self.get(self.get_base_path() + 'api/get_window_settings', (err, response) => {
                 if (err) {
                     console.log('Error: Bad response from server')
                 }
@@ -55,8 +58,11 @@ var twemoji = require('twemoji');
                     setInterval(self.decay, 500);
                 }
 
-                self.messagesLimit = response.message_limit;
-                self.loaded_style = response.style;
+                this.messagesLimit = response.message_limit;
+
+                for (let [key, value] of Object.entries(response.style)) {
+                    this.$set(this, `style_${key}`, value);
+                }
             });
         },
         methods: {
@@ -96,10 +102,7 @@ var twemoji = require('twemoji');
             },
             remove: function (message) {
                 var index = this.messages.indexOf(message);
-                if (index >= 0) {
-//                    this.del('http://' + window.location.host + '/rest/webchat/chat/' + message.id, function(err, ok) {});
-                    this.messages.splice(index, 1);
-                }
+                if (index >= 0) this.messages.splice(index, 1);
             },
             sanitize: function (message) {
                 var clean = this.replaceEmotions(message.text, message.emotes);
@@ -215,7 +218,7 @@ var twemoji = require('twemoji');
                 this.attempts++;
 
                 this.socket = null;
-                this.socket = new WebSocket(this.get_websocket_url());
+                this.socket = new WebSocket('ws://' + window.location.host + window.location.pathname + 'ws');
                 this.socket.onmessage = this.onmessage;
                 this.socket.onopen = this.onopen;
                 this.socket.onclose = this.onclose;

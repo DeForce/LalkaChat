@@ -9,11 +9,11 @@
     </head>
 
     <body>
-        <div id="chat-container">
+        <div id="chat-container" :style="style_background">
             <transition-group name="message">
             <div class="message_shared"
                  v-for="message in messages"
-                 v-bind:style="style_message"
+                 :style="style_message"
                  :class="[message.type, { message_old: message.old }]"
                  :key="message.id"
                  @mouseenter="mouseenter(message)" @mouseleave="mouseleave(message)">
@@ -26,7 +26,7 @@
                 </div>
 
                 <template v-if="message.show_channel_name">
-                    <div v-bind="style_text" class="channel">[{{message.channel}}]</div>
+                    <div :style="style_text" class="channel">[{{message.channel}}]</div>
                 </template>
 
                 <div class="message-badges" v-for="badge in message.badges">
