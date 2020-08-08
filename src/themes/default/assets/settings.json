@@ -10,6 +10,7 @@
   "badge_size": 16,
 
   "message_opacity": 67,
+  "message_special_opacity": 67,
 
   "message_background_colour": "#232323",
   "message_sub_background_colour": "#FF0080",

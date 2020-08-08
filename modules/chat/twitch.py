@@ -35,6 +35,8 @@ SYSTEM_USER = 'Twitch.TV'
 BITS_REGEXP = r'(\D+)(\d+)'
 API_URL = 'https://api.twitch.tv/kraken'
 
+BTTV_URL = 'https://cdn.betterttv.net/emote/{id}/1x'
+
 PING_DELAY = 10
 
 
@@ -517,12 +519,12 @@ class TWChannel(threading.Thread, Channel):
         try:
             # Getting Better Twitch TV smiles
             if self.bttv:
-                request = requests.get("https://api.betterttv.net/emotes", timeout=10)
+                request = requests.get("https://api.betterttv.net/2/emotes", timeout=10)
                 if request.ok:
                     for smile in request.json()['emotes']:
-                        self.custom_smiles[smile['regex']] = {
-                            'key': smile['regex'],
-                            'url': f"https:{smile['url']}"
+                        self.custom_smiles[smile['code']] = {
+                            'key': smile['code'],
+                            'url': BTTV_URL.format(id=smile['id'])
                         }
                 else:
                     raise Exception(f"Not successful status code: {request.status_code}")

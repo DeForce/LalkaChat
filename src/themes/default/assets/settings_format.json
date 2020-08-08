@@ -30,6 +30,11 @@
     "min_v": 0,
     "max_v": 100
   },
+  "message_special_opacity": {
+    "view": "spin",
+    "min_v": 0,
+    "max_v": 100
+  },
   "badge_size": {
     "view": "spin",
     "min_v": 8,
