@@ -48,12 +48,12 @@ def prepare_update():
         for item in json_files:
             json_file = item.split(os.sep)[-1]
             old_json_file = os.path.join(old_http_folder, style, json_file)
-            with open(old_json_file, 'r') as old_json:
+            with open(old_json_file, 'r', encoding='utf-8') as old_json:
                 old_data = json.load(old_json)
-            with open(item, 'r') as json_item:
+            with open(item, 'r', encoding='utf-8') as json_item:
                 new_data = json.load(json_item)
                 new_data.update(old_data)
-            with open(item, 'w') as json_item:
+            with open(item, 'w', encoding='utf-8') as json_item:
                 json.dump(new_data, json_item, indent=2)
 
 

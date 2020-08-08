@@ -62,7 +62,7 @@ CONF_GUI = {
     },
     'hidden': ['api'],
     'non_dynamic': [],
-    'ignored_sections': ['config.register_oidc']
+    'ignored_sections': ['config.register_oauth']
 }
 
 CONNECTION_SUCCESS = translate_key(MODULE_KEY.join(['youtube', 'connection_success']))
