@@ -404,7 +404,7 @@ class CssRoot(object):
     def style_css(self, *path):
         cherrypy.response.headers['Content-Type'] = 'text/css'
         self.apply_headers()
-        with open(os.path.join(self.settings['location'], *path), 'r') as css:
+        with open(os.path.join(self.settings['location'], *path), 'r', encoding='utf-8') as css:
             return css.read()
 
     def style_scss(self, *path):
@@ -429,7 +429,7 @@ class CssRoot(object):
             css_namespace.set_variable(f'${key}', css_value)
 
         cherrypy.response.headers['Content-Type'] = 'text/css'
-        with open(os.path.join(self.settings['location'], *path), 'r') as css:
+        with open(os.path.join(self.settings['location'], *path), 'r', encoding='utf-8') as css:
             css_content = css.read()
             compiler = Compiler(namespace=css_namespace)
             # Something wrong with PyScss,
@@ -757,11 +757,14 @@ class Webchat(MessagingModule):
         locale_file = os.path.join(
             self.get_style_path(style_name), 'translations', f'{self._language}')
 
-        with open(locale_file, 'r') as f:
-            for line in f.readlines():
-                if not line:
-                    continue
+        with open(locale_file, 'r', encoding='utf-8') as f:
+            try:
+                for line in f.readlines():
+                    if not line:
+                        continue
 
-                key, translation = map(str.strip, line.split(SPLIT_TRANSLATION))
-                style_key = MODULE_KEY.join(['webchat', style_type, 'style_settings', key])
-                self._translations[style_key] = translation
+                    key, translation = map(str.strip, line.split(SPLIT_TRANSLATION))
+                    style_key = MODULE_KEY.join(['webchat', style_type, 'style_settings', key])
+                    self._translations[style_key] = translation
+            except Exception as exc:
+                log.info(f'Skipping file {locale_file} due to {exc}')

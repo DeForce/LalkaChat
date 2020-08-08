@@ -56,7 +56,7 @@ def lc_replace(dst, src):
 def load_from_config_file(conf_file, conf_dict=None):
     if not os.path.exists(conf_file):
         return conf_dict
-    with open(conf_file, 'r') as conf_f:
+    with open(conf_file, 'r', encoding='utf-8') as conf_f:
         loaded_dict = rtyaml.load(conf_f.read())
     if loaded_dict:
         update(conf_dict, loaded_dict)
@@ -115,6 +115,6 @@ def save_settings(conf_dict, ignored_sections=()):
     if 'file' not in conf_dict:
         return
     output = convert_to_dict(conf_dict.get('config'), ignored_sections)
-    with open(conf_dict.get('file'), 'w+') as conf_file:
+    with open(conf_dict.get('file'), 'w+', encoding='utf-8') as conf_file:
         dump_text = rtyaml.dump(output)
         conf_file.write(dump_text)

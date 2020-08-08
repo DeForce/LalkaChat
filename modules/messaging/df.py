@@ -28,7 +28,7 @@ class DF(MessagingModule):
             os.makedirs(os.path.dirname(self.file))
 
         if not os.path.isfile(self.file):
-            with open(self.file, 'w'):
+            with open(self.file, 'w', encoding='utf-8'):
                 pass
 
     @property
@@ -44,11 +44,11 @@ class DF(MessagingModule):
         return self.get_config('grep', 'symbol')
 
     def write_to_file(self, user, role):
-        with open(self.file, 'r') as f:
+        with open(self.file, 'r', encoding='utf-8') as f:
             for line in f.readlines():
                 if user == line.split(',')[0]:
                     return
-        with open(self.file, 'a') as a_file:
+        with open(self.file, 'a', encoding='utf-8') as a_file:
             a_file.write(f"{user},{role}\n")
 
     @process_text_messages

@@ -84,12 +84,15 @@ def load_translations_keys(translation_folder, language):
         files_list = [r_item for r_item in os.listdir(language_folder) if r_item.endswith(TRANSLATION_FILETYPE)]
         for f_file in files_list:
             with open(os.path.join(language_folder, f_file), encoding='utf-8') as r_file:
-                for line in r_file.readlines():
-                    log.debug(line.strip())
-                    if line.strip():
-                        key, value = map(str.strip, line.strip().split(SPLIT_TRANSLATION))
-                        if key not in TRANSLATIONS:
-                            TRANSLATIONS[key] = value
+                try:
+                    for line in r_file.readlines():
+                        log.debug(line.strip())
+                        if line.strip():
+                            key, value = map(str.strip, line.strip().split(SPLIT_TRANSLATION))
+                            if key not in TRANSLATIONS:
+                                TRANSLATIONS[key] = value
+                except Exception as exc:
+                    log.info(f'Skipping file {f_file} due to {exc}')
     language = language.simple().lower()
     dir_list = [f_item for f_item in os.listdir(translation_folder)
                 if os.path.isdir(os.path.join(translation_folder, f_item))]
@@ -186,7 +189,7 @@ def deep_get_from_dict(dictionary, *keys):
 def get_secret(path):
     path_list = path.split('.')
 
-    with open(SECRETS_FILE, 'r') as secrets_file:
+    with open(SECRETS_FILE, 'r', encoding='utf-8') as secrets_file:
         data = yaml.safe_load(secrets_file)
 
     return deep_get_from_dict(data, *path_list)
