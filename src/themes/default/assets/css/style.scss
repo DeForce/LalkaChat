@@ -57,11 +57,11 @@ body {
 }
 
 .message_sub {
-  background-color: change_color($message_sub_background_colour, $alpha: ($message-opacity / 100));
+  background-color: change_color($message_sub_background_colour, $alpha: ($message-special-opacity / 100));
 }
 
 .message_highlight {
-  background-color: change_color($message_highlight_background_colour, $alpha: ($message-opacity / 100));
+  background-color: change_color($message_highlight_background_colour, $alpha: ($message-special-opacity / 100));
 }
 
 .message_old {
