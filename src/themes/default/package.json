@@ -4,7 +4,7 @@
   "repository": "https://github.com/DeForce/LalkaChat",
   "license": "GPL-3.0",
   "dependencies": {
-    "dompurify": "^0.8.5",
+    "dompurify": "^2.0.7",
     "vue": "^2.2.1",
     "whatwg-fetch": "^2.0.3",
     "twemoji": "^2.5.0"
