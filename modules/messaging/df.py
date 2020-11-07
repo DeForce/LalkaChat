@@ -12,7 +12,6 @@ CONF_DICT = LCPanel()
 CONF_DICT['grep'] = LCStaticBox()
 CONF_DICT['grep']['symbol'] = LCText('#')
 CONF_DICT['grep']['file'] = LCText('logs/df.txt')
-CONF_DICT['prof'] = LCGridDual()
 
 CONF_GUI = {'non_dynamic': ['grep.*']}
 
@@ -54,8 +53,8 @@ class DF(MessagingModule):
     @process_text_messages
     @ignore_system_messages
     def _process_message(self, message, **kwargs):
-        for role, regexp in self.professions.items():
-            if re.search(f'{self.regexp_symbol}{regexp}', message.text):
-                self.write_to_file(message.user, role.capitalize())
-                break
+        match = re.match(fr'.*{self.regexp_symbol}(\w+).*', message.text)
+        if match:
+            role = match.groups()[0]
+            self.write_to_file(message.user, role.capitalize())
         return message
